@@ -13,14 +13,15 @@ import (
 	"encoding/gob"
 	"flag"
 	"fmt"
-	"github.com/gocql/gocql"
-	"github.com/influxdata/influxdb-comparisons/bulk_query"
-	"github.com/influxdata/influxdb-comparisons/util/report"
 	"io"
 	"log"
 	"strconv"
 	"sync"
 	"time"
+
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_query"
+	"git.querycap.com/falcontsdb/fctsdb-bench/util/report"
+	"github.com/gocql/gocql"
 )
 
 const (

@@ -14,18 +14,18 @@ import (
 	"sync"
 	"time"
 
-	"github.com/influxdata/influxdb-comparisons/bulk_load"
-	"github.com/influxdata/influxdb-comparisons/util/report"
-	"github.com/jackc/pgx"
-	"github.com/jackc/pgx/pgxpool"
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_load"
+	"git.querycap.com/falcontsdb/fctsdb-bench/util/report"
+	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v4/pgxpool"
 
 	"bytes"
 	"context"
 	"encoding/binary"
 	"io"
 
-	"github.com/influxdata/influxdb-comparisons/bulk_data_gen/common"
-	timescale_serialization "github.com/influxdata/influxdb-comparisons/timescale_serializaition"
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
+	timescale_serialization "git.querycap.com/falcontsdb/fctsdb-bench/timescale_serializaition"
 )
 
 // Output data format choices:

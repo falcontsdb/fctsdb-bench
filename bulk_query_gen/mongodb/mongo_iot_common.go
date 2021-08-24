@@ -2,10 +2,11 @@ package mongodb
 
 import (
 	"fmt"
-	bulkDataGenIot "github.com/influxdata/influxdb-comparisons/bulk_data_gen/iot"
-	bulkQuerygen "github.com/influxdata/influxdb-comparisons/bulk_query_gen"
 	"math/rand"
 	"time"
+
+	bulkDataGenIot "git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/iot"
+	bulkQuerygen "git.querycap.com/falcontsdb/fctsdb-bench/bulk_query_gen"
 )
 
 // MongoIot produces Mongo-specific queries for the devops use case.
@@ -61,7 +62,7 @@ func (d *MongoIot) averageTemperatureDayByHourNHomes(qi bulkQuerygen.Query, nHom
 		fieldPath = "fields.temperature"
 	} else {
 		fieldSpec = "fields"
-		fieldExpr = M{ "$filter": M{ "input": "$fields", "as": "field", "cond": M{ "$eq": []string{ "$$field.key", "temperature" } } } }
+		fieldExpr = M{"$filter": M{"input": "$fields", "as": "field", "cond": M{"$eq": []string{"$$field.key", "temperature"}}}}
 		fieldPath = "fields.val"
 	}
 
@@ -88,7 +89,7 @@ func (d *MongoIot) averageTemperatureDayByHourNHomes(qi bulkQuerygen.Query, nHom
 						M{"$mod": S{"$timestamp_ns", bucketNano}},
 					},
 				},
-				fieldSpec: fieldExpr, // was value: 1
+				fieldSpec:     fieldExpr, // was value: 1
 				"measurement": 1,
 			},
 		},
@@ -98,7 +99,7 @@ func (d *MongoIot) averageTemperatureDayByHourNHomes(qi bulkQuerygen.Query, nHom
 		{
 			"$group": M{
 				"_id":       M{"time_bucket": "$time_bucket", "tags": "$tags"},
-				"agg_value": M{"$avg": "$"+fieldPath}, // was: $value
+				"agg_value": M{"$avg": "$" + fieldPath}, // was: $value
 			},
 		},
 		{

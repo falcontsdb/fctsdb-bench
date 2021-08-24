@@ -1,8 +1,9 @@
 package bulk_load
 
 import (
-	"github.com/influxdata/influxdb-comparisons/util/report"
 	"sync"
+
+	"git.querycap.com/falcontsdb/fctsdb-bench/util/report"
 )
 
 type BatchProcessor interface {

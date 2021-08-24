@@ -1,9 +1,10 @@
 package dashboard
 
 import (
-	. "github.com/influxdata/influxdb-comparisons/bulk_data_gen/common"
 	"math/rand"
 	"time"
+
+	. "git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
 )
 
 var (

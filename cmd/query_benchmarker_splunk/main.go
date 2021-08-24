@@ -10,27 +10,28 @@ import (
 	"encoding/gob"
 	"flag"
 	"fmt"
-	"github.com/influxdata/influxdb-comparisons/bulk_query"
-	"github.com/influxdata/influxdb-comparisons/bulk_query/http"
-	"github.com/influxdata/influxdb-comparisons/util/report"
 	"io"
 	"log"
 	"sync"
 	"time"
+
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_query"
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_query/http"
+	"git.querycap.com/falcontsdb/fctsdb-bench/util/report"
 )
 
 // Program option vars:
 type SplunkQueryBenchmarker struct {
-	daemonUrl     string
-	restUsername  string
-	restPassword  string
+	daemonUrl    string
+	restUsername string
+	restPassword string
 
-	dialTimeout        time.Duration
-	readTimeout        time.Duration
-	writeTimeout       time.Duration
-	httpClientType     string
-	scanFinished       bool
-	restAuthorization  string
+	dialTimeout       time.Duration
+	readTimeout       time.Duration
+	writeTimeout      time.Duration
+	httpClientType    string
+	scanFinished      bool
+	restAuthorization string
 
 	queryPool sync.Pool
 	queryChan chan []*http.Query
@@ -71,7 +72,7 @@ func (b *SplunkQueryBenchmarker) Validate() {
 		log.Fatalf("Unsupported HTPP client type: %v", b.httpClientType)
 	}
 
-	b.restAuthorization = fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte(b.restUsername + ":" + b.restPassword)))
+	b.restAuthorization = fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte(b.restUsername+":"+b.restPassword)))
 }
 
 func (b *SplunkQueryBenchmarker) Prepare() {

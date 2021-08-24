@@ -15,15 +15,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/influxdata/influxdb-comparisons/bulk_query"
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_query"
 
 	"context"
 	"strconv"
 	"strings"
 
-	"github.com/influxdata/influxdb-comparisons/util/report"
-	"github.com/jackc/pgx"
-	"github.com/jackc/pgx/pgxpool"
+	"git.querycap.com/falcontsdb/fctsdb-bench/util/report"
+	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v4/pgxpool"
 )
 
 type TimescaleQueryBenchmarker struct {

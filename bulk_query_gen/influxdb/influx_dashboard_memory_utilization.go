@@ -1,9 +1,10 @@
 package influxdb
 
-import "time"
 import (
 	"fmt"
-	bulkQuerygen "github.com/influxdata/influxdb-comparisons/bulk_query_gen"
+	"time"
+
+	bulkQuerygen "git.querycap.com/falcontsdb/fctsdb-bench/bulk_query_gen"
 )
 
 // InfluxDashboardMemoryUtilization produces Influx-specific queries for the dashboard single-host case.
@@ -38,7 +39,7 @@ func (d *InfluxDashboardMemoryUtilization) Dispatch(i int) bulkQuerygen.Query {
 			`|> filter(fn:(r) => r._measurement == "mem" and r._field == "used_percent" and r._cluster_id == "%s") `+
 			`|> keep(columns:["_start", "_stop", "_time", "_value", "hostname"]) `+
 			`|> group(columns:["hostname"]) `+
-			`|> aggregateWindow(every: 1m, fn: mean, createEmpty: false) ` +
+			`|> aggregateWindow(every: 1m, fn: mean, createEmpty: false) `+
 			`|> keep(columns: ["_time", "_value", "hostname"]) `+
 			`|> yield()`,
 			d.DatabaseName,

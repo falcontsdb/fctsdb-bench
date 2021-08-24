@@ -11,15 +11,16 @@ import (
 	"encoding/gob"
 	"flag"
 	"fmt"
-	"github.com/influxdata/influxdb-comparisons/bulk_query"
-	"github.com/influxdata/influxdb-comparisons/bulk_query/http"
 	"io"
 	"log"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/influxdata/influxdb-comparisons/util/report"
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_query"
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_query/http"
+
+	"git.querycap.com/falcontsdb/fctsdb-bench/util/report"
 )
 
 type ElasticQueryBenchmarker struct {
@@ -28,10 +29,10 @@ type ElasticQueryBenchmarker struct {
 	daemonUrls    []string
 
 	// HTTP options
-	dialTimeout        time.Duration
-	readTimeout        time.Duration
-	writeTimeout       time.Duration
-	httpClientType     string
+	dialTimeout    time.Duration
+	readTimeout    time.Duration
+	writeTimeout   time.Duration
+	httpClientType string
 
 	// Global vars:
 	queryPool    sync.Pool

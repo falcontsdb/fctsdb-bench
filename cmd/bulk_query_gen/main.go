@@ -13,16 +13,16 @@ import (
 	"sort"
 	"time"
 
-	"github.com/influxdata/influxdb-comparisons/bulk_data_gen/common"
-	bulkQueryGen "github.com/influxdata/influxdb-comparisons/bulk_query_gen"
-	"github.com/influxdata/influxdb-comparisons/bulk_query_gen/cassandra"
-	"github.com/influxdata/influxdb-comparisons/bulk_query_gen/elasticsearch"
-	"github.com/influxdata/influxdb-comparisons/bulk_query_gen/graphite"
-	"github.com/influxdata/influxdb-comparisons/bulk_query_gen/influxdb"
-	"github.com/influxdata/influxdb-comparisons/bulk_query_gen/mongodb"
-	"github.com/influxdata/influxdb-comparisons/bulk_query_gen/opentsdb"
-	"github.com/influxdata/influxdb-comparisons/bulk_query_gen/splunk"
-	"github.com/influxdata/influxdb-comparisons/bulk_query_gen/timescaledb"
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
+	bulkQueryGen "git.querycap.com/falcontsdb/fctsdb-bench/bulk_query_gen"
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_query_gen/cassandra"
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_query_gen/elasticsearch"
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_query_gen/graphite"
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_query_gen/influxdb"
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_query_gen/mongodb"
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_query_gen/opentsdb"
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_query_gen/splunk"
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_query_gen/timescaledb"
 )
 
 const (

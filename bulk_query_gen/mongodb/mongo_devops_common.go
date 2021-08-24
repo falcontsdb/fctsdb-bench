@@ -2,9 +2,10 @@ package mongodb
 
 import (
 	"fmt"
-	bulkQuerygen "github.com/influxdata/influxdb-comparisons/bulk_query_gen"
 	"math/rand"
 	"time"
+
+	bulkQuerygen "git.querycap.com/falcontsdb/fctsdb-bench/bulk_query_gen"
 )
 
 // MongoDevops produces Mongo-specific queries for the devops use case.
@@ -92,7 +93,7 @@ func (d *MongoDevops) maxCPUUsageHourByMinuteNHosts(qi bulkQuerygen.Query, nhost
 		fieldPath = "fields.usage_user"
 	} else {
 		fieldSpec = "fields"
-		fieldExpr = M{ "$filter": M{ "input": "$fields", "as": "field", "cond": M{ "$eq": []string{ "$$field.key", "usage_user" } } } }
+		fieldExpr = M{"$filter": M{"input": "$fields", "as": "field", "cond": M{"$eq": []string{"$$field.key", "usage_user"}}}}
 		fieldPath = "fields.val"
 	}
 
@@ -119,7 +120,7 @@ func (d *MongoDevops) maxCPUUsageHourByMinuteNHosts(qi bulkQuerygen.Query, nhost
 						M{"$mod": S{"$timestamp_ns", bucketNano}},
 					},
 				},
-				fieldSpec: fieldExpr, // was value: 1
+				fieldSpec:     fieldExpr, // was value: 1
 				"measurement": 1,
 			},
 		},
@@ -129,7 +130,7 @@ func (d *MongoDevops) maxCPUUsageHourByMinuteNHosts(qi bulkQuerygen.Query, nhost
 		{
 			"$group": M{
 				"_id":       M{"time_bucket": "$time_bucket", "tags": "$tags"},
-				"agg_value": M{"$max": "$"+fieldPath}, // was: $value
+				"agg_value": M{"$max": "$" + fieldPath}, // was: $value
 			},
 		},
 		{

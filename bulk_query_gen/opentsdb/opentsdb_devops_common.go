@@ -3,12 +3,13 @@ package opentsdb
 import (
 	"bytes"
 	"fmt"
-	bulkQuerygen "github.com/influxdata/influxdb-comparisons/bulk_query_gen"
 	"math/rand"
 	"net/url"
 	"strings"
 	"text/template"
 	"time"
+
+	bulkQuerygen "git.querycap.com/falcontsdb/fctsdb-bench/bulk_query_gen"
 )
 
 // OpenTSDBDevops produces OpenTSDB-specific queries for all the devops query types.

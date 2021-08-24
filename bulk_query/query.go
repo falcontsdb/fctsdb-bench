@@ -7,8 +7,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/influxdata/influxdb-comparisons/bulk_load"
-	"github.com/influxdata/influxdb-comparisons/util/report"
 	"io"
 	"io/ioutil"
 	"log"
@@ -21,6 +19,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_load"
+	"git.querycap.com/falcontsdb/fctsdb-bench/util/report"
 )
 
 type BulkQuery interface {

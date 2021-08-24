@@ -3,12 +3,13 @@ package elasticsearch
 import (
 	"bytes"
 	"fmt"
-	bulkQuerygen "github.com/influxdata/influxdb-comparisons/bulk_query_gen"
 	"io"
 	"math/rand"
 	"strings"
 	"text/template"
 	"time"
+
+	bulkQuerygen "git.querycap.com/falcontsdb/fctsdb-bench/bulk_query_gen"
 )
 
 var (

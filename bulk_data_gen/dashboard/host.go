@@ -2,10 +2,11 @@ package dashboard
 
 import (
 	"fmt"
-	. "github.com/influxdata/influxdb-comparisons/bulk_data_gen/common"
-	"github.com/influxdata/influxdb-comparisons/bulk_data_gen/devops"
 	"math/rand"
 	"time"
+
+	. "git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/devops"
 )
 
 const NHostSims = 11
@@ -47,8 +48,8 @@ func NewHostMeasurements(start time.Time) []SimulatedMeasurement {
 
 var (
 	currentClusterSize int
-	clusterId         int
-	currentHostIndex  int
+	clusterId          int
+	currentHostIndex   int
 )
 
 func NewHost(i int, offset int, start time.Time) Host {
@@ -61,12 +62,12 @@ func NewHost(i int, offset int, start time.Time) Host {
 		}
 
 		if currentHostIndex < 3 {
-			hostname = []byte(fmt.Sprintf("meta_%d", currentHostIndex+1/*+offset*/)) // hostname is 1-indexed in its cluster
+			hostname = []byte(fmt.Sprintf("meta_%d", currentHostIndex+1 /*+offset*/)) // hostname is 1-indexed in its cluster
 		} else {
-			hostname = []byte(fmt.Sprintf("data_%d", currentHostIndex-2/*+offset*/)) // hostname is 1-indexed in its cluster
+			hostname = []byte(fmt.Sprintf("data_%d", currentHostIndex-2 /*+offset*/)) // hostname is 1-indexed in its cluster
 		}
 	} else {
-		hostname = []byte(fmt.Sprintf("kapacitor_%d", 1/*+offset*/)) // hostname is 1-indexed in its cluster
+		hostname = []byte(fmt.Sprintf("kapacitor_%d", 1 /*+offset*/)) // hostname is 1-indexed in its cluster
 	}
 	sm := NewHostMeasurements(start)
 

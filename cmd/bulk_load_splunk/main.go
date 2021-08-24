@@ -15,44 +15,45 @@ import (
 	"sync"
 	"time"
 
-	"github.com/influxdata/influxdb-comparisons/bulk_data_gen/common"
-	"github.com/influxdata/influxdb-comparisons/util/report"
+	"strconv"
+
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
+	"git.querycap.com/falcontsdb/fctsdb-bench/util/report"
 	"github.com/pkg/profile"
 	"github.com/valyala/fasthttp"
-	"strconv"
 )
 
 // Program option vars:
 var (
-	inputUrl               string
-	splunkUrl              string
-	authToken              string
-	workers                int
-	batchSize              int
-	doLoad                 bool
-	useGzip                bool
-	memprofile             bool
-	cpuProfileFile         string
-	reportDatabase         string
-	reportHost             string
-	reportUser             string
-	reportPassword         string
-	reportTagsCSV          string
-	printInterval          uint64
+	inputUrl       string
+	splunkUrl      string
+	authToken      string
+	workers        int
+	batchSize      int
+	doLoad         bool
+	useGzip        bool
+	memprofile     bool
+	cpuProfileFile string
+	reportDatabase string
+	reportHost     string
+	reportUser     string
+	reportPassword string
+	reportTagsCSV  string
+	printInterval  uint64
 )
 
 // Global vars
 var (
-	bufPool               sync.Pool
-	batchChan             chan batch
-	inputDone             chan struct{}
-	workersGroup          sync.WaitGroup
-	syncChanDone          chan int
-	reportTags            [][2]string
-	reportHostname        string
-	endedPrematurely      bool
-	prematureEndReason    string
-	scanFinished          bool
+	bufPool            sync.Pool
+	batchChan          chan batch
+	inputDone          chan struct{}
+	workersGroup       sync.WaitGroup
+	syncChanDone       chan int
+	reportTags         [][2]string
+	reportHostname     string
+	endedPrematurely   bool
+	prematureEndReason string
+	scanFinished       bool
 )
 
 type batch struct {
@@ -151,9 +152,9 @@ func main() {
 	for i := 0; i < workers; i++ {
 		workersGroup.Add(1)
 		cfg := HTTPWriterConfig{
-			DebugInfo:      fmt.Sprintf("Worker #%d, dest url: %s", i, inputUrl),
-			Host:           inputUrl,
-			Token:          authToken,
+			DebugInfo: fmt.Sprintf("Worker #%d, dest url: %s", i, inputUrl),
+			Host:      inputUrl,
+			Token:     authToken,
 		}
 		go func(w int) {
 			err := processBatches(NewHTTPWriter(cfg))
@@ -294,9 +295,9 @@ outer:
 	// Closing inputDone signals to the application that we've read everything and can now shut down.
 	close(inputDone)
 
-	if linesRead != /*totalPoints*/totalValues { // Splunk protocol has one value per input line ie. JSON metric item
+	if linesRead != /*totalPoints*/ totalValues { // Splunk protocol has one value per input line ie. JSON metric item
 		if !endedPrematurely {
-			log.Fatalf("Incorrent number of read points: %d, expected: %d:", linesRead, /*totalPoints*/totalValues)
+			log.Fatalf("Incorrent number of read points: %d, expected: %d:", linesRead /*totalPoints*/, totalValues)
 		}
 	}
 
