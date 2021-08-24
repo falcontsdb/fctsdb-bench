@@ -3,7 +3,7 @@ package influxdb
 import (
 	"time"
 
-	bulkQuerygen "github.com/influxdata/influxdb-comparisons/bulk_query_gen"
+	bulkQuerygen "git.querycap.com/falcontsdb/fctsdb-bench/bulk_query_gen"
 )
 
 type InfluxIotStandAloneFilter struct {

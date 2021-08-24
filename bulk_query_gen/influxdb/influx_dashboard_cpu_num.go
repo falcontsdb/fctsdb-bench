@@ -1,9 +1,10 @@
 package influxdb
 
-import "time"
 import (
 	"fmt"
-	bulkQuerygen "github.com/influxdata/influxdb-comparisons/bulk_query_gen"
+	"time"
+
+	bulkQuerygen "git.querycap.com/falcontsdb/fctsdb-bench/bulk_query_gen"
 )
 
 // InfluxDashboardCpuNum produces Influx-specific queries for the dashboard single-host case.

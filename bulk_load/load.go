@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/pkg/profile"
 	"io"
 	"log"
 	"math"
@@ -20,7 +19,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/influxdata/influxdb-comparisons/util/report"
+	"github.com/pkg/profile"
+
+	"git.querycap.com/falcontsdb/fctsdb-bench/util/report"
 )
 
 // TODO: distinguish per use case

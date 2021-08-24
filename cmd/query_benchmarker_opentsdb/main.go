@@ -11,12 +11,13 @@ import (
 	"encoding/gob"
 	"flag"
 	"fmt"
-	"github.com/influxdata/influxdb-comparisons/bulk_query"
-	"github.com/influxdata/influxdb-comparisons/util/report"
 	"io"
 	"log"
 	"strings"
 	"sync"
+
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_query"
+	"git.querycap.com/falcontsdb/fctsdb-bench/util/report"
 )
 
 type OpenTsdbQueryBenchmarker struct {

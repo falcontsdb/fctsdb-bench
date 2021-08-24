@@ -2,10 +2,11 @@ package influxdb
 
 import (
 	"fmt"
-	"github.com/influxdata/influxdb-comparisons/bulk_data_gen/dashboard"
-	bulkQuerygen "github.com/influxdata/influxdb-comparisons/bulk_query_gen"
 	"math/rand"
 	"time"
+
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/dashboard"
+	bulkQuerygen "git.querycap.com/falcontsdb/fctsdb-bench/bulk_query_gen"
 )
 
 // InfluxDashboard produces Influx-specific queries for all the devops query types.
@@ -57,7 +58,7 @@ func (d *InfluxDashboard) GetTimeConstraint(interval *bulkQuerygen.TimeInterval)
 	case "last":
 		s = fmt.Sprintf("time >= now() - %dh and time < now() - %dh", int64(2*interval.Duration().Hours()), int64(interval.Duration().Hours()))
 	case "recent":
-		s = fmt.Sprintf("time >= now() - %dh and time < now() - %dh", int64(interval.Duration().Hours() + 24), int64(24))
+		s = fmt.Sprintf("time >= now() - %dh and time < now() - %dh", int64(interval.Duration().Hours()+24), int64(24))
 	}
 	return s
 }

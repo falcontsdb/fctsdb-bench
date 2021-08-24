@@ -1,9 +1,10 @@
 package dashboard
 
 import (
-	. "github.com/influxdata/influxdb-comparisons/bulk_data_gen/common"
-	"github.com/influxdata/influxdb-comparisons/bulk_data_gen/devops"
 	"time"
+
+	. "git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/devops"
 )
 
 // A DashboardSimulator generates data similar to telemetry from Telegraf.
@@ -44,7 +45,7 @@ type DashboardSimulatorConfig struct {
 	Start time.Time
 	End   time.Time
 
-	HostCount int64
+	HostCount  int64
 	HostOffset int64
 }
 

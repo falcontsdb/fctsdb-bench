@@ -2,11 +2,12 @@ package timescaledb
 
 import (
 	"fmt"
-	bulkDataGenIot "github.com/influxdata/influxdb-comparisons/bulk_data_gen/iot"
-	bulkQuerygen "github.com/influxdata/influxdb-comparisons/bulk_query_gen"
 	"math/rand"
 	"strings"
 	"time"
+
+	bulkDataGenIot "git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/iot"
+	bulkQuerygen "git.querycap.com/falcontsdb/fctsdb-bench/bulk_query_gen"
 )
 
 // TimescaleDevops produces Timescale-specific queries for all the devops query types.

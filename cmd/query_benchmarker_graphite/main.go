@@ -9,24 +9,25 @@ import (
 	"encoding/gob"
 	"flag"
 	"fmt"
-	"github.com/influxdata/influxdb-comparisons/bulk_query"
-	"github.com/influxdata/influxdb-comparisons/bulk_query/http"
-	"github.com/influxdata/influxdb-comparisons/util/report"
 	"io"
 	"log"
 	"sync"
 	"time"
+
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_query"
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_query/http"
+	"git.querycap.com/falcontsdb/fctsdb-bench/util/report"
 )
 
 // Program option vars:
 type GraphiteQueryBenchmarker struct {
-	daemonUrl     string
+	daemonUrl string
 
-	dialTimeout        time.Duration
-	readTimeout        time.Duration
-	writeTimeout       time.Duration
-	httpClientType     string
-	scanFinished       bool
+	dialTimeout    time.Duration
+	readTimeout    time.Duration
+	writeTimeout   time.Duration
+	httpClientType string
+	scanFinished   bool
 
 	queryPool sync.Pool
 	queryChan chan []*http.Query

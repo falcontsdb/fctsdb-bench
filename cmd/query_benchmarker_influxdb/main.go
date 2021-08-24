@@ -19,9 +19,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/influxdata/influxdb-comparisons/bulk_query"
-	"github.com/influxdata/influxdb-comparisons/bulk_query/http"
-	"github.com/influxdata/influxdb-comparisons/util/report"
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_query"
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_query/http"
+	"git.querycap.com/falcontsdb/fctsdb-bench/util/report"
 )
 
 // Program option vars:

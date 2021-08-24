@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	bulkDataGenIot "github.com/influxdata/influxdb-comparisons/bulk_data_gen/iot"
-	bulkQuerygen "github.com/influxdata/influxdb-comparisons/bulk_query_gen"
+	bulkDataGenIot "git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/iot"
+	bulkQuerygen "git.querycap.com/falcontsdb/fctsdb-bench/bulk_query_gen"
 )
 
 // InfluxIot produces Influx-specific queries for all the devops query types.

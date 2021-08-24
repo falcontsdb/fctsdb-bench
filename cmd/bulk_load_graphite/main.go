@@ -10,9 +10,6 @@ import (
 	"encoding/binary"
 	"flag"
 	"fmt"
-	"github.com/influxdata/influxdb-comparisons/bulk_data_gen/common"
-	"github.com/influxdata/influxdb-comparisons/util/report"
-	"github.com/kisielk/og-rek"
 	"io"
 	"log"
 	"net"
@@ -21,23 +18,27 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
+	"git.querycap.com/falcontsdb/fctsdb-bench/util/report"
+	ogórek "github.com/kisielk/og-rek"
 )
 
 // Program option vars:
 var (
-	carbonUrl           string
-	graphiteUrl         string
-	workers             int
-	batchSize           int
-	backoff             time.Duration
-	stallThreshold      time.Duration
-	doLoad              bool
-	reportDatabase      string
-	reportHost          string
-	reportUser          string
-	reportPassword      string
-	reportTagsCSV       string
-	file                string
+	carbonUrl      string
+	graphiteUrl    string
+	workers        int
+	batchSize      int
+	backoff        time.Duration
+	stallThreshold time.Duration
+	doLoad         bool
+	reportDatabase string
+	reportHost     string
+	reportUser     string
+	reportPassword string
+	reportTagsCSV  string
+	file           string
 )
 
 // Global vars
@@ -53,14 +54,14 @@ var (
 )
 
 // Output data format choices:
-var formatChoices = []string{"graphite-line", "graphite-line2pickle" }
+var formatChoices = []string{"graphite-line", "graphite-line2pickle"}
 
 var processes = map[string]struct {
 	scan    func(int, io.Reader) (int64, int64, int64)
 	process func(net.Conn) int64
 }{
-	formatChoices[0]:           {scan, processBatches},
-	formatChoices[1]:           {scanLine, processTupleBatches},
+	formatChoices[0]: {scan, processBatches},
+	formatChoices[1]: {scanLine, processTupleBatches},
 }
 
 // Parse args:
@@ -140,7 +141,6 @@ func main() {
 			},
 		}
 	}
-
 
 	batchChan = make(chan *bytes.Buffer, workers)
 	batchChanLines = make(chan []string, workers)
@@ -285,8 +285,8 @@ func scan(itemsPerBatch int, reader io.Reader) (int64, int64, int64) {
 	// Closing inputDone signals to the application that we've read everything and can now shut down.
 	close(inputDone)
 
-	if linesRead != /*totalPoints*/totalValues { // Graphite line protocol has one value per line
-		log.Fatalf("Incorrent number of read points: %d, expected: %d:", linesRead, /*totalPoints*/totalValues)
+	if linesRead != /*totalPoints*/ totalValues { // Graphite line protocol has one value per line
+		log.Fatalf("Incorrent number of read points: %d, expected: %d:", linesRead /*totalPoints*/, totalValues)
 	}
 
 	// The graphite format uses 1 line per item:
@@ -376,8 +376,8 @@ func scanLine(itemsPerBatch int, reader io.Reader) (int64, int64, int64) {
 	// Closing inputDone signals to the application that we've read everything and can now shut down.
 	close(inputDone)
 
-	if linesRead != /*totalPoints*/totalValues { // Graphite line protocol has one value per line
-		log.Fatalf("Incorrent number of read points: %d, expected: %d:", linesRead, /*totalPoints*/totalValues)
+	if linesRead != /*totalPoints*/ totalValues { // Graphite line protocol has one value per line
+		log.Fatalf("Incorrent number of read points: %d, expected: %d:", linesRead /*totalPoints*/, totalValues)
 	}
 
 	// The graphite format uses 1 line per item:
@@ -404,7 +404,7 @@ func processTupleBatches(conn net.Conn) int64 {
 
 		// Create tuple list
 		tuples = tuples[:0]
-		for _,line := range batch {
+		for _, line := range batch {
 			parts := strings.Split(line, " ")
 			name := parts[0]
 			timestamp, _ := strconv.Atoi(parts[2])
@@ -412,7 +412,7 @@ func processTupleBatches(conn net.Conn) int64 {
 			if err != nil {
 				log.Fatalf("error parsing line [%s]: %v", line, err)
 			}
-			tuple := &ogórek.Tuple{ name, ogórek.Tuple{ timestamp, value } }
+			tuple := &ogórek.Tuple{name, ogórek.Tuple{timestamp, value}}
 			tuples = append(tuples, tuple)
 		}
 

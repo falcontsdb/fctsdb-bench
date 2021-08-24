@@ -21,9 +21,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/influxdata/influxdb-comparisons/bulk_data_gen/common"
-	"github.com/influxdata/influxdb-comparisons/bulk_load"
-	"github.com/influxdata/influxdb-comparisons/util/report"
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_load"
+	"git.querycap.com/falcontsdb/fctsdb-bench/util/report"
 	"github.com/valyala/fasthttp"
 )
 

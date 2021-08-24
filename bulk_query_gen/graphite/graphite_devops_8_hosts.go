@@ -1,7 +1,10 @@
 package graphite
 
-import "time"
-import bulkQuerygen "github.com/influxdata/influxdb-comparisons/bulk_query_gen"
+import (
+	"time"
+
+	bulkQuerygen "git.querycap.com/falcontsdb/fctsdb-bench/bulk_query_gen"
+)
 
 // GraphiteDevops8Hosts produces Influx-specific queries for the devops groupby case.
 type GraphiteDevops8Hosts struct {

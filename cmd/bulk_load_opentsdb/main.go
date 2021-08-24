@@ -9,14 +9,15 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-	"github.com/influxdata/influxdb-comparisons/bulk_load"
 	"io"
 	"log"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/influxdata/influxdb-comparisons/util/report"
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_load"
+
+	"git.querycap.com/falcontsdb/fctsdb-bench/util/report"
 	"github.com/klauspost/compress/gzip"
 )
 

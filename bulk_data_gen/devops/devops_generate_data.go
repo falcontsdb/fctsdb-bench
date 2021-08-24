@@ -1,8 +1,9 @@
 package devops
 
 import (
-	. "github.com/influxdata/influxdb-comparisons/bulk_data_gen/common"
 	"time"
+
+	. "git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
 )
 
 // A DevopsSimulator generates data similar to telemetry from Telegraf.
@@ -43,7 +44,7 @@ type DevopsSimulatorConfig struct {
 	Start time.Time
 	End   time.Time
 
-	HostCount int64
+	HostCount  int64
 	HostOffset int64
 }
 

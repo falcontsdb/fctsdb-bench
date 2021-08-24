@@ -25,11 +25,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/influxdata/influxdb-comparisons/bulk_data_gen/common"
-	"github.com/influxdata/influxdb-comparisons/bulk_data_gen/dashboard"
-	"github.com/influxdata/influxdb-comparisons/bulk_data_gen/devops"
-	"github.com/influxdata/influxdb-comparisons/bulk_data_gen/iot"
-	"github.com/influxdata/influxdb-comparisons/bulk_data_gen/metaqueries"
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/dashboard"
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/devops"
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/iot"
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/metaqueries"
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/vehicle"
 )
 
 // Output data format choices:
@@ -60,7 +61,8 @@ var (
 	seed  int64
 	debug int
 
-	cpuProfile string
+	cpuProfile    string
+	startVinIndex int
 )
 
 const NHostSims = 9
@@ -96,6 +98,7 @@ func init() {
 	flag.UintVar(&interleavedGenerationGroups, "interleaved-generation-groups", 1, "The number of round-robin serialization groups. Use this to scale up data generation to multiple processes.")
 
 	flag.StringVar(&cpuProfile, "cpu-profile", "", "Write CPU profile to `file`")
+	flag.IntVar(&startVinIndex, "start-vin-index", 100000, "which first vin do you want to generate")
 
 	flag.Parse()
 
@@ -225,6 +228,17 @@ func main() {
 			ScaleFactor: int(scaleVar),
 		}
 		sim = cfg.ToSimulator()
+	case common.UseCaseChoices[7]:
+		cfg := &vehicle.VehicleSimulatorConfig{
+			Start:         timestampStart,
+			End:           timestampEnd,
+			VehicleCount:  scaleVar,
+			VehicleOffset: scaleVarOffset,
+
+			StartVinIndex: startVinIndex,
+		}
+		sim = cfg.ToSimulator()
+
 	default:
 		panic("unreachable")
 	}

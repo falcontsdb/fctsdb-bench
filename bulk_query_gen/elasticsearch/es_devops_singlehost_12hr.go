@@ -1,7 +1,10 @@
 package elasticsearch
 
-import "time"
-import bulkQuerygen "github.com/influxdata/influxdb-comparisons/bulk_query_gen"
+import (
+	"time"
+
+	bulkQuerygen "git.querycap.com/falcontsdb/fctsdb-bench/bulk_query_gen"
+)
 
 // ElasticSearchDevopsSingleHost12hr produces ES-specific queries for the devops single-host case.
 type ElasticSearchDevopsSingleHost12hr struct {

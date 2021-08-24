@@ -9,21 +9,23 @@ import (
 	"encoding/binary"
 	"flag"
 	"fmt"
-	"github.com/influxdata/influxdb-comparisons/bulk_load"
 	"io"
 	"log"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/google/flatbuffers/go"
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_load"
+
+	flatbuffers "github.com/google/flatbuffers/go"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
-	"github.com/influxdata/influxdb-comparisons/bulk_query_gen/mongodb"
-	"github.com/influxdata/influxdb-comparisons/mongo_serialization"
-	"github.com/influxdata/influxdb-comparisons/util/report"
 	"strconv"
+
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_query_gen/mongodb"
+	"git.querycap.com/falcontsdb/fctsdb-bench/mongo_serialization"
+	"git.querycap.com/falcontsdb/fctsdb-bench/util/report"
 )
 
 // Magic database constants

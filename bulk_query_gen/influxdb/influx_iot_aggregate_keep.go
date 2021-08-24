@@ -3,7 +3,7 @@ package influxdb
 import (
 	"time"
 
-	bulkQuerygen "github.com/influxdata/influxdb-comparisons/bulk_query_gen"
+	bulkQuerygen "git.querycap.com/falcontsdb/fctsdb-bench/bulk_query_gen"
 )
 
 // InfluxIotAggregateKeep produces queries that will test performance
@@ -17,7 +17,7 @@ func NewInfluxQLIotAggregateKeep(dbConfig bulkQuerygen.DatabaseConfig, queriesFu
 	underlying := NewInfluxIotCommon(InfluxQL, dbConfig, queriesFullRange, queryInterval, scaleVar).(*InfluxIot)
 	return &InfluxIotAggregateKeep{
 		InfluxIot: *underlying,
-		interval: queryInterval,
+		interval:  queryInterval,
 	}
 }
 
@@ -25,7 +25,7 @@ func NewFluxIotAggregateKeep(dbConfig bulkQuerygen.DatabaseConfig, queriesFullRa
 	underlying := NewInfluxIotCommon(Flux, dbConfig, queriesFullRange, queryInterval, scaleVar).(*InfluxIot)
 	return &InfluxIotAggregateKeep{
 		InfluxIot: *underlying,
-		interval: queryInterval,
+		interval:  queryInterval,
 	}
 }
 

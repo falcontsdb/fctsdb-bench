@@ -2,10 +2,11 @@ package cassandra
 
 import (
 	"fmt"
-	bulkQuerygen "github.com/influxdata/influxdb-comparisons/bulk_query_gen"
 	"math/rand"
 	"strings"
 	"time"
+
+	bulkQuerygen "git.querycap.com/falcontsdb/fctsdb-bench/bulk_query_gen"
 )
 
 // CassandraDevops produces Cassandra-specific queries for all the devops query types.

@@ -2,9 +2,10 @@ package graphite
 
 import (
 	"fmt"
-	bulkQuerygen "github.com/influxdata/influxdb-comparisons/bulk_query_gen"
 	"net/url"
 	"time"
+
+	bulkQuerygen "git.querycap.com/falcontsdb/fctsdb-bench/bulk_query_gen"
 )
 
 type GraphiteCommon struct {

@@ -10,14 +10,15 @@ import (
 	"encoding/gob"
 	"flag"
 	"fmt"
-	"github.com/influxdata/influxdb-comparisons/bulk_query"
-	"github.com/influxdata/influxdb-comparisons/bulk_query_gen/mongodb"
-	"github.com/influxdata/influxdb-comparisons/util/report"
-	"gopkg.in/mgo.v2"
 	"io"
 	"log"
 	"sync"
 	"time"
+
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_query"
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_query_gen/mongodb"
+	"git.querycap.com/falcontsdb/fctsdb-bench/util/report"
+	"gopkg.in/mgo.v2"
 )
 
 type MongoQueryBenchmarker struct {

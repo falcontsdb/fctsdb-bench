@@ -3,10 +3,11 @@ package common
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/influxdata/influxdb-comparisons/timescale_serializaition"
 	"io"
 	"log"
 	"reflect"
+
+	timescale_serialization "git.querycap.com/falcontsdb/fctsdb-bench/timescale_serializaition"
 )
 
 type SerializerTimescaleSql struct {
