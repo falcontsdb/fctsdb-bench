@@ -1,9 +1,10 @@
 package vehicle
 
 import (
-	. "git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
 	"math/rand"
 	"time"
+
+	. "git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
 )
 
 func init() {
@@ -83,49 +84,29 @@ var (
 
 type EntityMeasurement struct {
 	timestamp time.Time
-	//distributions []Distribution
-	values []int64
+	values    []int64
 }
 
 func NewEntityMeasurement(start time.Time) *EntityMeasurement {
-	//distributions := make([]Distribution, len(EntityFieldKeys))
-	//for i := range distributions {
-	//	distributions[i] = &ClampedRandomWalkDistribution{
-	//		State: rand.Float64() * 100.0,
-	//		Min:   0.0,
-	//		Max:   100.0,
-	//		Step: &NormalDistribution{
-	//			Mean:   0.0,
-	//			StdDev: 1.0,
-	//		},
-	//	}
-	//}
+
 	values := make([]int64, len(EntityFieldKeys))
-	//for i := range values {
-	//	index := rand.Intn(100)
-	//	values[i] = randomNumbers[i][index]
-	//}
+
 	return &EntityMeasurement{
 		timestamp: start,
-		//distributions: distributions,
+
 		values: values,
 	}
 }
 
 func (m *EntityMeasurement) Tick(d time.Duration) {
 	m.timestamp = m.timestamp.Add(d)
-	//for i := range m.distributions {
-	//	m.distributions[i].Advance()
-	//}
+
 }
 
 func (m *EntityMeasurement) ToPoint(p *Point) bool {
 	p.SetMeasurementName(EntityByteString)
 	p.SetTimestamp(&m.timestamp)
 
-	//for i := range m.distributions {
-	//	p.AppendField(EntityFieldKeys[i], m.distributions[i].Get())
-	//}
 	for i := range m.values {
 		index := rand.Intn(100)
 		p.AppendField(EntityFieldKeys[i], randomNumbers[i][index])

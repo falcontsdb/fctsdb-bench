@@ -51,7 +51,7 @@ func NewVehicle(i int, offset int, start time.Time) Vehicle {
 
 	h := Vehicle{
 		// Tag Values that are static throughout the life of a Host:
-		Name:                  []byte(fmt.Sprintf("vehicle_%d", i+offset)),
+		Name:                  []byte(fmt.Sprintf("LSVNV2182E%09d", i+offset)),
 		SimulatedMeasurements: sm,
 	}
 

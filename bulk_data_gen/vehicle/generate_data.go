@@ -1,7 +1,6 @@
 package vehicle
 
 import (
-	"fmt"
 	"time"
 
 	. "git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
@@ -14,8 +13,6 @@ type VehicleSimulatorConfig struct {
 
 	VehicleCount  int64
 	VehicleOffset int64
-
-	StartVinIndex int
 }
 
 func (d *VehicleSimulatorConfig) ToSimulator() *VehicleSimulator {
@@ -23,7 +20,7 @@ func (d *VehicleSimulatorConfig) ToSimulator() *VehicleSimulator {
 	var measNum int64
 
 	for i := 0; i < len(vehicleInfos); i++ {
-		//vehicleInfos[i] = NewSmartHome(i, int(d.SmartHomeOffset), d.Start)
+
 		vehicleInfos[i] = NewVehicle(i, int(d.VehicleOffset), d.Start)
 		measNum += int64(vehicleInfos[i].NumMeasurements())
 	}
@@ -36,13 +33,11 @@ func (d *VehicleSimulatorConfig) ToSimulator() *VehicleSimulator {
 		maxPoints:  maxPoints,
 
 		currentVehicleIndex: 0,
-		vehicles:            vehicleInfos,
+		Vehicles:            vehicleInfos,
 
 		timestampNow:   d.Start,
 		timestampStart: d.Start,
 		timestampEnd:   d.End,
-
-		startVinIndex: d.StartVinIndex,
 	}
 
 	return dg
@@ -58,13 +53,11 @@ type VehicleSimulator struct {
 	simulatedMeasurementIndex int
 
 	currentVehicleIndex int
-	vehicles            []Vehicle
+	Vehicles            []Vehicle
 
 	timestampNow   time.Time
 	timestampStart time.Time
 	timestampEnd   time.Time
-
-	startVinIndex int
 }
 
 func (g *VehicleSimulator) SeenPoints() int64 {
@@ -86,7 +79,7 @@ func (g *VehicleSimulator) Finished() bool {
 // Next advances a Point to the next state in the generator.
 func (v *VehicleSimulator) Next(p *Point) {
 	// switch to the next metric if needed
-	if v.currentVehicleIndex == len(v.vehicles) {
+	if v.currentVehicleIndex == len(v.Vehicles) {
 		v.currentVehicleIndex = 0
 		v.simulatedMeasurementIndex++
 	}
@@ -94,25 +87,15 @@ func (v *VehicleSimulator) Next(p *Point) {
 	if v.simulatedMeasurementIndex == NVehicleSims {
 		v.simulatedMeasurementIndex = 0
 
-		for i := 0; i < len(v.vehicles); i++ {
-			v.vehicles[i].TickAll(EpochDuration)
+		for i := 0; i < len(v.Vehicles); i++ {
+			v.Vehicles[i].TickAll(EpochDuration)
 		}
 	}
 
-	vehicle := &v.vehicles[v.currentVehicleIndex]
+	vehicle := &v.Vehicles[v.currentVehicleIndex]
 
 	// Populate host-specific tags: for example, LSVNV2182E2100001
-	vin := fmt.Sprintf("LSVNV2182E2%d", v.startVinIndex+v.currentVehicleIndex)
-	p.AppendTag([]byte("VIN"), []byte(vin))
-	//p.AppendTag(MachineTagKeys[1], host.Region)
-	//p.AppendTag(MachineTagKeys[2], host.Datacenter)
-	//p.AppendTag(MachineTagKeys[3], host.Rack)
-	//p.AppendTag(MachineTagKeys[4], host.OS)
-	//p.AppendTag(MachineTagKeys[5], host.Arch)
-	//p.AppendTag(MachineTagKeys[6], host.Team)
-	//p.AppendTag(MachineTagKeys[7], host.Service)
-	//p.AppendTag(MachineTagKeys[8], host.ServiceVersion)
-	//p.AppendTag(MachineTagKeys[9], host.ServiceEnvironment)
+	p.AppendTag([]byte("VIN"), vehicle.Name)
 
 	// Populate measurement-specific tags and fields:
 	vehicle.SimulatedMeasurements[v.simulatedMeasurementIndex].ToPoint(p)
@@ -120,6 +103,4 @@ func (v *VehicleSimulator) Next(p *Point) {
 	v.madePoints++
 	v.currentVehicleIndex++
 	v.madeValues += int64(len(p.FieldValues))
-
-	return
 }

@@ -25,6 +25,7 @@ import (
 	"strings"
 	"time"
 
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/airq"
 	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
 	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/dashboard"
 	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/devops"
@@ -61,8 +62,7 @@ var (
 	seed  int64
 	debug int
 
-	cpuProfile    string
-	startVinIndex int
+	cpuProfile string
 )
 
 const NHostSims = 9
@@ -98,7 +98,6 @@ func init() {
 	flag.UintVar(&interleavedGenerationGroups, "interleaved-generation-groups", 1, "The number of round-robin serialization groups. Use this to scale up data generation to multiple processes.")
 
 	flag.StringVar(&cpuProfile, "cpu-profile", "", "Write CPU profile to `file`")
-	flag.IntVar(&startVinIndex, "start-vin-index", 100000, "which first vin do you want to generate")
 
 	flag.Parse()
 
@@ -234,8 +233,15 @@ func main() {
 			End:           timestampEnd,
 			VehicleCount:  scaleVar,
 			VehicleOffset: scaleVarOffset,
+		}
+		sim = cfg.ToSimulator()
+	case common.UseCaseChoices[8]:
+		cfg := &airq.AirqSimulatorConfig{
+			Start: timestampStart,
+			End:   timestampEnd,
 
-			StartVinIndex: startVinIndex,
+			AirqDeviceCount:  scaleVar,
+			AirqDeviceOffset: scaleVarOffset,
 		}
 		sim = cfg.ToSimulator()
 
@@ -300,7 +306,7 @@ func main() {
 	}
 	serializer.SerializeSize(out, sim.SeenPoints(), sim.SeenValues())
 	err := out.Flush()
-	dur := time.Now().Sub(t)
+	dur := time.Since(t)
 	log.Printf("Written %d points, %d values, took %0f seconds\n", n, sim.SeenValues(), dur.Seconds())
 	if err != nil {
 		log.Fatal(err.Error())
