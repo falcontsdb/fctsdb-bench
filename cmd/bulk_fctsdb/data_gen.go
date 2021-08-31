@@ -27,11 +27,9 @@ import (
 
 	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/airq"
 	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
-	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/dashboard"
 	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/devops"
-	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/iot"
-	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/metaqueries"
 	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/vehicle"
+	"github.com/spf13/cobra"
 )
 
 // Output data format choices:
@@ -39,9 +37,6 @@ var formatChoices = []string{"influx-bulk", "es-bulk", "es-bulk6x", "es-bulk7x",
 
 // Program option vars:
 var (
-	daemonUrl string
-	dbName    string
-
 	format           string
 	useCase          string
 	configFile       string
@@ -63,6 +58,19 @@ var (
 	debug int
 
 	cpuProfile string
+
+	CaseChoices = []string{
+		common.UseCaseVehicle,
+		common.UseCaseAirQuality,
+	}
+
+	dataGenCmd = &cobra.Command{
+		Use:   "gen",
+		Short: "gen the data",
+		Run: func(cmd *cobra.Command, args []string) {
+			DataGen()
+		},
+	}
 )
 
 const NHostSims = 9
@@ -79,28 +87,30 @@ func isFlagPassed(name string) bool {
 
 // Parse args:
 func init() {
-	flag.StringVar(&format, "format", formatChoices[0], fmt.Sprintf("Format to emit. (choices: %s)", strings.Join(formatChoices, ", ")))
+	dataGenFlag := dataGenCmd.Flags()
+	dataGenFlag.StringVar(&format, "format", formatChoices[0], fmt.Sprintf("Format to emit. (choices: %s)", strings.Join(formatChoices, ", ")))
 
-	flag.StringVar(&useCase, "use-case", common.UseCaseChoices[0], fmt.Sprintf("Use case to model. (choices: %s)", strings.Join(common.UseCaseChoices, ", ")))
-	flag.Int64Var(&scaleVar, "scale-var", 1, "Scaling variable specific to the use case.")
-	flag.Int64Var(&cardinality, "cardinality", 1, "Target measures/tags unique counts (over writes the 'scale-var').")
-	flag.Int64Var(&scaleVarOffset, "scale-var-offset", 0, "Scaling variable offset specific to the use case.")
-	flag.DurationVar(&samplingInterval, "sampling-interval", devops.EpochDuration, "Simulated sampling interval.")
-	flag.StringVar(&configFile, "config-file", "", "Simulator config file in TOML format (experimental)")
+	dataGenFlag.StringVar(&useCase, "use-case", CaseChoices[0], fmt.Sprintf("Use case to model. (choices: %s)", strings.Join(CaseChoices, ", ")))
+	dataGenFlag.Int64Var(&scaleVar, "scale-var", 1, "Scaling variable specific to the use case.")
+	dataGenFlag.Int64Var(&cardinality, "cardinality", 1, "Target measures/tags unique counts (over writes the 'scale-var').")
+	dataGenFlag.Int64Var(&scaleVarOffset, "scale-var-offset", 0, "Scaling variable offset specific to the use case.")
+	dataGenFlag.DurationVar(&samplingInterval, "sampling-interval", devops.EpochDuration, "Simulated sampling interval.")
+	dataGenFlag.StringVar(&configFile, "config-file", "", "Simulator config file in TOML format (experimental)")
 
-	flag.StringVar(&timestampStartStr, "timestamp-start", common.DefaultDateTimeStart, "Beginning timestamp (RFC3339).")
-	flag.StringVar(&timestampEndStr, "timestamp-end", common.DefaultDateTimeEnd, "Ending timestamp (RFC3339).")
+	dataGenFlag.StringVar(&timestampStartStr, "timestamp-start", common.DefaultDateTimeStart, "Beginning timestamp (RFC3339).")
+	dataGenFlag.StringVar(&timestampEndStr, "timestamp-end", common.DefaultDateTimeEnd, "Ending timestamp (RFC3339).")
 
-	flag.Int64Var(&seed, "seed", 0, "PRNG seed (default, or 0, uses the current timestamp).")
-	flag.IntVar(&debug, "debug", 0, "Debug printing (choices: 0, 1, 2) (default 0).")
+	dataGenFlag.Int64Var(&seed, "seed", 12345678, "PRNG seed (default 12345678, or 0, uses the current timestamp).")
+	dataGenFlag.IntVar(&debug, "debug", 0, "Debug printing (choices: 0, 1, 2) (default 0).")
 
-	flag.UintVar(&interleavedGenerationGroupID, "interleaved-generation-group-id", 0, "Group (0-indexed) to perform round-robin serialization within. Use this to scale up data generation to multiple processes.")
-	flag.UintVar(&interleavedGenerationGroups, "interleaved-generation-groups", 1, "The number of round-robin serialization groups. Use this to scale up data generation to multiple processes.")
+	dataGenFlag.UintVar(&interleavedGenerationGroupID, "interleaved-generation-group-id", 0, "Group (0-indexed) to perform round-robin serialization within. Use this to scale up data generation to multiple processes.")
+	dataGenFlag.UintVar(&interleavedGenerationGroups, "interleaved-generation-groups", 1, "The number of round-robin serialization groups. Use this to scale up data generation to multiple processes.")
 
-	flag.StringVar(&cpuProfile, "cpu-profile", "", "Write CPU profile to `file`")
+	dataGenFlag.StringVar(&cpuProfile, "cpu-profile", "", "Write CPU profile to `file`")
+	rootCmd.AddCommand(dataGenCmd)
+}
 
-	flag.Parse()
-
+func Validate() {
 	if !(interleavedGenerationGroupID < interleavedGenerationGroups) {
 		log.Fatal("incorrect interleaved groups configuration")
 	}
@@ -141,12 +151,13 @@ func init() {
 	devops.EpochDuration = samplingInterval
 	log.Printf("Using sampling interval %v\n", devops.EpochDuration)
 
-	if isFlagPassed("cardinality") == true {
+	if isFlagPassed("cardinality") {
 		scaleVar = cardinality / NHostSims
 	} else {
 		cardinality = scaleVar * NHostSims
 	}
 	log.Printf("Using cardinality of %v\n", cardinality)
+
 }
 
 func timeTrack(start time.Time, name string) {
@@ -154,7 +165,8 @@ func timeTrack(start time.Time, name string) {
 	log.Printf("%s took %s", name, elapsed)
 }
 
-func main() {
+func DataGen() {
+	Validate()
 	defer timeTrack(time.Now(), "bulk_data_gen - main()")
 
 	if cpuProfile != "" {
@@ -186,48 +198,7 @@ func main() {
 	var sim common.Simulator
 
 	switch useCase {
-	case common.UseCaseChoices[0]:
-		cfg := &devops.DevopsSimulatorConfig{
-			Start: timestampStart,
-			End:   timestampEnd,
-
-			HostCount:  scaleVar,
-			HostOffset: scaleVarOffset,
-		}
-		sim = cfg.ToSimulator()
-	case common.UseCaseChoices[2]:
-		cfg := &dashboard.DashboardSimulatorConfig{
-			Start: timestampStart,
-			End:   timestampEnd,
-
-			HostCount:  scaleVar,
-			HostOffset: scaleVarOffset,
-		}
-		sim = cfg.ToSimulator()
-	case common.UseCaseChoices[4]: // window-agg
-		fallthrough
-	case common.UseCaseChoices[5]: // group-agg
-		fallthrough
-	case common.UseCaseChoices[6]: // bare-agg:
-		fallthrough
-	case common.UseCaseChoices[1]:
-		cfg := &iot.IotSimulatorConfig{
-			Start: timestampStart,
-			End:   timestampEnd,
-
-			SmartHomeCount:  scaleVar,
-			SmartHomeOffset: scaleVarOffset,
-		}
-		sim = cfg.ToSimulator()
-	case common.UseCaseChoices[3]:
-		cfg := &metaqueries.MetaquerySimulatorConfig{
-			Start: timestampStart,
-			End:   timestampEnd,
-
-			ScaleFactor: int(scaleVar),
-		}
-		sim = cfg.ToSimulator()
-	case common.UseCaseChoices[7]:
+	case CaseChoices[0]:
 		cfg := &vehicle.VehicleSimulatorConfig{
 			Start:         timestampStart,
 			End:           timestampEnd,
@@ -235,7 +206,7 @@ func main() {
 			VehicleOffset: scaleVarOffset,
 		}
 		sim = cfg.ToSimulator()
-	case common.UseCaseChoices[8]:
+	case CaseChoices[1]:
 		cfg := &airq.AirqSimulatorConfig{
 			Start: timestampStart,
 			End:   timestampEnd,
