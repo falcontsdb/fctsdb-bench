@@ -13,11 +13,11 @@ func BenchmarkCarsNewest(b *testing.B) {
 		Start: now.Add(time.Hour * -1000),
 		End:   now,
 
-		VehicleCount:  1000,
+		VehicleCount:  100000,
 		VehicleOffset: 0,
 	}
 	sim := cfg.ToSimulator()
-	car := CarsNewest{count: 8}
+	car := CarsNewest{count: 1000}
 	// car := OneCarNewest{}
 	car.Init(sim)
 	for i := 0; i < b.N; i++ {
