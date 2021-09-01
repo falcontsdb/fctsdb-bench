@@ -42,6 +42,7 @@ var (
 			RunGenerateQueries()
 		},
 	}
+
 	listQueryCmd = &cobra.Command{
 		Use:   "list",
 		Short: "list query types",
@@ -49,16 +50,7 @@ var (
 			ListQueryTypes()
 		},
 	}
-
-	showQueryCmd = &cobra.Command{
-		Use:   "show",
-		Short: "show query types",
-		Run: func(cmd *cobra.Command, args []string) {
-			if len(args) >= 1 {
-				ShowQueryTypes(args[0])
-			}
-		},
-	}
+	listQueryWithDetail bool
 
 	fctsdbQueryGenerator = FctsdbQueryGenerator{}
 )
@@ -66,8 +58,8 @@ var (
 func init() {
 	queryCmd.AddCommand(queryGenCmd)
 	queryCmd.AddCommand(listQueryCmd)
-	queryCmd.AddCommand(showQueryCmd)
-	showQueryCmd.Flags().StringVar(&fctsdbQueryGenerator.useCase, "use-case", CaseChoices[0], fmt.Sprintf("Use case to model. (choices: %s)", strings.Join(CaseChoices, ", ")))
+	// queryCmd.AddCommand(showQueryCmd)
+	listQueryCmd.Flags().BoolVar(&listQueryWithDetail, "use-case", false, "show the detail of query-types")
 	rootCmd.AddCommand(queryCmd)
 	fctsdbQueryGenerator.Init(queryGenCmd)
 }
@@ -79,12 +71,8 @@ func (f *FctsdbQueryGenerator) Init(cmd *cobra.Command) {
 	queryGenFlag.Int64Var(&f.scaleVarOffset, "scale-var-offset", 0, "Scaling variable offset specific to the use case.")
 	queryGenFlag.StringVar(&f.queryType, "query-type", "", "Scaling variable offset specific to the use case.")
 	queryGenFlag.Int64Var(&f.queryCount, "queries", 1000, "Number of queries to generate.")
-	// queryGenFlag.DurationVar(&samplingInterval, "sampling-interval", devops.EpochDuration, "Simulated sampling interval.")
-	// queryGenFlag.StringVar(&configFile, "config-file", "", "Simulator config file in TOML format (experimental)")
-
 	queryGenFlag.StringVar(&f.timestampStartStr, "timestamp-start", common.DefaultDateTimeStart, "Beginning timestamp (RFC3339).")
 	queryGenFlag.StringVar(&f.timestampEndStr, "timestamp-end", common.DefaultDateTimeEnd, "Ending timestamp (RFC3339).")
-
 	queryGenFlag.Int64Var(&f.seed, "seed", 12345678, "PRNG seed (default 12345678, or 0, uses the current timestamp).")
 }
 
@@ -146,12 +134,23 @@ func RunGenerateQueries() {
 }
 
 func ListQueryTypes() {
-	// fmt.Println("use-case    query-type")
-	for _, qtypes := range bulk_query_fctsdb.AirqTypes.Types {
-		fmt.Println(bulk_query_fctsdb.AirqTypes.CaseName, qtypes.Name)
+	for i := 1; i <= bulk_query_fctsdb.AirqTypes.Count; i++ {
+		qtype := bulk_query_fctsdb.AirqTypes.Types[i]
+		caseName := bulk_query_fctsdb.AirqTypes.CaseName
+		if listQueryWithDetail {
+
+		} else {
+			fmt.Printf("%s %d %s\n", caseName, i, qtype.Name)
+		}
 	}
-	for _, qtypes := range bulk_query_fctsdb.VehicleTypes.Types {
-		fmt.Println(bulk_query_fctsdb.VehicleTypes.CaseName, qtypes.Name)
+	for i := 1; i <= bulk_query_fctsdb.VehicleTypes.Count; i++ {
+		qtype := bulk_query_fctsdb.VehicleTypes.Types[i]
+		caseName := bulk_query_fctsdb.VehicleTypes.CaseName
+		if listQueryWithDetail {
+
+		} else {
+			fmt.Printf("%s %d %s\n", caseName, i, qtype.Name)
+		}
 	}
 }
 

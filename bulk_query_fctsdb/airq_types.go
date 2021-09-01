@@ -3,9 +3,7 @@ package bulk_query_fctsdb
 import "time"
 
 var (
-	AirqTypes = QueryTypes{
-		CaseName: "air-quality",
-	}
+	AirqTypes = NewQueryTypes("air-quality")
 )
 
 func init() {
