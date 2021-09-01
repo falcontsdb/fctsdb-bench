@@ -1,9 +1,7 @@
 package bulk_query_fctsdb
 
 var (
-	AirqTypes = QueryTypes{
-		CaseName: "air-quality",
-	}
+	AirqTypes = NewQueryTypes("air-quality")
 )
 
 func init() {
