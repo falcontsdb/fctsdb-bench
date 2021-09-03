@@ -55,15 +55,19 @@ func TestDevice(t *testing.T) {
 func BenchmarkNewPoint(b *testing.B) {
 	now := time.Now()
 	cfg := &AirqSimulatorConfig{
-		Start: now.Add(time.Hour * -24000),
-		End:   now,
-
-		AirqDeviceCount:  1000,
+		Start:            now.Add(time.Hour * -24000),
+		End:              now,
+		SamplingInterval: time.Second,
+		AirqDeviceCount:  100000,
 		AirqDeviceOffset: 1,
 	}
+	// out := bufio.NewWriterSize(os.Stdout, 4<<24)
+	// serializer := common.NewSerializerInflux()
 	sim := cfg.ToSimulator()
 	point := common.MakeUsablePoint()
 	for i := 0; i < b.N; i++ {
 		sim.Next(point)
+		// serializer.SerializePoint(out, point)
+		point.Reset()
 	}
 }

@@ -27,6 +27,7 @@ type InfluxQueryLoad struct {
 	dbName          string
 	dataFile        string
 	timeLimit       time.Duration
+	debug           bool
 
 	//runtime vars
 	bufPool               sync.Pool
@@ -36,7 +37,7 @@ type InfluxQueryLoad struct {
 
 	scanFinished     bool
 	totalBackOffSecs float64
-	configs          []*workerConfig
+	configs          []*loadWorkerConfig
 	// valuesRead       int64
 	itemsRead int64
 	// bytesRead        int64
@@ -104,19 +105,11 @@ func RunQuery() {
 
 	influxQueryLoad.CleanUp()
 
-	// end := time.Now()
-	// took := end.Sub(start)
-
 	if influxQueryLoad.dataFile != "" {
 		influxQueryLoad.sourceReader.Close()
 	}
 
 	influxQueryLoad.GetRespResult()
-	// itemsRead := influxQueryLoad.GetReadStatistics()
-
-	// loadTime := took.Seconds()
-	// convertedBytesRate := bytesRate / (1 << 20)
-	// log.Printf("loaded %d items in %fsec with %d workers (mean point rate %f/sec, mean value rate %f/s, %.2fMB/sec from stdin)\n", itemsRead, loadTime, influxQueryLoad.workers, itemsRate, valuesRate, convertedBytesRate)
 
 	if exitCode != 0 {
 		os.Exit(exitCode)
@@ -134,6 +127,7 @@ func (q *InfluxQueryLoad) Init(cmd *cobra.Command) {
 	writeFlag.IntVar(&q.workers, "workers", 1, "Number of parallel requests to make.")
 	writeFlag.StringVar(&q.dataFile, "file", "", "Input file")
 	writeFlag.DurationVar(&q.timeLimit, "time-limit", -1, "Maximum duration to run (-1 is the default: no limit).")
+	writeFlag.BoolVar(&q.debug, "debug", false, "Debug printing (default false).")
 }
 
 func (l *InfluxQueryLoad) Validate() {
@@ -168,7 +162,7 @@ func (l *InfluxQueryLoad) Validate() {
 }
 
 func (q *InfluxQueryLoad) PrepareProcess(i int) {
-	q.configs[i] = &workerConfig{
+	q.configs[i] = &loadWorkerConfig{
 		url:            q.daemonUrls[i%len(q.daemonUrls)],
 		backingOffChan: make(chan bool, 100),
 		backingOffDone: make(chan struct{}),
@@ -197,7 +191,7 @@ func (q *InfluxQueryLoad) PrepareWorkers() {
 	q.batchChan = make(chan batch, q.workers)
 	q.inputDone = make(chan struct{})
 
-	q.configs = make([]*workerConfig, q.workers)
+	q.configs = make([]*loadWorkerConfig, q.workers)
 }
 
 func (q *InfluxQueryLoad) EmptyBatchChanel() {
@@ -326,18 +320,12 @@ func (q *InfluxQueryLoad) processBatches(w *HTTPWriter, backoffSrc chan bool, te
 
 	for batch := range q.batchChan {
 
-		// Write the batch: try until backoff is not needed.
-
-		// var err error
-		// sleepTime := q.backoff
-		// timeStart := time.Now()
-
 		buf := q.bufPool.Get().(*bytes.Buffer)
 		buf.Write(w.url)
 		buf.Write([]byte("&q="))
 		buf.Write(batch.Buffer.Bytes())
 
-		lat, err := w.QueryLine(buf.Bytes(), false)
+		lat, err := w.QueryLineProtocol(buf.Bytes(), q.debug)
 		if err != nil {
 			q.respCollector.AddOne(w.c.Database, lat, false)
 			return fmt.Errorf("error writing: %s", err.Error())

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	. "git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
 )
 
 var (
@@ -40,7 +40,7 @@ func (m *CityAirQualityMeasurement) Tick(d time.Duration) {
 	m.timestamp = m.timestamp.Add(d)
 }
 
-func (m *CityAirQualityMeasurement) ToPoint(p *Point) bool {
+func (m *CityAirQualityMeasurement) ToPoint(p *common.Point) bool {
 	p.SetMeasurementName(CityAirQualityByteString)
 	p.SetTimestamp(&m.timestamp)
 

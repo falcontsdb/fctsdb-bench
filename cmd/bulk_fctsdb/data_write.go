@@ -5,13 +5,12 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"net/http"
 	neturl "net/url"
 	"os"
@@ -21,136 +20,108 @@ import (
 	"sync/atomic"
 	"time"
 
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/airq"
 	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/vehicle"
 	"git.querycap.com/falcontsdb/fctsdb-bench/util/report"
 	"github.com/spf13/cobra"
 	"github.com/valyala/fasthttp"
 )
 
-// TODO AP: Maybe useless
-const RateControlGranularity = 1000 // 1000 ms = 1s
-const RateControlMinBatchSize = 100
-
-type InfluxBulkLoad struct {
+type DataWriteBenchmark struct {
 	// Program option vars:
-	csvDaemonUrls   string
-	daemonUrls      []string
-	ingestRateLimit int
-	backoff         time.Duration
-	backoffTimeOut  time.Duration
-	useGzip         bool
-	workers         int
-	batchSize       int
-	dbName          string
-	dataFile        string
-	timeLimit       time.Duration
+	csvDaemonUrls     string
+	backoff           time.Duration
+	backoffTimeOut    time.Duration
+	useGzip           bool
+	workers           int
+	batchSize         int
+	dbName            string
+	timeLimit         time.Duration
+	format            string
+	useCase           string
+	scaleVar          int64
+	scaleVarOffset    int64
+	samplingInterval  time.Duration
+	timestampStartStr string
+	timestampEndStr   string
+	seed              int64
+	debug             int
+	cpuProfile        string
 
 	//runtime vars
-	bufPool               sync.Pool
-	batchChan             chan batch
-	inputDone             chan struct{}
-	progressIntervalItems uint64
-	ingestionRateGran     float64
-	maxBatchSize          int
-	speedUpRequest        int32
-	scanFinished          bool
-	totalBackOffSecs      float64
-	configs               []*workerConfig
-	valuesRead            int64
-	itemsRead             int64
-	bytesRead             int64
-	sourceReader          *os.File
-}
-
-type batch struct {
-	Buffer *bytes.Buffer
-	Items  int
-	Values int
+	timestampStart   time.Time
+	timestampEnd     time.Time
+	daemonUrls       []string
+	bufPool          sync.Pool
+	pointChan        chan *[]byte
+	inputDone        chan struct{}
+	totalBackOffSecs float64
+	configs          []*loadWorkerConfig
+	valuesRead       int64
+	runningCount     int64
+	itemsRead        int64
+	bytesRead        int64
+	sourceReader     *os.File
+	simulators       []common.Simulator
 }
 
 var (
-	influxLoad   = &InfluxBulkLoad{}
-	dataWriteCmd = &cobra.Command{
+	dataWriteBenchmark = &DataWriteBenchmark{}
+	dataWriteCmd       = &cobra.Command{
 		Use:   "write",
-		Short: "write the data to db",
+		Short: "generate data and write the data to db",
 		Run: func(cmd *cobra.Command, args []string) {
 			RunWrite()
 		},
 	}
+	mutex sync.Mutex
 )
 
-func (l *InfluxBulkLoad) Init(cmd *cobra.Command) {
-	writeFlag := cmd.Flags()
-	writeFlag.StringVar(&l.csvDaemonUrls, "urls", "http://localhost:8086", "InfluxDB URLs, comma-separated. Will be used in a round-robin fashion.")
-	writeFlag.DurationVar(&l.backoff, "backoff", time.Second, "Time to sleep between requests when server indicates backpressure is needed.")
-	writeFlag.DurationVar(&l.backoffTimeOut, "backoff-timeout", time.Minute*30, "Maximum time to spent when dealing with backoff messages in one shot")
-	writeFlag.BoolVar(&l.useGzip, "gzip", true, "Whether to gzip encode requests (default true).")
-	writeFlag.IntVar(&l.ingestRateLimit, "ingest-rate-limit", -1, "Ingest rate limit in values/s (-1 = no limit).")
-	writeFlag.StringVar(&l.dbName, "db", "benchmark_db", "Database name.")
-	writeFlag.IntVar(&l.batchSize, "batch-size", 100, "Batch size (1 line of input = 1 item).")
-	writeFlag.IntVar(&l.workers, "workers", 1, "Number of parallel requests to make.")
-	writeFlag.StringVar(&l.dataFile, "file", "", "Input file")
-	writeFlag.DurationVar(&l.timeLimit, "time-limit", -1, "Maximum duration to run (-1 is the default: no limit).")
-}
-
 func init() {
-	influxLoad.Init(dataWriteCmd)
-	rootCmd.AddCommand(dataWriteCmd)
+	dataWriteBenchmark.Init(dataWriteCmd)
+	dataCmd.AddCommand(dataWriteCmd)
 }
 
-func RunWrite() int {
+func RunWrite() {
 
-	influxLoad.Validate()
-	exitCode := 0
+	dataWriteBenchmark.Validate()
+	dataWriteBenchmark.CreateDb()
 
-	influxLoad.CreateDb()
-
-	var once sync.Once
 	var workersGroup sync.WaitGroup
 	syncChanDone := make(chan int)
-	influxLoad.PrepareWorkers()
+	dataWriteBenchmark.PrepareWorkers()
+	fmt.Println(len(dataWriteBenchmark.simulators))
 
-	scanner := influxLoad.GetScanner()
-	for i := 0; i < influxLoad.workers; i++ {
-		influxLoad.PrepareProcess(i)
+	for i := 0; i < dataWriteBenchmark.workers; i++ {
+		dataWriteBenchmark.PrepareProcess(i)
+		dataWriteBenchmark.runningCount++
 		workersGroup.Add(1)
 		go func(w int) {
-			err := influxLoad.RunProcess(w, &workersGroup)
+			dataWriteBenchmark.RunSimulator(w, syncChanDone)
+			err := dataWriteBenchmark.RunProcess(w, &workersGroup)
 			if err != nil {
 				log.Println(err.Error())
-				once.Do(func() {
-					if !scanner.IsScanFinished() {
-						go func() {
-							influxLoad.EmptyBatchChanel()
-						}()
-						syncChanDone <- 1
-					}
-					exitCode = 1
-				})
 			}
 		}(i)
 		go func(w int) {
-			influxLoad.AfterRunProcess(w)
+			dataWriteBenchmark.AfterRunProcess(w)
 		}(i)
 	}
-	log.Printf("Started load with %d workers\n", influxLoad.workers)
+	log.Printf("Started load with %d workers\n", dataWriteBenchmark.workers)
 
 	start := time.Now()
-	scanner.RunScanner(influxLoad.sourceReader, syncChanDone)
 
-	influxLoad.SyncEnd()
+	dataWriteBenchmark.SyncEnd()
 	close(syncChanDone)
 	workersGroup.Wait()
 
-	influxLoad.CleanUp()
+	dataWriteBenchmark.CleanUp()
 
 	end := time.Now()
 	took := end.Sub(start)
 
-	if influxLoad.dataFile != "" {
-		influxLoad.sourceReader.Close()
-	}
-	itemsRead, bytesRead, valuesRead := scanner.GetReadStatistics()
+	itemsRead, bytesRead, valuesRead := dataWriteBenchmark.GetReadStatistics()
 
 	itemsRate := float64(itemsRead) / float64(took.Seconds())
 	bytesRate := float64(bytesRead) / float64(took.Seconds())
@@ -158,67 +129,93 @@ func RunWrite() int {
 
 	loadTime := took.Seconds()
 	convertedBytesRate := bytesRate / (1 << 20)
-	log.Printf("loaded %d items in %fsec with %d workers (mean point rate %f/sec, mean value rate %f/s, %.2fMB/sec from stdin)\n", itemsRead, loadTime, influxLoad.workers, itemsRate, valuesRate, convertedBytesRate)
-
-	if exitCode != 0 {
-		os.Exit(exitCode)
-	}
-
-	return exitCode
+	log.Printf("loaded %d items in %fsec with %d workers (mean point rate %f/sec, mean value rate %f/s, %.2fMB/sec from stdin)\n", itemsRead, loadTime, dataWriteBenchmark.workers, itemsRate, valuesRate, convertedBytesRate)
 }
 
-type workerConfig struct {
-	url            string
-	backingOffChan chan bool
-	backingOffDone chan struct{}
-	writer         *HTTPWriter
-	backingOffSecs float64
+func (d *DataWriteBenchmark) Init(cmd *cobra.Command) {
+	writeFlag := cmd.Flags()
+	writeFlag.StringVar(&d.format, "format", formatChoices[0], fmt.Sprintf("Format to emit. (choices: %s)", strings.Join(formatChoices, ", ")))
+	writeFlag.StringVar(&d.useCase, "use-case", CaseChoices[0], fmt.Sprintf("Use case to model. (choices: %s)", strings.Join(CaseChoices, ", ")))
+	writeFlag.Int64Var(&d.scaleVar, "scale-var", 1, "Scaling variable specific to the use case.")
+	writeFlag.Int64Var(&d.scaleVarOffset, "scale-var-offset", 0, "Scaling variable offset specific to the use case.")
+	writeFlag.DurationVar(&d.samplingInterval, "sampling-interval", time.Second, "Simulated sampling interval.")
+	writeFlag.StringVar(&d.timestampStartStr, "timestamp-start", common.DefaultDateTimeStart, "Beginning timestamp (RFC3339).")
+	writeFlag.StringVar(&d.timestampEndStr, "timestamp-end", common.DefaultDateTimeEnd, "Ending timestamp (RFC3339).")
+	writeFlag.Int64Var(&d.seed, "seed", 12345678, "PRNG seed (default 12345678, or 0, uses the current timestamp).")
+	writeFlag.IntVar(&d.debug, "debug", 0, "Debug printing (choices: 0, 1, 2) (default 0).")
+	writeFlag.StringVar(&d.cpuProfile, "cpu-profile", "", "Write CPU profile to `file`")
+	writeFlag.StringVar(&d.csvDaemonUrls, "urls", "http://localhost:8086", "InfluxDB URLs, comma-separated. Will be used in a round-robin fashion.")
+	writeFlag.DurationVar(&d.backoff, "backoff", time.Second, "Time to sleep between requests when server indicates backpressure is needed.")
+	writeFlag.DurationVar(&d.backoffTimeOut, "backoff-timeout", time.Minute*30, "Maximum time to spent when dealing with backoff messages in one shot")
+	writeFlag.BoolVar(&d.useGzip, "gzip", false, "Whether to gzip encode requests (default true).")
+	writeFlag.StringVar(&d.dbName, "db", "benchmark_db", "Database name.")
+	writeFlag.IntVar(&d.batchSize, "batch-size", 100, "Batch size (1 line of input = 1 item).")
+	writeFlag.IntVar(&d.workers, "workers", 1, "Number of parallel requests to make.")
+	writeFlag.DurationVar(&d.timeLimit, "time-limit", -1, "Maximum duration to run (-1 is the default: no limit).")
 }
 
-type Scanner interface {
-	RunScanner(r io.Reader, syncChanDone chan int)
-	IsScanFinished() bool
-	GetReadStatistics() (itemsRead, bytesRead, valuesRead int64)
-}
+func (d *DataWriteBenchmark) Validate() {
 
-func (l *InfluxBulkLoad) Validate() {
-
-	if l.dataFile != "" {
-		if f, err := os.Open(l.dataFile); err == nil {
-			l.sourceReader = f
-		} else {
-			log.Fatalf("Error opening %s: %v\n", l.dataFile, err)
-		}
-	}
-	if l.sourceReader == nil {
-		l.sourceReader = os.Stdin
+	if d.sourceReader == nil {
+		d.sourceReader = os.Stdin
 	}
 
-	l.daemonUrls = strings.Split(l.csvDaemonUrls, ",")
-	if len(l.daemonUrls) == 0 {
+	d.daemonUrls = strings.Split(d.csvDaemonUrls, ",")
+	if len(d.daemonUrls) == 0 {
 		log.Fatal("missing 'urls' flag")
 	}
-	log.Printf("daemon URLs: %v\n", l.daemonUrls)
+	log.Printf("daemon URLs: %v\n", d.daemonUrls)
 
-	if l.ingestRateLimit > 0 {
-		l.ingestionRateGran = (float64(l.ingestRateLimit) / float64(l.batchSize)) / (float64(1000) / float64(RateControlGranularity))
-		log.Printf("Using worker ingestion rate %v values/%v ms", l.ingestionRateGran, RateControlGranularity)
-	} else {
-		log.Print("Ingestion rate control is off")
+	if d.timeLimit > 0 && d.backoffTimeOut > d.timeLimit {
+		d.backoffTimeOut = d.timeLimit
 	}
 
-	if l.timeLimit > 0 && l.backoffTimeOut > l.timeLimit {
-		l.backoffTimeOut = l.timeLimit
+	validFormat := false
+	for _, s := range formatChoices {
+		if s == d.format {
+			validFormat = true
+			break
+		}
 	}
+	if !validFormat {
+		log.Fatalf("invalid format specifier: %v", d.format)
+	}
+
+	// the default seed is the current timestamp:
+	if d.seed == 0 {
+		d.seed = int64(time.Now().Nanosecond())
+	}
+	log.Printf("using random seed %d\n", d.seed)
+	common.Seed(d.seed)
+	rand.Seed(d.seed)
+
+	// Parse timestamps:
+	var err error
+	d.timestampStart, err = time.Parse(time.RFC3339, d.timestampStartStr)
+	if err != nil {
+		log.Fatal(err)
+	}
+	d.timestampStart = d.timestampStart.UTC()
+	d.timestampEnd, err = time.Parse(time.RFC3339, d.timestampEndStr)
+	if err != nil {
+		log.Fatal(err)
+	}
+	d.timestampEnd = d.timestampEnd.UTC()
+
+	if d.samplingInterval <= 0 {
+		log.Fatal("Invalid sampling interval")
+	}
+
+	log.Printf("Using sampling interval %v\n", d.samplingInterval)
 
 }
 
-func (l *InfluxBulkLoad) CreateDb() {
-	listDatabasesFn := l.listDatabases
-	createDbFn := l.createDb
+func (d *DataWriteBenchmark) CreateDb() {
+	listDatabasesFn := d.listDatabases
+	createDbFn := d.createDb
 
 	// this also test db connection
-	existingDatabases, err := listDatabasesFn(l.daemonUrls[0])
+	existingDatabases, err := listDatabasesFn(d.daemonUrls[0])
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -236,343 +233,288 @@ func (l *InfluxBulkLoad) CreateDb() {
 	}
 
 	var id string
-	id, ok := existingDatabases[l.dbName]
+	id, ok := existingDatabases[d.dbName]
 	if ok {
-		log.Printf("Database %s [%s] already exists", l.dbName, id)
+		log.Printf("Database %s [%s] already exists", d.dbName, id)
 	} else {
-		id, err = createDbFn(l.daemonUrls[0], l.dbName)
+		id, err = createDbFn(d.daemonUrls[0], d.dbName)
 		if err != nil {
 			log.Fatal(err)
 		}
 		time.Sleep(1000 * time.Millisecond)
-		log.Printf("Database %s [%s] created", l.dbName, id)
+		log.Printf("Database %s [%s] created", d.dbName, id)
 	}
 
 }
 
-func (l *InfluxBulkLoad) PrepareWorkers() {
+func (d *DataWriteBenchmark) PrepareWorkers() {
 
-	l.bufPool = sync.Pool{
+	d.bufPool = sync.Pool{
 		New: func() interface{} {
 			return bytes.NewBuffer(make([]byte, 0, 4*1024*1024))
 		},
 	}
+	d.pointChan = make(chan *[]byte, 100*d.workers)
+	d.inputDone = make(chan struct{})
 
-	l.batchChan = make(chan batch, l.workers)
-	l.inputDone = make(chan struct{})
+	d.configs = make([]*loadWorkerConfig, d.workers)
 
-	l.configs = make([]*workerConfig, l.workers)
-}
-
-func (l *InfluxBulkLoad) EmptyBatchChanel() {
-	for range l.batchChan {
-		//read out remaining batches
+	d.simulators = make([]common.Simulator, d.workers)
+	var step int64 = d.scaleVar / int64(d.workers)
+	var offset int64 = 0
+	for i := 0; i < d.workers; i++ {
+		offset = step * int64(i)
+		if i == d.workers-1 {
+			step = d.scaleVar - step*int64(i)
+		}
+		d.prepareSimulator(i, step, offset)
 	}
 }
 
-func (l *InfluxBulkLoad) SyncEnd() {
-	<-l.inputDone
-	close(l.batchChan)
+func (d *DataWriteBenchmark) prepareSimulator(i int, step, offset int64) {
+	var sim common.Simulator
+	switch d.useCase {
+	case CaseChoices[0]:
+		cfg := &vehicle.VehicleSimulatorConfig{
+			Start:            d.timestampStart,
+			End:              d.timestampEnd,
+			SamplingInterval: d.samplingInterval,
+			VehicleCount:     step,
+			VehicleOffset:    offset,
+		}
+		sim = cfg.ToSimulator()
+	case CaseChoices[1]:
+		cfg := &airq.AirqSimulatorConfig{
+			Start:            d.timestampStart,
+			End:              d.timestampEnd,
+			SamplingInterval: d.samplingInterval,
+			AirqDeviceCount:  step,
+			AirqDeviceOffset: offset,
+		}
+		sim = cfg.ToSimulator()
+
+	default:
+		panic("unreachable")
+	}
+	d.simulators[i] = sim
 }
 
-func (l *InfluxBulkLoad) CleanUp() {
-	for _, c := range l.configs {
+func (d *DataWriteBenchmark) EmptyPointChanel() {
+	for range d.pointChan {
+	}
+}
+
+func (d *DataWriteBenchmark) SyncEnd() {
+	<-d.inputDone
+	close(d.pointChan)
+}
+
+func (d *DataWriteBenchmark) CleanUp() {
+	for _, c := range d.configs {
 		close(c.backingOffChan)
 		<-c.backingOffDone
 	}
-	l.totalBackOffSecs = float64(0)
-	for i := 0; i < l.workers; i++ {
-		l.totalBackOffSecs += l.configs[i].backingOffSecs
+	d.totalBackOffSecs = float64(0)
+	for i := 0; i < d.workers; i++ {
+		d.totalBackOffSecs += d.configs[i].backingOffSecs
 	}
 }
 
-func (l *InfluxBulkLoad) GetScanner() Scanner {
-	return l
-}
-
-func (l *InfluxBulkLoad) PrepareProcess(i int) {
-	l.configs[i] = &workerConfig{
-		url:            l.daemonUrls[i%len(l.daemonUrls)],
+func (d *DataWriteBenchmark) PrepareProcess(i int) {
+	d.configs[i] = &loadWorkerConfig{
+		url:            d.daemonUrls[i%len(d.daemonUrls)],
 		backingOffChan: make(chan bool, 100),
 		backingOffDone: make(chan struct{}),
 	}
 	var url string
 	c := &HTTPWriterConfig{
-		DebugInfo:      fmt.Sprintf("worker #%d, dest url: %s", i, l.configs[i].url),
-		Host:           l.configs[i].url,
-		Database:       l.dbName,
-		BackingOffChan: l.configs[i].backingOffChan,
-		BackingOffDone: l.configs[i].backingOffDone,
+		DebugInfo:      fmt.Sprintf("worker #%d, dest url: %s", i, d.configs[i].url),
+		Host:           d.configs[i].url,
+		Database:       d.dbName,
+		BackingOffChan: d.configs[i].backingOffChan,
+		BackingOffDone: d.configs[i].backingOffDone,
 	}
 	url = c.Host + "/write?db=" + neturl.QueryEscape(c.Database)
 
-	l.configs[i].writer = NewHTTPWriter(*c, url)
+	d.configs[i].writer = NewHTTPWriter(*c, url)
 }
 
-func (l *InfluxBulkLoad) RunProcess(i int, waitGroup *sync.WaitGroup) error {
-	return l.processBatches(l.configs[i].writer, l.configs[i].backingOffChan, fmt.Sprintf("%d", i), waitGroup)
-}
-func (l *InfluxBulkLoad) AfterRunProcess(i int) {
-	l.configs[i].backingOffSecs = processBackoffMessages(i, l.configs[i].backingOffChan, l.configs[i].backingOffDone)
+func (d *DataWriteBenchmark) RunProcess(i int, waitGroup *sync.WaitGroup) error {
+	defer waitGroup.Done()
+
+	var batchItemCount int
+	var err error
+	newline := []byte("\n")
+	buf := d.bufPool.Get().(*bytes.Buffer)
+
+	batchItemCount = 0
+	for pointByte := range d.pointChan {
+		// mutex.Lock()
+		// fmt.Println(string(*pointByte))
+		// mutex.Unlock()
+		buf.Write(*pointByte)
+		buf.Write(newline)
+		batchItemCount++
+
+		// 达到batchSize
+		if batchItemCount >= d.batchSize {
+			batchItemCount = 0
+			atomic.AddInt64(&d.bytesRead, int64(buf.Len()))
+			err = d.processBatches(d.configs[i].writer, buf, d.configs[i].backingOffChan, fmt.Sprintf("%d", i))
+
+			// Return the point buffer to the pool.
+			buf.Reset()
+			d.bufPool.Put(buf)
+			buf = d.bufPool.Get().(*bytes.Buffer)
+		}
+
+	}
+
+	if batchItemCount > 0 {
+		atomic.AddInt64(&d.bytesRead, int64(buf.Len()))
+		err = d.processBatches(d.configs[i].writer, buf, d.configs[i].backingOffChan, fmt.Sprintf("%d", i))
+	}
+	return err
 }
 
-func (l *InfluxBulkLoad) UpdateReport(params *report.LoadReportParams) (reportTags [][2]string, extraVals []report.ExtraVal) {
+func (d *DataWriteBenchmark) AfterRunProcess(i int) {
+	d.configs[i].backingOffSecs = processBackoffMessages(i, d.configs[i].backingOffChan, d.configs[i].backingOffDone)
+}
 
-	reportTags = [][2]string{{"back_off", strconv.Itoa(int(l.backoff.Seconds()))}}
+func (d *DataWriteBenchmark) UpdateReport(params *report.LoadReportParams) (reportTags [][2]string, extraVals []report.ExtraVal) {
+
+	reportTags = [][2]string{{"back_off", strconv.Itoa(int(d.backoff.Seconds()))}}
 
 	extraVals = make([]report.ExtraVal, 0)
 
-	if l.ingestRateLimit > 0 {
-		extraVals = append(extraVals, report.ExtraVal{Name: "ingest_rate_limit_values", Value: l.ingestRateLimit})
-	}
-	if l.totalBackOffSecs > 0 {
-		extraVals = append(extraVals, report.ExtraVal{Name: "total_backoff_secs", Value: l.totalBackOffSecs})
+	if d.totalBackOffSecs > 0 {
+		extraVals = append(extraVals, report.ExtraVal{Name: "total_backoff_secs", Value: d.totalBackOffSecs})
 	}
 
 	params.DBType = "InfluxDB"
-	params.DestinationUrl = l.csvDaemonUrls
-	params.IsGzip = l.useGzip
+	params.DestinationUrl = d.csvDaemonUrls
+	params.IsGzip = d.useGzip
 
 	return
 }
 
-func (l *InfluxBulkLoad) IsScanFinished() bool {
-	return l.scanFinished
+func (d *DataWriteBenchmark) GetReadStatistics() (itemsRead, bytesRead, valuesRead int64) {
+	itemsRead = d.itemsRead
+	bytesRead = d.bytesRead
+	valuesRead = d.valuesRead
+	return
 }
 
-func (l *InfluxBulkLoad) GetReadStatistics() (itemsRead, bytesRead, valuesRead int64) {
-	itemsRead = l.itemsRead
-	bytesRead = l.bytesRead
-	valuesRead = l.valuesRead
-	return
+func (d *DataWriteBenchmark) Write(p []byte) (n int, err error) {
+	b := make([]byte, len(p))
+	copy(b, p)
+	d.pointChan <- &b
+	return len(p), nil
 }
 
 // scan reads one item at a time from stdin. 1 item = 1 line.
 // When the requested number of items per batch is met, send a batch over batchChan for the workers to write.
-func (l *InfluxBulkLoad) RunScanner(r io.Reader, syncChanDone chan int) {
-	l.scanFinished = false
-	l.itemsRead = 0
-	l.bytesRead = 0
-	l.valuesRead = 0
-	buf := l.bufPool.Get().(*bytes.Buffer)
+func (d *DataWriteBenchmark) RunSimulator(i int, syncChanDone chan int) {
 
-	var n, values int
-	var totalPoints, totalValues, totalValuesCounted int64
-
-	newline := []byte("\n")
-	var deadline time.Time
-	if l.timeLimit > 0 {
-		deadline = time.Now().Add(l.timeLimit)
+	var serializer common.Serializer
+	switch d.format {
+	case "influx-bulk":
+		serializer = common.NewSerializerInflux()
+	case "es-bulk":
+		serializer = common.NewSerializerElastic("5x")
+	case "es-bulk6x":
+		serializer = common.NewSerializerElastic("6x")
+	case "es-bulk7x":
+		serializer = common.NewSerializerElastic("7x")
+	case "cassandra":
+		serializer = common.NewSerializerCassandra()
+	case "mongo":
+		serializer = common.NewSerializerMongo()
+	case "opentsdb":
+		serializer = common.NewSerializerOpenTSDB()
+	case "timescaledb-sql":
+		serializer = common.NewSerializerTimescaleSql()
+	case "timescaledb-copyFrom":
+		serializer = common.NewSerializerTimescaleBin()
+	case "graphite-line":
+		serializer = common.NewSerializerGraphiteLine()
+	case "splunk-json":
+		serializer = common.NewSerializerSplunkJson()
+	default:
+		panic("unreachable")
 	}
 
-	var batchItemCount uint64
-	var err error
-	scanner := bufio.NewScanner(bufio.NewReaderSize(r, 4*1024*1024))
-outer:
-	for scanner.Scan() {
-		line := scanner.Text()
-		totalPoints, totalValues, err = common.CheckTotalValues(line)
-		if totalPoints > 0 || totalValues > 0 {
-			continue
-		} else {
-			fieldCnt := countFields(line)
-			values += fieldCnt
-			totalValuesCounted += int64(fieldCnt)
-		}
+	sim := d.simulators[i]
+	point := common.MakeUsablePoint()
+	for !sim.Finished() {
+		sim.Next(point)
+		err := serializer.SerializePoint(d, point)
 		if err != nil {
 			log.Fatal(err)
 		}
-		l.itemsRead++
-		batchItemCount++
-
-		buf.Write(scanner.Bytes())
-		buf.Write(newline)
-
-		n++
-		if n >= l.batchSize {
-			atomic.AddUint64(&l.progressIntervalItems, batchItemCount)
-			batchItemCount = 0
-
-			l.bytesRead += int64(buf.Len())
-			l.batchChan <- batch{buf, n, values}
-			buf = l.bufPool.Get().(*bytes.Buffer)
-			n = 0
-			values = 0
-
-			if l.timeLimit > 0 && time.Now().After(deadline) {
-				// bulk_load.Runner.SetPrematureEnd("Timeout elapsed")
-				break outer
-			}
-
-			if l.ingestRateLimit > 0 {
-				if l.batchSize < l.maxBatchSize {
-					hint := atomic.LoadInt32(&l.speedUpRequest)
-					if hint > int32(l.workers*2) { // we should wait for more requests (and this is just a magic number)
-						atomic.StoreInt32(&l.speedUpRequest, 0)
-						l.batchSize += int(float32(l.maxBatchSize) * 0.10)
-						if l.batchSize > l.maxBatchSize {
-							l.batchSize = l.maxBatchSize
-						}
-						log.Printf("Increased batch size to %d\n", l.batchSize)
-					}
-				}
-			}
-		}
-		select {
-		case <-syncChanDone:
-			break outer
-		default:
-		}
+		point.Reset()
 	}
 
-	if err := scanner.Err(); err != nil {
-		log.Fatalf("Error reading input: %s", err.Error())
-	}
-
-	// Finished reading input, make sure last batch goes out.
-	if n > 0 {
-		l.batchChan <- batch{buf, n, values}
-	}
+	atomic.AddInt64(&d.itemsRead, sim.SeenPoints())
+	atomic.AddInt64(&d.valuesRead, sim.SeenValues())
 
 	// Closing inputDone signals to the application that we've read everything and can now shut down.
-	close(l.inputDone)
+	atomic.AddInt64(&d.runningCount, -1)
+	if atomic.LoadInt64(&d.runningCount) == 0 {
+		close(d.pointChan)
+	}
 
-	l.valuesRead = totalValues
-	if totalValues == 0 {
-		l.valuesRead = totalValuesCounted
-	}
-	if l.itemsRead != totalPoints { // totalPoints is unknown (0) when exiting prematurely due to time limit
-		if l.timeLimit > 0 {
-			log.Fatalf("Incorrent number of read points: %d, expected: %d:", l.itemsRead, totalPoints)
-		}
-	}
-	l.scanFinished = true
 }
 
 // processBatches reads byte buffers from batchChan and writes them to the target server, while tracking stats on the write.
-func (l *InfluxBulkLoad) processBatches(w *HTTPWriter, backoffSrc chan bool, telemetryWorkerLabel string, workersGroup *sync.WaitGroup) error {
+func (d *DataWriteBenchmark) processBatches(w *HTTPWriter, buf *bytes.Buffer, backoffSrc chan bool, telemetryWorkerLabel string) error {
 	// var batchesSeen int64
+	// 发送http write
+	var err error
+	sleepTime := d.backoff
+	timeStart := time.Now()
 
-	// Ingestion rate control vars
-	var gvCount float64
-	var gvStart time.Time
-
-	defer workersGroup.Done()
-
-	for batch := range l.batchChan {
-		// batchesSeen++
-
-		//var bodySize int
-		// ts := time.Now().UnixNano()
-
-		if l.ingestRateLimit > 0 && gvStart.Nanosecond() == 0 {
-			gvStart = time.Now()
+	for {
+		if d.useGzip {
+			compressedBatch := d.bufPool.Get().(*bytes.Buffer)
+			fasthttp.WriteGzip(compressedBatch, buf.Bytes())
+			//bodySize = len(compressedBatch.Bytes())
+			_, err = w.WriteLineProtocol(compressedBatch.Bytes(), true)
+			// Return the compressed batch buffer to the pool.
+			compressedBatch.Reset()
+			d.bufPool.Put(compressedBatch)
+		} else {
+			//bodySize = len(batch.Bytes())
+			// fmt.Println(string(buf.Bytes()))
+			_, err = w.WriteLineProtocol(buf.Bytes(), false)
 		}
 
-		// Write the batch: try until backoff is not needed.
-
-		var err error
-		sleepTime := l.backoff
-		timeStart := time.Now()
-		for {
-			if l.useGzip {
-				compressedBatch := l.bufPool.Get().(*bytes.Buffer)
-				fasthttp.WriteGzip(compressedBatch, batch.Buffer.Bytes())
-				//bodySize = len(compressedBatch.Bytes())
-				_, err = w.WriteLineProtocol(compressedBatch.Bytes(), true)
-				// Return the compressed batch buffer to the pool.
-				compressedBatch.Reset()
-				l.bufPool.Put(compressedBatch)
-			} else {
-				//bodySize = len(batch.Bytes())
-				_, err = w.WriteLineProtocol(batch.Buffer.Bytes(), false)
+		if err == ErrorBackoff {
+			backoffSrc <- true
+			// Report telemetry, if applicable:
+			time.Sleep(sleepTime)
+			sleepTime += d.backoff        // sleep longer if backpressure comes again
+			if sleepTime > 10*d.backoff { // but not longer than 10x default backoff time
+				log.Printf("[worker %s] sleeping on backoff response way too long (10x %v)", telemetryWorkerLabel, d.backoff)
+				sleepTime = 10 * d.backoff
 			}
-
-			if err == ErrorBackoff {
-				backoffSrc <- true
-				// Report telemetry, if applicable:
-				time.Sleep(sleepTime)
-				sleepTime += l.backoff        // sleep longer if backpressure comes again
-				if sleepTime > 10*l.backoff { // but not longer than 10x default backoff time
-					log.Printf("[worker %s] sleeping on backoff response way too long (10x %v)", telemetryWorkerLabel, l.backoff)
-					sleepTime = 10 * l.backoff
-				}
-				checkTime := time.Now()
-				if timeStart.Add(l.backoffTimeOut).Before(checkTime) {
-					log.Printf("[worker %s] Spent too much time in backoff: %ds\n", telemetryWorkerLabel, int64(checkTime.Sub(timeStart).Seconds()))
-					break
-				}
-			} else {
-				backoffSrc <- false
+			checkTime := time.Now()
+			if timeStart.Add(d.backoffTimeOut).Before(checkTime) {
+				log.Printf("[worker %s] Spent too much time in backoff: %ds\n", telemetryWorkerLabel, int64(checkTime.Sub(timeStart).Seconds()))
 				break
 			}
-		}
-		if err != nil {
-			return fmt.Errorf("error writing: %s", err.Error())
-		}
-
-		// lagMillis intentionally includes backoff time,
-		// and incidentally includes compression time:
-		// lagMillis := float64(time.Now().UnixNano()-ts) / 1e6
-		var lagMillis float64
-
-		// Return the batch buffer to the pool.
-		batch.Buffer.Reset()
-		l.bufPool.Put(batch.Buffer)
-
-		// Normally report after each batch
-		// reportStat := true
-		valuesWritten := float64(batch.Values)
-
-		// Apply ingest rate control if set
-		if l.ingestRateLimit > 0 {
-			gvCount += valuesWritten
-			if gvCount >= l.ingestionRateGran {
-				now := time.Now()
-				elapsed := now.Sub(gvStart)
-				overDelay := (gvCount - l.ingestionRateGran) / (l.ingestionRateGran / float64(RateControlGranularity))
-				remainingMs := RateControlGranularity - (elapsed.Nanoseconds() / 1e6) + int64(overDelay)
-				valuesWritten = gvCount
-				lagMillis = float64(elapsed.Nanoseconds() / 1e6)
-				if remainingMs > 0 {
-					time.Sleep(time.Duration(remainingMs) * time.Millisecond)
-					gvStart = time.Now()
-					realDelay := gvStart.Sub(now).Nanoseconds() / 1e6 // 'now' was before sleep
-					lagMillis += float64(realDelay)
-				} else {
-					gvStart = now
-					atomic.AddInt32(&l.speedUpRequest, 1)
-				}
-				gvCount = 0
-			}
+		} else {
+			backoffSrc <- false
+			break
 		}
 	}
-
+	if err != nil {
+		return fmt.Errorf("error writing: %s", err.Error())
+	}
 	return nil
 }
 
-func processBackoffMessages(workerId int, src chan bool, dst chan struct{}) float64 {
-	var totalBackoffSecs float64
-	var start time.Time
-	last := false
-	for this := range src {
-		if this && !last {
-			start = time.Now()
-			last = true
-		} else if !this && last {
-			took := time.Since(start)
-			log.Printf("[worker %d] backoff took %.02fsec\n", workerId, took.Seconds())
-			totalBackoffSecs += took.Seconds()
-			last = false
-			start = time.Now()
-		}
-	}
-	log.Printf("[worker %d] backoffs took a total of %fsec of runtime\n", workerId, totalBackoffSecs)
-	dst <- struct{}{}
-	return totalBackoffSecs
-}
-
-func (l *InfluxBulkLoad) createDb(daemonUrl, dbName string) (string, error) {
+func (d *DataWriteBenchmark) createDb(daemonUrl, dbName string) (string, error) {
 	u, err := neturl.Parse(daemonUrl)
 	if err != nil {
 		return "", err
@@ -604,7 +546,7 @@ func (l *InfluxBulkLoad) createDb(daemonUrl, dbName string) (string, error) {
 }
 
 // listDatabases lists the existing databases in InfluxDB.
-func (l *InfluxBulkLoad) listDatabases(daemonUrl string) (map[string]string, error) {
+func (d *DataWriteBenchmark) listDatabases(daemonUrl string) (map[string]string, error) {
 	u := fmt.Sprintf("%s/query?q=show%%20databases", daemonUrl)
 	resp, err := http.Get(u)
 	if err != nil {
@@ -643,17 +585,4 @@ func (l *InfluxBulkLoad) listDatabases(daemonUrl string) (map[string]string, err
 		ret[nestedName[0]] = ""
 	}
 	return ret, nil
-}
-
-// countFields return number of fields in protocol line
-func countFields(line string) int {
-	lineParts := strings.Split(line, " ") // "measurement,tags fields timestamp"
-	if len(lineParts) != 3 {
-		log.Fatalf("invalid protocol line: '%s'", line)
-	}
-	fieldCnt := strings.Count(lineParts[1], "=")
-	if fieldCnt == 0 {
-		log.Fatalf("invalid fields parts: '%s'", lineParts[1])
-	}
-	return fieldCnt
 }

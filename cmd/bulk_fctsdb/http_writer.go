@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"github.com/valyala/fasthttp"
@@ -87,6 +88,7 @@ func (w *HTTPWriter) WriteLineProtocol(body []byte, isGzip bool) (int64, error) 
 	if w.c.AuthToken != "" {
 		req.Header.Add("Authorization", fmt.Sprintf("Token %s", w.c.AuthToken))
 	}
+	// fmt.Println(string(body))
 	req.SetBody(body)
 
 	resp := fasthttp.AcquireResponse()
@@ -102,22 +104,17 @@ func (w *HTTPWriter) WriteLineProtocol(body []byte, isGzip bool) (int64, error) 
 			err = fmt.Errorf("[DebugInfo: %s] Invalid write response (status %d): %s", w.c.DebugInfo, sc, resp.Body())
 		}
 	}
-
 	fasthttp.ReleaseResponse(resp)
 	fasthttp.ReleaseRequest(req)
 
 	return lat, err
 }
 
-func (w *HTTPWriter) QueryLine(queryUrl []byte, isGzip bool) (int64, error) {
+func (w *HTTPWriter) QueryLineProtocol(queryUrl []byte, debug bool) (int64, error) {
 	req := fasthttp.AcquireRequest()
 	req.Header.SetContentTypeBytes(textPlain)
 	req.Header.SetMethodBytes(get)
 	req.Header.SetRequestURIBytes(queryUrl)
-	fmt.Println(string(queryUrl))
-	if isGzip {
-		req.Header.Add("Content-Encoding", "gzip")
-	}
 	if w.c.AuthToken != "" {
 		req.Header.Add("Authorization", fmt.Sprintf("Token %s", w.c.AuthToken))
 	}
@@ -133,6 +130,10 @@ func (w *HTTPWriter) QueryLine(queryUrl []byte, isGzip bool) (int64, error) {
 			log.Printf("backoff suggested, reason: %s", resp.Body())
 		} else if sc != fasthttp.StatusOK {
 			err = fmt.Errorf("[DebugInfo: %s] Invalid write response (status %d): %s", w.c.DebugInfo, sc, resp.Body())
+		}
+		if debug {
+			fmt.Println(string(queryUrl))
+			fmt.Fprintln(os.Stdout, string(resp.Body()))
 		}
 	}
 

@@ -5,17 +5,25 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"time"
 
 	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/vehicle"
 )
 
 // basic
 type VehicleBasicGenerator struct {
-	sim *vehicle.VehicleSimulator
+	sim   *vehicle.VehicleSimulator
+	epoch string
 }
 
 func (g *VehicleBasicGenerator) Init(sim interface{}) {
 	g.sim = sim.(*vehicle.VehicleSimulator)
+}
+
+func (g *VehicleBasicGenerator) loadEpochFromEnd(d time.Duration) {
+	end := g.sim.TimestampEnd
+	start := end.Add(d * -1)
+	g.epoch = fmt.Sprintf("time >= '%s' and time < '%s'", start.UTC().Format(time.RFC3339), end.UTC().Format(time.RFC3339))
 }
 
 func (g *VehicleBasicGenerator) Next() string {
@@ -28,8 +36,8 @@ type OneCarNewest struct {
 }
 
 func (g *OneCarNewest) Next() string {
-	index := rand.Intn(len(g.sim.Vehicles))
-	veh := g.sim.Vehicles[index]
+	index := rand.Intn(len(g.sim.Hosts))
+	veh := g.sim.Hosts[index]
 	return fmt.Sprintf("select * from vehicle where VIN='%s' order by time desc limit 1;", veh.Name)
 }
 
@@ -42,20 +50,20 @@ type CarsNewest struct {
 
 func (g *CarsNewest) Init(sim interface{}) {
 	g.sim = sim.(*vehicle.VehicleSimulator)
-	g.perm = rand.Perm(len(g.sim.Vehicles))
+	g.perm = rand.Perm(len(g.sim.Hosts))
 }
 
 func (g *CarsNewest) Next() string {
-	if g.count > len(g.sim.Vehicles) {
+	if g.count >= len(g.sim.Hosts) {
 		log.Fatal("query cars more than the count of cars in database")
 	}
 	// perm := rand.Perm(len(g.sim.Vehicles))
-	index := rand.Intn(len(g.sim.Vehicles) - g.count)
+	index := rand.Intn(len(g.sim.Hosts) - g.count)
 	buf := bufPool.Get().(*bytes.Buffer)
 	buf.Write([]byte(`select * from vehicle where VIN in (`))
 	for i := 0; i < g.count; i++ {
 		buf.Write([]byte(`'`))
-		buf.Write(g.sim.Vehicles[g.perm[index+i]].Name)
+		buf.Write(g.sim.Hosts[g.perm[index+i]].Name)
 		buf.Write([]byte(`'`))
 		if i != g.count-1 {
 			buf.Write([]byte(`,`))
@@ -73,10 +81,15 @@ type CarPaging struct {
 	VehicleBasicGenerator
 }
 
+func (g *CarPaging) Init(sim interface{}) {
+	g.sim = sim.(*vehicle.VehicleSimulator)
+	g.loadEpochFromEnd(time.Hour * 24)
+}
+
 func (g *CarPaging) Next() string {
-	index := rand.Intn(len(g.sim.Vehicles))
-	veh := g.sim.Vehicles[index]
-	return fmt.Sprintf("select * from vehicle where VIN='%s' and time > now()-1d order by time desc limit 100 offset 100;", veh.Name)
+	index := rand.Intn(len(g.sim.Hosts))
+	veh := g.sim.Hosts[index]
+	return fmt.Sprintf("select * from vehicle where VIN='%s' and %s order by time desc limit 100 offset 100;", veh.Name, g.epoch)
 }
 
 // case 4
@@ -84,10 +97,15 @@ type OneCarMessageCountMonth struct {
 	VehicleBasicGenerator
 }
 
+func (g *OneCarMessageCountMonth) Init(sim interface{}) {
+	g.sim = sim.(*vehicle.VehicleSimulator)
+	g.loadEpochFromEnd(time.Hour * 24 * 30)
+}
+
 func (g *OneCarMessageCountMonth) Next() string {
-	index := rand.Intn(len(g.sim.Vehicles))
-	veh := g.sim.Vehicles[index]
-	return fmt.Sprintf("select count(value1) from vehicle where VIN='%s' and time > now()-30d;", veh.Name)
+	index := rand.Intn(len(g.sim.Hosts))
+	veh := g.sim.Hosts[index]
+	return fmt.Sprintf("select count(value1) from vehicle where VIN='%s' and %s;", veh.Name, g.epoch)
 }
 
 // case 5
@@ -95,8 +113,13 @@ type CarsMessageCountMonth struct {
 	VehicleBasicGenerator
 }
 
+func (g *CarsMessageCountMonth) Init(sim interface{}) {
+	g.sim = sim.(*vehicle.VehicleSimulator)
+	g.loadEpochFromEnd(time.Hour * 24 * 30)
+}
+
 func (g *CarsMessageCountMonth) Next() string {
-	return "select count(value1) from vehicle where time > now()-30d;"
+	return fmt.Sprintf("select count(value1) from vehicle where %s;", g.epoch)
 }
 
 // case 6
@@ -104,8 +127,13 @@ type CarsGroupMessageCountMonth struct {
 	VehicleBasicGenerator
 }
 
+func (g *CarsGroupMessageCountMonth) Init(sim interface{}) {
+	g.sim = sim.(*vehicle.VehicleSimulator)
+	g.loadEpochFromEnd(time.Hour * 24 * 30)
+}
+
 func (g *CarsGroupMessageCountMonth) Next() string {
-	return "select count(value1) from vehicle where time > now()-30d group by VIN;"
+	return fmt.Sprintf("select count(value1) from vehicle where %s group by VIN;", g.epoch)
 }
 
 // case 7
@@ -113,10 +141,15 @@ type OneCarMessageCountYear struct {
 	VehicleBasicGenerator
 }
 
+func (g *OneCarMessageCountYear) Init(sim interface{}) {
+	g.sim = sim.(*vehicle.VehicleSimulator)
+	g.loadEpochFromEnd(time.Hour * 24 * 365)
+}
+
 func (g *OneCarMessageCountYear) Next() string {
-	index := rand.Intn(len(g.sim.Vehicles))
-	veh := g.sim.Vehicles[index]
-	return fmt.Sprintf("select count(value1) from vehicle where VIN='%s' and time > now()-1y;", veh.Name)
+	index := rand.Intn(len(g.sim.Hosts))
+	veh := g.sim.Hosts[index]
+	return fmt.Sprintf("select count(value1) from vehicle where VIN='%s' and %s;", veh.Name, g.epoch)
 }
 
 // case 8
@@ -124,8 +157,13 @@ type CarsMessageCountYear struct {
 	VehicleBasicGenerator
 }
 
+func (g *CarsMessageCountYear) Init(sim interface{}) {
+	g.sim = sim.(*vehicle.VehicleSimulator)
+	g.loadEpochFromEnd(time.Hour * 24 * 365)
+}
+
 func (g *CarsMessageCountYear) Next() string {
-	return "select count(value1) from vehicle where time > now()-1y;"
+	return fmt.Sprintf("select count(value1) from vehicle where %s;", g.epoch)
 }
 
 // case 9
@@ -133,6 +171,11 @@ type CarsGroupMessageCountYear struct {
 	VehicleBasicGenerator
 }
 
+func (g *CarsGroupMessageCountYear) Init(sim interface{}) {
+	g.sim = sim.(*vehicle.VehicleSimulator)
+	g.loadEpochFromEnd(time.Hour * 24 * 365)
+}
+
 func (g *CarsGroupMessageCountYear) Next() string {
-	return "select count(value1) from vehicle where time > now()-1y group by VIN;"
+	return fmt.Sprintf("select count(value1) from vehicle where %s group by VIN;", g.epoch)
 }

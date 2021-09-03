@@ -3,15 +3,15 @@ package airq
 import (
 	"time"
 
-	. "git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
 )
 
 // Type AirqSimulatorConfig is used to create a AirqSimulator.
 
 type AirqSimulatorConfig struct {
-	Start time.Time
-	End   time.Time
-
+	Start            time.Time
+	End              time.Time
+	SamplingInterval time.Duration
 	AirqDeviceCount  int64
 	AirqDeviceOffset int64
 }
@@ -25,19 +25,20 @@ func (d *AirqSimulatorConfig) ToSimulator() *AirqSimulator {
 		measNum += int64(AirqDevices[i].NumMeasurements())
 	}
 
-	epochs := d.End.Sub(d.Start).Nanoseconds() / EpochDuration.Nanoseconds()
+	epochs := d.End.Sub(d.Start).Nanoseconds() / d.SamplingInterval.Nanoseconds()
 	maxPoints := epochs * measNum
 	dg := &AirqSimulator{
 		madePoints: 0,
 		madeValues: 0,
 		maxPoints:  maxPoints,
 
-		currentAirqIndex: 0,
-		Airqs:            AirqDevices,
+		currentHostIndex: 0,
+		Hosts:            AirqDevices,
 
-		timestampNow:   d.Start,
-		timestampStart: d.Start,
-		timestampEnd:   d.End,
+		// timestampNow:   d.Start,
+		SamplingInterval: d.SamplingInterval,
+		TimestampStart:   d.Start,
+		TimestampEnd:     d.End,
 	}
 
 	return dg
@@ -46,18 +47,16 @@ func (d *AirqSimulatorConfig) ToSimulator() *AirqSimulator {
 // A IotSimulator generates data similar to telemetry from Telegraf.
 // It fulfills the Simulator interface.
 type AirqSimulator struct {
-	madePoints int64
-	maxPoints  int64
-	madeValues int64
-
+	madePoints                int64
+	maxPoints                 int64
+	madeValues                int64
 	simulatedMeasurementIndex int
+	currentHostIndex          int
 
-	currentAirqIndex int
-	Airqs            []AirqDevice
-
-	timestampNow   time.Time
-	timestampStart time.Time
-	timestampEnd   time.Time
+	Hosts            []AirqDevice
+	SamplingInterval time.Duration
+	TimestampStart   time.Time
+	TimestampEnd     time.Time
 }
 
 func (s *AirqSimulator) SeenPoints() int64 {
@@ -77,22 +76,22 @@ func (s *AirqSimulator) Finished() bool {
 }
 
 // Next advances a Point to the next state in the generator.
-func (s *AirqSimulator) Next(p *Point) {
+func (s *AirqSimulator) Next(p *common.Point) {
 	// switch to the next metric if needed
-	if s.currentAirqIndex == len(s.Airqs) {
-		s.currentAirqIndex = 0
+	if s.currentHostIndex == len(s.Hosts) {
+		s.currentHostIndex = 0
 		s.simulatedMeasurementIndex++
 	}
 
 	if s.simulatedMeasurementIndex == NAirqSims {
 		s.simulatedMeasurementIndex = 0
 
-		for i := 0; i < len(s.Airqs); i++ {
-			s.Airqs[i].TickAll(EpochDuration)
+		for i := 0; i < len(s.Hosts); i++ {
+			s.Hosts[i].TickAll(s.SamplingInterval)
 		}
 	}
 
-	Airq := &s.Airqs[s.currentAirqIndex]
+	Airq := &s.Hosts[s.currentHostIndex]
 
 	// Populate host-specific tags: for example, LSVNV2182E2100001
 	p.AppendTag(AirqTagKeys[0], Airq.Province)
@@ -105,6 +104,6 @@ func (s *AirqSimulator) Next(p *Point) {
 	Airq.SimulatedMeasurements[s.simulatedMeasurementIndex].ToPoint(p)
 
 	s.madePoints++
-	s.currentAirqIndex++
+	s.currentHostIndex++
 	s.madeValues += int64(len(p.FieldValues))
 }

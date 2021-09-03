@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/airq/gbt2260"
-	. "git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
 )
 
 const NAirqSims = 1
@@ -18,9 +18,8 @@ const (
 )
 
 var (
-	EpochDuration = 1 * time.Second
-	Region        = gbt2260.NewGBT2260()
-	AreaCode      = Region.GetAllAreaCode()
+	Region   = gbt2260.NewGBT2260()
+	AreaCode = Region.GetAllAreaCode()
 )
 
 var (
@@ -40,14 +39,14 @@ var (
 
 // Type Host models a machine being monitored by Telegraf.
 type AirqDevice struct {
-	SimulatedMeasurements []SimulatedMeasurement
+	SimulatedMeasurements []common.SimulatedMeasurement
 
 	// These are all assigned once, at Host creation:
 	Province, City, County, SiteType, SiteID []byte
 }
 
-func NewAirqDeviceMeasurements(start time.Time) []SimulatedMeasurement {
-	sm := []SimulatedMeasurement{
+func NewAirqDeviceMeasurements(start time.Time) []common.SimulatedMeasurement {
+	sm := []common.SimulatedMeasurement{
 		NewCityAirQualityMeasurement(start),
 	}
 
@@ -59,13 +58,13 @@ func NewAirqDeviceMeasurements(start time.Time) []SimulatedMeasurement {
 
 func NewAirqDevice(i int, offset int, start time.Time) AirqDevice {
 	sm := NewAirqDeviceMeasurements(start)
-	region := Region.SearchGBT2260(string(RandChoice(AreaCode)))
+	region := Region.SearchGBT2260(string(common.RandChoice(AreaCode)))
 	h := AirqDevice{
 		// Tag Values that are static throughout the life of a Host:
 		Province: []byte(region[0]),
 		City:     []byte(region[1]),
 		County:   []byte(region[2]),
-		SiteType: RandChoice(SiteTypeChoices),
+		SiteType: common.RandChoice(SiteTypeChoices),
 		SiteID:   []byte(fmt.Sprintf("DEV%09d", i+offset)),
 
 		SimulatedMeasurements: sm,

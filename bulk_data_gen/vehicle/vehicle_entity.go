@@ -4,7 +4,7 @@ import (
 	"math/rand"
 	"time"
 
-	. "git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
 )
 
 func init() {
@@ -93,8 +93,7 @@ func NewEntityMeasurement(start time.Time) *EntityMeasurement {
 
 	return &EntityMeasurement{
 		timestamp: start,
-
-		values: values,
+		values:    values,
 	}
 }
 
@@ -103,7 +102,7 @@ func (m *EntityMeasurement) Tick(d time.Duration) {
 
 }
 
-func (m *EntityMeasurement) ToPoint(p *Point) bool {
+func (m *EntityMeasurement) ToPoint(p *common.Point) bool {
 	p.SetMeasurementName(EntityByteString)
 	p.SetTimestamp(&m.timestamp)
 

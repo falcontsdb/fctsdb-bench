@@ -11,11 +11,19 @@ import (
 )
 
 type AirqBasicGenerator struct {
-	sim *airq.AirqSimulator
+	// basic struct
+	sim   *airq.AirqSimulator
+	epoch string
 }
 
 func (g *AirqBasicGenerator) Init(sim interface{}) {
 	g.sim = sim.(*airq.AirqSimulator)
+}
+
+func (g *AirqBasicGenerator) loadEpochFromEnd(d time.Duration) {
+	end := g.sim.TimestampEnd
+	start := end.Add(d * -1)
+	g.epoch = fmt.Sprintf("time >= '%s' and time < '%s'", start.UTC().Format(time.RFC3339), end.UTC().Format(time.RFC3339))
 }
 
 func (g *AirqBasicGenerator) Next() string {
@@ -23,36 +31,38 @@ func (g *AirqBasicGenerator) Next() string {
 }
 
 type airqFromOneSiteNewest struct {
+	// case 1
 	AirqBasicGenerator
 }
 
 func (g *airqFromOneSiteNewest) Next() string {
-	index := rand.Intn(len(g.sim.Airqs))
-	airq := g.sim.Airqs[index]
-	return fmt.Sprintf("select * from city_air_quality where site_id = '%s'  order by time desc limit 1", airq.SiteID)
+	index := rand.Intn(len(g.sim.Hosts))
+	airq := g.sim.Hosts[index]
+	return fmt.Sprintf("select * from city_air_quality where site_id = '%s' order by time desc limit 1;", airq.SiteID)
 }
 
 type airqFromSitesNewest struct {
+	// case 2
 	AirqBasicGenerator
-	count int
+	count int // 需要查询的设备数
 	perm  []int
 }
 
 func (g *airqFromSitesNewest) Init(sim interface{}) {
 	g.sim = sim.(*airq.AirqSimulator)
-	g.perm = rand.Perm(len(g.sim.Airqs))
+	g.perm = rand.Perm(len(g.sim.Hosts))
 }
 
 func (g *airqFromSitesNewest) Next() string {
-	if g.count > len(g.sim.Airqs) {
+	if g.count >= len(g.sim.Hosts) {
 		log.Fatal("site num the query needed is more than the count of sites in database")
 	}
-	index := rand.Intn(len(g.sim.Airqs) - g.count)
+	index := rand.Intn(len(g.sim.Hosts) - g.count)
 	buf := bufPool.Get().(*bytes.Buffer)
 	buf.Write([]byte(`select * from city_air_quality where site_id in (`))
 	for i := 0; i < g.count; i++ {
 		buf.Write([]byte(`'`))
-		buf.Write(g.sim.Airqs[g.perm[index+i]].SiteID)
+		buf.Write(g.sim.Hosts[g.perm[index+i]].SiteID)
 		buf.Write([]byte(`'`))
 		if i != g.count-1 {
 			buf.Write([]byte(`,`))
@@ -66,154 +76,252 @@ func (g *airqFromSitesNewest) Next() string {
 }
 
 type countOfDataFromOneSite struct {
+	// case 3
 	AirqBasicGenerator
 	Period time.Duration
 }
 
-//todo
-// change the Now() in query to the endTime of dataSet
+func (g *countOfDataFromOneSite) Init(sim interface{}) {
+	g.sim = sim.(*airq.AirqSimulator)
+	g.loadEpochFromEnd(g.Period)
+}
+
 func (g *countOfDataFromOneSite) Next() string {
-	index := rand.Intn(len(g.sim.Airqs))
-	airq := g.sim.Airqs[index]
-	return fmt.Sprintf("select count(aqi) from city_air_quality where site_id = '%s' and time > now()-%s", airq.SiteID, g.Period.String())
+	index := rand.Intn(len(g.sim.Hosts))
+	airq := g.sim.Hosts[index]
+	return fmt.Sprintf("select count(aqi) from city_air_quality where site_id = '%s' and %s", airq.SiteID, g.epoch)
 }
 
 type limitOffsetWithTimeOfOneSite struct {
+	// case 4
 	AirqBasicGenerator
 	Period time.Duration
+}
+
+func (g *limitOffsetWithTimeOfOneSite) Init(sim interface{}) {
+	g.sim = sim.(*airq.AirqSimulator)
+	g.loadEpochFromEnd(g.Period)
 }
 
 //todo
 // make the offset-clause value changeable
 func (g *limitOffsetWithTimeOfOneSite) Next() string {
-	index := rand.Intn(len(g.sim.Airqs))
-	airq := g.sim.Airqs[index]
-	return fmt.Sprintf("select * from city_air_quality where device_id = '%s' and time > now()-%s order by time desc limit 100 offset 100", airq.SiteID, g.Period.String())
+	index := rand.Intn(len(g.sim.Hosts))
+	airq := g.sim.Hosts[index]
+	g.sim.TimestampEnd.Add(g.Period * -1)
+	return fmt.Sprintf("select * from city_air_quality where site_id = '%s' and %s order by time desc limit 100 offset 100", airq.SiteID, g.epoch)
 }
 
 type countOfData struct {
+	// case 5
 	AirqBasicGenerator
 	Period time.Duration
+}
+
+func (g *countOfData) Init(sim interface{}) {
+	g.sim = sim.(*airq.AirqSimulator)
+	g.loadEpochFromEnd(g.Period)
 }
 
 func (g *countOfData) Next() string {
-	return fmt.Sprintf("select count(aqi) from city_air_quality where time > now()-%s", g.Period.String())
+	return fmt.Sprintf("select count(aqi) from city_air_quality where %s", g.epoch)
 }
 
 type countOfDataGroupByTag struct {
+	// case 6
 	AirqBasicGenerator
 	Period time.Duration
+}
+
+func (g *countOfDataGroupByTag) Init(sim interface{}) {
+	g.sim = sim.(*airq.AirqSimulator)
+	g.loadEpochFromEnd(g.Period)
 }
 
 func (g *countOfDataGroupByTag) Next() string {
-	index := rand.Intn(len(g.sim.Airqs))
-	airq := g.sim.Airqs[index]
-	return fmt.Sprintf("select count(aqi) from city_air_quality where city = '%s' and time > now()-%s group by county", airq.City, g.Period.String())
+	index := rand.Intn(len(g.sim.Hosts))
+	airq := g.sim.Hosts[index]
+	return fmt.Sprintf("select count(aqi) from city_air_quality where city = '%s' and %s group by county", airq.City, g.epoch)
 }
 
 type countOfDataGroupByCity struct {
+	// case 7
 	AirqBasicGenerator
 	Period time.Duration
 }
 
+func (g *countOfDataGroupByCity) Init(sim interface{}) {
+	g.sim = sim.(*airq.AirqSimulator)
+	g.loadEpochFromEnd(g.Period)
+}
+
 func (g *countOfDataGroupByCity) Next() string {
-	return fmt.Sprintf("select count(aqi) from city_air_quality where time > now()-%s group by city", g.Period.String())
+	return fmt.Sprintf("select count(aqi) from city_air_quality where %s group by city", g.epoch)
 }
 
 type meanOfLastGroupBy struct {
+	// case 8
 	AirqBasicGenerator
 }
 
 func (g *meanOfLastGroupBy) Next() string {
-	index := rand.Intn(len(g.sim.Airqs))
-	airq := g.sim.Airqs[index]
+	index := rand.Intn(len(g.sim.Hosts))
+	airq := g.sim.Hosts[index]
 	return fmt.Sprintf("select mean(*) from (select last(*) from city_air_quality where city='%s' group by site_id)", airq.City)
 }
 
 type lastGroupBy struct {
+	// case 9
 	AirqBasicGenerator
 }
 
 func (g *lastGroupBy) Next() string {
-	index := rand.Intn(len(g.sim.Airqs))
-	airq := g.sim.Airqs[index]
+	index := rand.Intn(len(g.sim.Hosts))
+	airq := g.sim.Hosts[index]
 	return fmt.Sprintf("select last(*) from city_air_quality where city='%s' group by site_id", airq.City)
 }
 
 type meanOfOneSiteGroupByTime struct {
+	// case 10
 	AirqBasicGenerator
 	Period        time.Duration
 	GroupByPeriod time.Duration
+}
+
+func (g *meanOfOneSiteGroupByTime) Init(sim interface{}) {
+	g.sim = sim.(*airq.AirqSimulator)
+	g.loadEpochFromEnd(g.Period)
 }
 
 func (g *meanOfOneSiteGroupByTime) Next() string {
-	index := rand.Intn(len(g.sim.Airqs))
-	airq := g.sim.Airqs[index]
-	return fmt.Sprintf("select mean(*) from city_air_quality where site_id = '%s' and time > now()-%s group by time(%s)", airq.SiteID, g.Period.String(), g.GroupByPeriod.String())
+	index := rand.Intn(len(g.sim.Hosts))
+	airq := g.sim.Hosts[index]
+	return fmt.Sprintf("select mean(*) from city_air_quality where site_id = '%s' and %s group by time(%s)", airq.SiteID, g.epoch, g.GroupByPeriod.String())
 }
 
 type meanOfOneCityGroupByTime struct {
+	// case 11
 	AirqBasicGenerator
 	Period        time.Duration
 	GroupByPeriod time.Duration
 }
 
+func (g *meanOfOneCityGroupByTime) Init(sim interface{}) {
+	g.sim = sim.(*airq.AirqSimulator)
+	g.loadEpochFromEnd(g.Period)
+}
+
 func (g *meanOfOneCityGroupByTime) Next() string {
-	index := rand.Intn(len(g.sim.Airqs))
-	airq := g.sim.Airqs[index]
-	return fmt.Sprintf("select mean(*) from city_air_quality where city = '%s' and time > now()-%s group by time(%s)", airq.City, g.Period.String(), g.GroupByPeriod.String())
+	index := rand.Intn(len(g.sim.Hosts))
+	airq := g.sim.Hosts[index]
+	return fmt.Sprintf("select mean(*) from city_air_quality where city = '%s' and %s group by time(%s)", airq.City, g.epoch, g.GroupByPeriod.String())
 }
 
 type topOfLastGroupBySite struct {
+	// case 12
 	AirqBasicGenerator
 }
 
 func (g *topOfLastGroupBySite) Next() string {
-	index := rand.Intn(len(g.sim.Airqs))
-	airq := g.sim.Airqs[index]
+	index := rand.Intn(len(g.sim.Hosts))
+	airq := g.sim.Hosts[index]
 	return fmt.Sprintf("select top(aqi, 100), site_id from (select last(aqi) as aqi from city_air_quality where city='%s' group by site_id)", airq.City)
 }
 
 type countOfMeanGroupBytime struct {
+	// case 13
 	AirqBasicGenerator
 	Period        time.Duration
 	GroupByPeriod time.Duration
+}
+
+func (g *countOfMeanGroupBytime) Init(sim interface{}) {
+	g.sim = sim.(*airq.AirqSimulator)
+	g.loadEpochFromEnd(g.Period)
 }
 
 func (g *countOfMeanGroupBytime) Next() string {
-	index := rand.Intn(len(g.sim.Airqs))
-	airq := g.sim.Airqs[index]
-	return fmt.Sprintf("select count(aqi) from (select mean(aqi) as aqi from city_air_quality where city = '%s' and site_id = '%s' and time > now()-%s group by time(%s)) where aqi > 50", airq.City, airq.SiteID, g.Period, g.GroupByPeriod)
+	index := rand.Intn(len(g.sim.Hosts))
+	airq := g.sim.Hosts[index]
+	return fmt.Sprintf("select count(aqi) from (select mean(aqi) as aqi from city_air_quality where city = '%s' and site_id = '%s' and %s group by time(%s)) where aqi > 50", airq.City, airq.SiteID, g.epoch, g.GroupByPeriod.String())
 }
 
 type countOfMeanGroupBytime1 struct {
+	// case 14
 	AirqBasicGenerator
 	Period        time.Duration
 	GroupByPeriod time.Duration
 }
 
+func (g *countOfMeanGroupBytime1) Init(sim interface{}) {
+	g.sim = sim.(*airq.AirqSimulator)
+	g.loadEpochFromEnd(g.Period)
+}
+
 func (g *countOfMeanGroupBytime1) Next() string {
-	index := rand.Intn(len(g.sim.Airqs))
-	airq := g.sim.Airqs[index]
-	return fmt.Sprintf("select count(aqi) from (select mean(aqi) as aqi from city_air_quality where city = '%s' and time > now()-%s group by time(%s)) where aqi > 50", airq.City, g.Period, g.GroupByPeriod)
+	index := rand.Intn(len(g.sim.Hosts))
+	airq := g.sim.Hosts[index]
+	return fmt.Sprintf("select count(aqi) from (select mean(aqi) as aqi from city_air_quality where city = '%s' and %s group by time(%s)) where aqi > 50", airq.City, g.epoch, g.GroupByPeriod.String())
 }
 
 type topOfMeanGroupByCity struct {
+	// case 15
 	AirqBasicGenerator
 	Period time.Duration
+}
+
+func (g *topOfMeanGroupByCity) Init(sim interface{}) {
+	g.sim = sim.(*airq.AirqSimulator)
+	g.loadEpochFromEnd(g.Period)
 }
 
 func (g *topOfMeanGroupByCity) Next() string {
-	index := rand.Intn(len(g.sim.Airqs))
-	airq := g.sim.Airqs[index]
-	return fmt.Sprintf("select top(aqi, 100) as aqi, city from (select mean(aqi) as aqi from city_air_quality where province='%s' and time > now()-%s group by city)", airq.Province, g.Period)
+	index := rand.Intn(len(g.sim.Hosts))
+	airq := g.sim.Hosts[index]
+	return fmt.Sprintf("select top(aqi, 100) as aqi, city from (select mean(aqi) as aqi from city_air_quality where province='%s' and %s group by city)", airq.Province, g.epoch)
 }
 
 type topOfMeanGroupByCity1 struct {
+	// case 16
 	AirqBasicGenerator
 	Period time.Duration
 }
 
+func (g *topOfMeanGroupByCity1) Init(sim interface{}) {
+	g.sim = sim.(*airq.AirqSimulator)
+	g.loadEpochFromEnd(g.Period)
+}
+
 func (g *topOfMeanGroupByCity1) Next() string {
-	return fmt.Sprintf("select top(aqi, 100) as aqi, city from (select mean(aqi) as aqi from city_air_quality where time > now()-%s group by city)", g.Period)
+	return fmt.Sprintf("select top(aqi, 100) as aqi, city from (select mean(aqi) as aqi from city_air_quality where %s group by city)", g.epoch)
+}
+
+type meanOfOneCityAndMonthGroupByDay struct {
+	// case 17
+	AirqBasicGenerator
+	timeNow   time.Time
+	timeIndex int
+}
+
+func (g *meanOfOneCityAndMonthGroupByDay) Init(sim interface{}) {
+	g.sim = sim.(*airq.AirqSimulator)
+	g.timeNow = g.sim.TimestampStart
+	g.timeIndex = 0
+}
+
+func (g *meanOfOneCityAndMonthGroupByDay) Next() string {
+	index := rand.Intn(len(g.sim.Hosts))
+	airq := g.sim.Hosts[index]
+	start := g.timeNow
+	end := start.Add(time.Hour * 24 * 30)
+	if end.After(g.sim.TimestampEnd) { // 如果超过结束时间，重头开始，本条因为不满30天，丢弃
+		g.timeIndex = 0
+		start = g.sim.TimestampStart
+		end = start.Add(time.Hour * 24 * 30)
+	}
+	g.timeIndex++
+	g.timeNow = end
+
+	return fmt.Sprintf("select mean(aqi) as aqi from city_air_quality where city = '%s' and time > '%s' and time < '%s' group by time(1d)",
+		airq.City, start.UTC().Format(time.RFC3339), end.UTC().Format(time.RFC3339))
 }

@@ -3,16 +3,16 @@ package vehicle
 import (
 	"time"
 
-	. "git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
 )
 
 // Type IotSimulatorConfig is used to create a IotSimulator.
 type VehicleSimulatorConfig struct {
-	Start time.Time
-	End   time.Time
-
-	VehicleCount  int64
-	VehicleOffset int64
+	Start            time.Time
+	End              time.Time
+	SamplingInterval time.Duration
+	VehicleCount     int64
+	VehicleOffset    int64
 }
 
 func (d *VehicleSimulatorConfig) ToSimulator() *VehicleSimulator {
@@ -25,19 +25,18 @@ func (d *VehicleSimulatorConfig) ToSimulator() *VehicleSimulator {
 		measNum += int64(vehicleInfos[i].NumMeasurements())
 	}
 
-	epochs := d.End.Sub(d.Start).Nanoseconds() / EpochDuration.Nanoseconds()
+	epochs := d.End.Sub(d.Start).Nanoseconds() / d.SamplingInterval.Nanoseconds()
 	maxPoints := epochs * measNum
 	dg := &VehicleSimulator{
 		madePoints: 0,
 		madeValues: 0,
 		maxPoints:  maxPoints,
 
-		currentVehicleIndex: 0,
-		Vehicles:            vehicleInfos,
-
-		timestampNow:   d.Start,
-		timestampStart: d.Start,
-		timestampEnd:   d.End,
+		currentHostIndex: 0,
+		Hosts:            vehicleInfos,
+		SamplingInterval: d.SamplingInterval,
+		TimestampStart:   d.Start,
+		TimestampEnd:     d.End,
 	}
 
 	return dg
@@ -46,18 +45,16 @@ func (d *VehicleSimulatorConfig) ToSimulator() *VehicleSimulator {
 // A IotSimulator generates data similar to telemetry from Telegraf.
 // It fulfills the Simulator interface.
 type VehicleSimulator struct {
-	madePoints int64
-	maxPoints  int64
-	madeValues int64
-
+	madePoints                int64
+	maxPoints                 int64
+	madeValues                int64
 	simulatedMeasurementIndex int
+	currentHostIndex          int
 
-	currentVehicleIndex int
-	Vehicles            []Vehicle
-
-	timestampNow   time.Time
-	timestampStart time.Time
-	timestampEnd   time.Time
+	Hosts            []Vehicle
+	SamplingInterval time.Duration
+	TimestampStart   time.Time
+	TimestampEnd     time.Time
 }
 
 func (g *VehicleSimulator) SeenPoints() int64 {
@@ -77,22 +74,22 @@ func (g *VehicleSimulator) Finished() bool {
 }
 
 // Next advances a Point to the next state in the generator.
-func (v *VehicleSimulator) Next(p *Point) {
+func (v *VehicleSimulator) Next(p *common.Point) {
 	// switch to the next metric if needed
-	if v.currentVehicleIndex == len(v.Vehicles) {
-		v.currentVehicleIndex = 0
+	if v.currentHostIndex == len(v.Hosts) {
+		v.currentHostIndex = 0
 		v.simulatedMeasurementIndex++
 	}
 
 	if v.simulatedMeasurementIndex == NVehicleSims {
 		v.simulatedMeasurementIndex = 0
 
-		for i := 0; i < len(v.Vehicles); i++ {
-			v.Vehicles[i].TickAll(EpochDuration)
+		for i := 0; i < len(v.Hosts); i++ {
+			v.Hosts[i].TickAll(v.SamplingInterval)
 		}
 	}
 
-	vehicle := &v.Vehicles[v.currentVehicleIndex]
+	vehicle := &v.Hosts[v.currentHostIndex]
 
 	// Populate host-specific tags: for example, LSVNV2182E2100001
 	p.AppendTag([]byte("VIN"), vehicle.Name)
@@ -101,6 +98,6 @@ func (v *VehicleSimulator) Next(p *Point) {
 	vehicle.SimulatedMeasurements[v.simulatedMeasurementIndex].ToPoint(p)
 
 	v.madePoints++
-	v.currentVehicleIndex++
+	v.currentHostIndex++
 	v.madeValues += int64(len(p.FieldValues))
 }
