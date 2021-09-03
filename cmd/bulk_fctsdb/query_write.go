@@ -34,15 +34,12 @@ type InfluxQueryLoad struct {
 	batchChan             chan batch
 	inputDone             chan struct{}
 	progressIntervalItems uint64
-
-	scanFinished     bool
-	totalBackOffSecs float64
-	configs          []*loadWorkerConfig
-	// valuesRead       int64
-	itemsRead int64
-	// bytesRead        int64
-	sourceReader  *os.File
-	respCollector ResponseCollector
+	scanFinished          bool
+	totalBackOffSecs      float64
+	configs               []*loadWorkerConfig
+	itemsRead             int64
+	sourceReader          *os.File
+	respCollector         ResponseCollector
 }
 
 var (

@@ -64,6 +64,7 @@ type DataWriteBenchmark struct {
 	bytesRead        int64
 	sourceReader     *os.File
 	simulators       []common.Simulator
+	respCollector    ResponseCollector
 }
 
 var (
@@ -75,7 +76,6 @@ var (
 			RunWrite()
 		},
 	}
-	mutex sync.Mutex
 )
 
 func init() {
@@ -89,16 +89,18 @@ func RunWrite() {
 	dataWriteBenchmark.CreateDb()
 
 	var workersGroup sync.WaitGroup
-	syncChanDone := make(chan int)
+
 	dataWriteBenchmark.PrepareWorkers()
-	fmt.Println(len(dataWriteBenchmark.simulators))
 
 	for i := 0; i < dataWriteBenchmark.workers; i++ {
 		dataWriteBenchmark.PrepareProcess(i)
 		dataWriteBenchmark.runningCount++
 		workersGroup.Add(1)
+
 		go func(w int) {
-			dataWriteBenchmark.RunSimulator(w, syncChanDone)
+			dataWriteBenchmark.RunSimulator(w)
+		}(i)
+		go func(w int) {
 			err := dataWriteBenchmark.RunProcess(w, &workersGroup)
 			if err != nil {
 				log.Println(err.Error())
@@ -111,14 +113,11 @@ func RunWrite() {
 	log.Printf("Started load with %d workers\n", dataWriteBenchmark.workers)
 
 	start := time.Now()
-
-	dataWriteBenchmark.SyncEnd()
-	close(syncChanDone)
+	dataWriteBenchmark.respCollector.SetStart(start)
 	workersGroup.Wait()
-
 	dataWriteBenchmark.CleanUp()
-
 	end := time.Now()
+	dataWriteBenchmark.respCollector.SetEnd(end)
 	took := end.Sub(start)
 
 	itemsRead, bytesRead, valuesRead := dataWriteBenchmark.GetReadStatistics()
@@ -130,6 +129,7 @@ func RunWrite() {
 	loadTime := took.Seconds()
 	convertedBytesRate := bytesRate / (1 << 20)
 	log.Printf("loaded %d items in %fsec with %d workers (mean point rate %f/sec, mean value rate %f/s, %.2fMB/sec from stdin)\n", itemsRead, loadTime, dataWriteBenchmark.workers, itemsRate, valuesRate, convertedBytesRate)
+	dataWriteBenchmark.respCollector.ShowDetail()
 }
 
 func (d *DataWriteBenchmark) Init(cmd *cobra.Command) {
@@ -267,6 +267,7 @@ func (d *DataWriteBenchmark) PrepareWorkers() {
 		if i == d.workers-1 {
 			step = d.scaleVar - step*int64(i)
 		}
+		fmt.Println(i, step, offset)
 		d.prepareSimulator(i, step, offset)
 	}
 }
@@ -369,7 +370,6 @@ func (d *DataWriteBenchmark) RunProcess(i int, waitGroup *sync.WaitGroup) error 
 		}
 
 	}
-
 	if batchItemCount > 0 {
 		atomic.AddInt64(&d.bytesRead, int64(buf.Len()))
 		err = d.processBatches(d.configs[i].writer, buf, d.configs[i].backingOffChan, fmt.Sprintf("%d", i))
@@ -409,12 +409,13 @@ func (d *DataWriteBenchmark) Write(p []byte) (n int, err error) {
 	b := make([]byte, len(p))
 	copy(b, p)
 	d.pointChan <- &b
+	// fmt.Println("write", len(p))
 	return len(p), nil
 }
 
 // scan reads one item at a time from stdin. 1 item = 1 line.
 // When the requested number of items per batch is met, send a batch over batchChan for the workers to write.
-func (d *DataWriteBenchmark) RunSimulator(i int, syncChanDone chan int) {
+func (d *DataWriteBenchmark) RunSimulator(i int) {
 
 	var serializer common.Serializer
 	switch d.format {
@@ -460,6 +461,7 @@ func (d *DataWriteBenchmark) RunSimulator(i int, syncChanDone chan int) {
 
 	// Closing inputDone signals to the application that we've read everything and can now shut down.
 	atomic.AddInt64(&d.runningCount, -1)
+
 	if atomic.LoadInt64(&d.runningCount) == 0 {
 		close(d.pointChan)
 	}
@@ -473,22 +475,21 @@ func (d *DataWriteBenchmark) processBatches(w *HTTPWriter, buf *bytes.Buffer, ba
 	var err error
 	sleepTime := d.backoff
 	timeStart := time.Now()
-
+	var lat int64
 	for {
 		if d.useGzip {
 			compressedBatch := d.bufPool.Get().(*bytes.Buffer)
 			fasthttp.WriteGzip(compressedBatch, buf.Bytes())
 			//bodySize = len(compressedBatch.Bytes())
-			_, err = w.WriteLineProtocol(compressedBatch.Bytes(), true)
+			lat, err = w.WriteLineProtocol(compressedBatch.Bytes(), true)
 			// Return the compressed batch buffer to the pool.
 			compressedBatch.Reset()
 			d.bufPool.Put(compressedBatch)
 		} else {
 			//bodySize = len(batch.Bytes())
 			// fmt.Println(string(buf.Bytes()))
-			_, err = w.WriteLineProtocol(buf.Bytes(), false)
+			lat, err = w.WriteLineProtocol(buf.Bytes(), false)
 		}
-
 		if err == ErrorBackoff {
 			backoffSrc <- true
 			// Report telemetry, if applicable:
@@ -509,8 +510,10 @@ func (d *DataWriteBenchmark) processBatches(w *HTTPWriter, buf *bytes.Buffer, ba
 		}
 	}
 	if err != nil {
+		d.respCollector.AddOne(w.c.Database, lat, false)
 		return fmt.Errorf("error writing: %s", err.Error())
 	}
+	d.respCollector.AddOne(w.c.Database, lat, true)
 	return nil
 }
 
