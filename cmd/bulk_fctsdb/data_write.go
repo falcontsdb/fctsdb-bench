@@ -13,7 +13,7 @@ import (
 	"math/rand"
 	"net/http"
 	neturl "net/url"
-	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -52,21 +52,21 @@ type DataWriteBenchmark struct {
 	doDBCreate        bool
 
 	//runtime vars
-	timestampStart   time.Time
-	timestampEnd     time.Time
-	daemonUrls       []string
-	bufPool          sync.Pool
-	pointChan        chan *[]byte
-	inputDone        chan struct{}
-	totalBackOffSecs float64
-	configs          []*loadWorkerConfig
-	valuesRead       int64
-	runningCount     int64
-	itemsRead        int64
-	bytesRead        int64
-	sourceReader     *os.File
-	simulators       []common.Simulator
-	respCollector    ResponseCollector
+	timestampStart    time.Time
+	timestampEnd      time.Time
+	daemonUrls        []string
+	bufPool           sync.Pool
+	pointByteChan     chan *[]byte
+	pointPool         sync.Pool
+	inputDone         chan struct{}
+	totalBackOffSecs  float64
+	configs           []*loadWorkerConfig
+	valuesRead        int64
+	parallelSimulator int64
+	itemsRead         int64
+	bytesRead         int64
+	simulator         common.Simulator
+	respCollector     ResponseCollector
 }
 
 var (
@@ -95,15 +95,13 @@ func RunWrite() {
 	var workersGroup sync.WaitGroup
 
 	dataWriteBenchmark.PrepareWorkers()
+	dataWriteBenchmark.PrepareSimulator()
 
 	for i := 0; i < dataWriteBenchmark.workers; i++ {
 		dataWriteBenchmark.PrepareProcess(i)
-		dataWriteBenchmark.runningCount++
+		dataWriteBenchmark.parallelSimulator++
 		workersGroup.Add(1)
 
-		go func(w int) {
-			dataWriteBenchmark.RunSimulator(w)
-		}(i)
 		go func(w int) {
 			err := dataWriteBenchmark.RunProcess(w, &workersGroup)
 			if err != nil {
@@ -117,6 +115,7 @@ func RunWrite() {
 	log.Printf("Started load with %d workers\n", dataWriteBenchmark.workers)
 
 	start := time.Now()
+	dataWriteBenchmark.RunSimulator()
 	dataWriteBenchmark.respCollector.SetStart(start)
 	workersGroup.Wait()
 	dataWriteBenchmark.CleanUp()
@@ -160,10 +159,6 @@ func (d *DataWriteBenchmark) Init(cmd *cobra.Command) {
 }
 
 func (d *DataWriteBenchmark) Validate() {
-
-	if d.sourceReader == nil {
-		d.sourceReader = os.Stdin
-	}
 
 	d.daemonUrls = strings.Split(d.csvDaemonUrls, ",")
 	if len(d.daemonUrls) == 0 {
@@ -259,67 +254,61 @@ func (d *DataWriteBenchmark) PrepareWorkers() {
 			return bytes.NewBuffer(make([]byte, 0, 4*1024*1024))
 		},
 	}
-	d.pointChan = make(chan *[]byte, 100*d.workers)
+	d.pointByteChan = make(chan *[]byte, 100*d.workers)
+	d.pointPool = sync.Pool{
+		New: func() interface{} {
+			return common.MakeUsablePoint()
+		},
+	}
 	d.inputDone = make(chan struct{})
-
 	d.configs = make([]*loadWorkerConfig, d.workers)
 
-	d.simulators = make([]common.Simulator, d.workers)
-	var step int64 = d.scaleVar / int64(d.workers)
-	var offset int64 = 0
-	for i := 0; i < d.workers; i++ {
-		offset = step * int64(i)
-		if i == d.workers-1 {
-			step = d.scaleVar - step*int64(i)
-		}
-		d.prepareSimulator(i, step, offset)
-	}
 }
 
-func (d *DataWriteBenchmark) prepareSimulator(i int, step, offset int64) {
-	var sim common.Simulator
+func (d *DataWriteBenchmark) PrepareSimulator() {
+
 	switch d.useCase {
 	case common.UseCaseVehicle:
 		cfg := &vehicle.VehicleSimulatorConfig{
 			Start:            d.timestampStart,
 			End:              d.timestampEnd,
 			SamplingInterval: d.samplingInterval,
-			VehicleCount:     step,
-			VehicleOffset:    offset,
+			VehicleCount:     d.scaleVar,
+			VehicleOffset:    d.scaleVarOffset,
 		}
-		sim = cfg.ToSimulator()
+		d.simulator = cfg.ToSimulator()
 	case common.UseCaseAirQuality:
 		cfg := &airq.AirqSimulatorConfig{
 			Start:            d.timestampStart,
 			End:              d.timestampEnd,
 			SamplingInterval: d.samplingInterval,
-			AirqDeviceCount:  step,
-			AirqDeviceOffset: offset,
+			AirqDeviceCount:  d.scaleVar,
+			AirqDeviceOffset: d.scaleVarOffset,
 		}
-		sim = cfg.ToSimulator()
+		d.simulator = cfg.ToSimulator()
 	case common.UseCaseDevOps:
 		cfg := &devops.DevopsSimulatorConfig{
 			Start: d.timestampStart,
 			End:   d.timestampEnd,
 			// SamplingInterval: d.samplingInterval,
-			HostCount:  step,
-			HostOffset: offset,
+			HostCount:  d.scaleVar,
+			HostOffset: d.scaleVarOffset,
 		}
-		sim = cfg.ToSimulator()
+		d.simulator = cfg.ToSimulator()
+
 	default:
 		panic("unreachable")
 	}
-	d.simulators[i] = sim
 }
 
 func (d *DataWriteBenchmark) EmptyPointChanel() {
-	for range d.pointChan {
+	for range d.pointByteChan {
 	}
 }
 
 func (d *DataWriteBenchmark) SyncEnd() {
 	<-d.inputDone
-	close(d.pointChan)
+	close(d.pointByteChan)
 }
 
 func (d *DataWriteBenchmark) CleanUp() {
@@ -361,7 +350,7 @@ func (d *DataWriteBenchmark) RunProcess(i int, waitGroup *sync.WaitGroup) error 
 	buf := d.bufPool.Get().(*bytes.Buffer)
 
 	batchItemCount = 0
-	for pointByte := range d.pointChan {
+	for pointByte := range d.pointByteChan {
 		// mutex.Lock()
 		// fmt.Println(string(*pointByte))
 		// mutex.Unlock()
@@ -420,14 +409,14 @@ func (d *DataWriteBenchmark) GetReadStatistics() (itemsRead, bytesRead, valuesRe
 func (d *DataWriteBenchmark) Write(p []byte) (n int, err error) {
 	b := make([]byte, len(p))
 	copy(b, p)
-	d.pointChan <- &b
+	d.pointByteChan <- &b
 	// fmt.Println("write", len(p))
 	return len(p), nil
 }
 
 // scan reads one item at a time from stdin. 1 item = 1 line.
 // When the requested number of items per batch is met, send a batch over batchChan for the workers to write.
-func (d *DataWriteBenchmark) RunSimulator(i int) {
+func (d *DataWriteBenchmark) RunSimulator() {
 
 	var serializer common.Serializer
 	switch d.format {
@@ -457,26 +446,48 @@ func (d *DataWriteBenchmark) RunSimulator(i int) {
 		panic("unreachable")
 	}
 
-	sim := d.simulators[i]
-	point := common.MakeUsablePoint()
-	for !sim.Finished() {
-		sim.Next(point)
-		err := serializer.SerializePoint(d, point)
-		if err != nil {
-			log.Fatal(err)
-		}
-		point.Reset()
+	count := runtime.NumCPU() / 4
+	if count < 1 {
+		count = 1
+	}
+	var wg sync.WaitGroup
+	pointChan := make(chan *common.Point, 1000)
+	// 单倍协程生成point
+	for i := 0; i < count; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for !d.simulator.Finished() {
+				point := d.pointPool.Get().(*common.Point)
+				d.simulator.Next(point)
+				pointChan <- point
+			}
+		}()
 	}
 
-	atomic.AddInt64(&d.itemsRead, sim.SeenPoints())
-	atomic.AddInt64(&d.valuesRead, sim.SeenValues())
-
-	// Closing inputDone signals to the application that we've read everything and can now shut down.
-	atomic.AddInt64(&d.runningCount, -1)
-
-	if atomic.LoadInt64(&d.runningCount) == 0 {
-		close(d.pointChan)
+	var wg2 sync.WaitGroup
+	// 双倍协程将point转为为[]byte
+	for i := 0; i < 2*count; i++ {
+		wg2.Add(1)
+		go func() {
+			defer wg2.Done()
+			for point := range pointChan {
+				err := serializer.SerializePoint(d, point)
+				if err != nil {
+					log.Fatal(err)
+				}
+				point.Reset()
+				d.pointPool.Put(point)
+			}
+		}()
 	}
+
+	wg.Wait()
+	d.itemsRead = d.simulator.SeenPoints()
+	d.valuesRead = d.simulator.SeenValues()
+	close(pointChan)
+	wg2.Wait()
+	close(d.pointByteChan)
 
 }
 
