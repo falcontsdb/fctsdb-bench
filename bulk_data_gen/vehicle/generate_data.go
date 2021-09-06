@@ -1,6 +1,8 @@
 package vehicle
 
 import (
+	"log"
+	"sync/atomic"
 	"time"
 
 	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
@@ -16,11 +18,13 @@ type VehicleSimulatorConfig struct {
 }
 
 func (d *VehicleSimulatorConfig) ToSimulator() *VehicleSimulator {
+	if d.VehicleCount <= 0 {
+		log.Fatal("the vehicle count is unavailable")
+	}
 	vehicleInfos := make([]Vehicle, d.VehicleCount)
 	var measNum int64
 
 	for i := 0; i < len(vehicleInfos); i++ {
-
 		vehicleInfos[i] = NewVehicle(i, int(d.VehicleOffset), d.Start)
 		measNum += int64(vehicleInfos[i].NumMeasurements())
 	}
@@ -32,7 +36,7 @@ func (d *VehicleSimulatorConfig) ToSimulator() *VehicleSimulator {
 		madeValues: 0,
 		maxPoints:  maxPoints,
 
-		currentHostIndex: 0,
+		// currentHostIndex: 0,
 		Hosts:            vehicleInfos,
 		SamplingInterval: d.SamplingInterval,
 		TimestampStart:   d.Start,
@@ -45,11 +49,11 @@ func (d *VehicleSimulatorConfig) ToSimulator() *VehicleSimulator {
 // A IotSimulator generates data similar to telemetry from Telegraf.
 // It fulfills the Simulator interface.
 type VehicleSimulator struct {
-	madePoints                int64
-	maxPoints                 int64
-	madeValues                int64
-	simulatedMeasurementIndex int
-	currentHostIndex          int
+	madePoints int64
+	maxPoints  int64
+	madeValues int64
+	// simulatedMeasurementIndex int
+	// currentHostIndex int
 
 	Hosts            []Vehicle
 	SamplingInterval time.Duration
@@ -76,28 +80,22 @@ func (g *VehicleSimulator) Finished() bool {
 // Next advances a Point to the next state in the generator.
 func (v *VehicleSimulator) Next(p *common.Point) {
 	// switch to the next metric if needed
-	if v.currentHostIndex == len(v.Hosts) {
-		v.currentHostIndex = 0
-		v.simulatedMeasurementIndex++
-	}
+	madePoint := atomic.AddInt64(&v.madePoints, 1)
+	hostIndex := madePoint % int64(len(v.Hosts))
 
-	if v.simulatedMeasurementIndex == NVehicleSims {
-		v.simulatedMeasurementIndex = 0
-
-		for i := 0; i < len(v.Hosts); i++ {
-			v.Hosts[i].TickAll(v.SamplingInterval)
-		}
-	}
-
-	vehicle := &v.Hosts[v.currentHostIndex]
+	vehicle := &v.Hosts[hostIndex]
+	// vehicle.SimulatedMeasurements[0].Tick(v.SamplingInterval)
+	// 为了协程安全，这里不使用Tick方法
+	timestamp := v.TimestampStart.Add(v.SamplingInterval * time.Duration(madePoint/int64(len(v.Hosts))))
+	p.SetTimestamp(&timestamp)
 
 	// Populate host-specific tags: for example, LSVNV2182E2100001
 	p.AppendTag([]byte("VIN"), vehicle.Name)
 
 	// Populate measurement-specific tags and fields:
-	vehicle.SimulatedMeasurements[v.simulatedMeasurementIndex].ToPoint(p)
+	vehicle.SimulatedMeasurements[0].ToPoint(p)
 
-	v.madePoints++
-	v.currentHostIndex++
-	v.madeValues += int64(len(p.FieldValues))
+	// v.madePoints++
+	// v.madeValues += int64(len(p.FieldValues))
+	atomic.AddInt64(&v.madeValues, int64(len(p.FieldValues)))
 }

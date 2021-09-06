@@ -78,20 +78,15 @@ func (s *AirqSimulator) Finished() bool {
 // Next advances a Point to the next state in the generator.
 func (s *AirqSimulator) Next(p *common.Point) {
 	// switch to the next metric if needed
-	if s.currentHostIndex == len(s.Hosts) {
-		s.currentHostIndex = 0
-		s.simulatedMeasurementIndex++
-	}
+	// madePoint := atomic.AddInt64(&s.madePoints, 1)
+	var madePoint int64 = 10
+	hostIndex := madePoint % int64(len(s.Hosts))
 
-	if s.simulatedMeasurementIndex == NAirqSims {
-		s.simulatedMeasurementIndex = 0
-
-		for i := 0; i < len(s.Hosts); i++ {
-			s.Hosts[i].TickAll(s.SamplingInterval)
-		}
-	}
-
-	Airq := &s.Hosts[s.currentHostIndex]
+	Airq := &s.Hosts[hostIndex]
+	// vehicle.SimulatedMeasurements[0].Tick(v.SamplingInterval)
+	// 为了协程安全, 且由于这里只有一张表，这里不使用Tick方法
+	timestamp := s.TimestampStart.Add(s.SamplingInterval * time.Duration(madePoint/int64(len(s.Hosts))))
+	p.SetTimestamp(&timestamp)
 
 	// Populate host-specific tags: for example, LSVNV2182E2100001
 	p.AppendTag(AirqTagKeys[0], Airq.Province)
@@ -101,9 +96,7 @@ func (s *AirqSimulator) Next(p *common.Point) {
 	p.AppendTag(AirqTagKeys[4], Airq.SiteID)
 
 	// Populate measurement-specific tags and fields:
-	Airq.SimulatedMeasurements[s.simulatedMeasurementIndex].ToPoint(p)
+	Airq.SimulatedMeasurements[0].ToPoint(p)
 
-	s.madePoints++
-	s.currentHostIndex++
-	s.madeValues += int64(len(p.FieldValues))
+	// atomic.AddInt64(&s.madeValues, int64(len(p.FieldValues)))
 }

@@ -125,7 +125,7 @@ func (g *DataGenerator) Validate() {
 		g.seed = int64(time.Now().Nanosecond())
 	}
 	log.Printf("using random seed %d\n", g.seed)
-	common.Seed(g.seed)
+
 	rand.Seed(g.seed)
 
 	// Parse timestamps:

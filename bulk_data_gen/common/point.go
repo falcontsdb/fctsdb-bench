@@ -59,3 +59,8 @@ func (p *Point) AppendField(key []byte, value interface{}) {
 	p.FieldKeys = append(p.FieldKeys, key)
 	p.FieldValues = append(p.FieldValues, value)
 }
+
+func (p *Point) AddFeild(key [][]byte, value []interface{}) {
+	p.FieldKeys = key
+	p.FieldValues = value
+}

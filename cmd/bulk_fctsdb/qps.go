@@ -6,6 +6,7 @@ import (
 	"math"
 	"reflect"
 	"sort"
+	"sync"
 	"time"
 )
 
@@ -32,18 +33,23 @@ type ResponseCollector struct {
 	stats     []*RespStat
 	startTime time.Time
 	endTime   time.Time
+	mutex     sync.Mutex
 }
 
 func (c *ResponseCollector) Add(r *RespStat) {
+	c.mutex.Lock()
 	c.stats = append(c.stats, r)
+	c.mutex.Unlock()
 }
 
 func (c *ResponseCollector) AddOne(lable string, lat int64, isPass bool) {
+	c.mutex.Lock()
 	c.stats = append(c.stats, &RespStat{
 		Lable:  lable,
 		Lat:    lat,
 		IsPass: isPass,
 	})
+	c.mutex.Unlock()
 }
 
 func (c *ResponseCollector) SetStart(t time.Time) {

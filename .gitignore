@@ -1,6 +1,8 @@
 .DS_Store
 .pytest_cache
 cpu.out
-qe.txt
+*.txt
 airq.test
 data.txt
+.vscode
+fcbench*

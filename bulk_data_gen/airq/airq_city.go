@@ -42,7 +42,7 @@ func (m *CityAirQualityMeasurement) Tick(d time.Duration) {
 
 func (m *CityAirQualityMeasurement) ToPoint(p *common.Point) bool {
 	p.SetMeasurementName(CityAirQualityByteString)
-	p.SetTimestamp(&m.timestamp)
+	// p.SetTimestamp(&m.timestamp)
 
 	p.AppendField(CityAirQualityFieldKeys[0], rand.Intn(490)+10)
 	p.AppendField(CityAirQualityFieldKeys[1], rand.Intn(490)+10)

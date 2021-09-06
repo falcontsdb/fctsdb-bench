@@ -22,6 +22,7 @@ import (
 
 	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/airq"
 	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/devops"
 	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/vehicle"
 	"git.querycap.com/falcontsdb/fctsdb-bench/util/report"
 	"github.com/spf13/cobra"
@@ -48,6 +49,7 @@ type DataWriteBenchmark struct {
 	seed              int64
 	debug             int
 	cpuProfile        string
+	doDBCreate        bool
 
 	//runtime vars
 	timestampStart   time.Time
@@ -86,7 +88,9 @@ func init() {
 func RunWrite() {
 
 	dataWriteBenchmark.Validate()
-	dataWriteBenchmark.CreateDb()
+	if dataWriteBenchmark.doDBCreate {
+		dataWriteBenchmark.CreateDb()
+	}
 
 	var workersGroup sync.WaitGroup
 
@@ -136,6 +140,7 @@ func (d *DataWriteBenchmark) Init(cmd *cobra.Command) {
 	writeFlag := cmd.Flags()
 	writeFlag.StringVar(&d.format, "format", formatChoices[0], fmt.Sprintf("Format to emit. (choices: %s)", strings.Join(formatChoices, ", ")))
 	writeFlag.StringVar(&d.useCase, "use-case", CaseChoices[0], fmt.Sprintf("Use case to model. (choices: %s)", strings.Join(CaseChoices, ", ")))
+	writeFlag.BoolVar(&d.doDBCreate, "do-db-create", true, "Whether to create the database.")
 	writeFlag.Int64Var(&d.scaleVar, "scale-var", 1, "Scaling variable specific to the use case.")
 	writeFlag.Int64Var(&d.scaleVarOffset, "scale-var-offset", 0, "Scaling variable offset specific to the use case.")
 	writeFlag.DurationVar(&d.samplingInterval, "sampling-interval", time.Second, "Simulated sampling interval.")
@@ -186,7 +191,7 @@ func (d *DataWriteBenchmark) Validate() {
 		d.seed = int64(time.Now().Nanosecond())
 	}
 	log.Printf("using random seed %d\n", d.seed)
-	common.Seed(d.seed)
+
 	rand.Seed(d.seed)
 
 	// Parse timestamps:
@@ -267,7 +272,6 @@ func (d *DataWriteBenchmark) PrepareWorkers() {
 		if i == d.workers-1 {
 			step = d.scaleVar - step*int64(i)
 		}
-		fmt.Println(i, step, offset)
 		d.prepareSimulator(i, step, offset)
 	}
 }
@@ -275,7 +279,7 @@ func (d *DataWriteBenchmark) PrepareWorkers() {
 func (d *DataWriteBenchmark) prepareSimulator(i int, step, offset int64) {
 	var sim common.Simulator
 	switch d.useCase {
-	case CaseChoices[0]:
+	case common.UseCaseVehicle:
 		cfg := &vehicle.VehicleSimulatorConfig{
 			Start:            d.timestampStart,
 			End:              d.timestampEnd,
@@ -284,7 +288,7 @@ func (d *DataWriteBenchmark) prepareSimulator(i int, step, offset int64) {
 			VehicleOffset:    offset,
 		}
 		sim = cfg.ToSimulator()
-	case CaseChoices[1]:
+	case common.UseCaseAirQuality:
 		cfg := &airq.AirqSimulatorConfig{
 			Start:            d.timestampStart,
 			End:              d.timestampEnd,
@@ -293,7 +297,15 @@ func (d *DataWriteBenchmark) prepareSimulator(i int, step, offset int64) {
 			AirqDeviceOffset: offset,
 		}
 		sim = cfg.ToSimulator()
-
+	case common.UseCaseDevOps:
+		cfg := &devops.DevopsSimulatorConfig{
+			Start: d.timestampStart,
+			End:   d.timestampEnd,
+			// SamplingInterval: d.samplingInterval,
+			HostCount:  step,
+			HostOffset: offset,
+		}
+		sim = cfg.ToSimulator()
 	default:
 		panic("unreachable")
 	}

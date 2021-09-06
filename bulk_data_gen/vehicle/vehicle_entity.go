@@ -2,14 +2,11 @@ package vehicle
 
 import (
 	"math/rand"
+	"sync"
 	"time"
 
 	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
 )
-
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
 
 var (
 	EntityByteString      = []byte("vehicle")       // heap optimization
@@ -84,12 +81,13 @@ var (
 
 type EntityMeasurement struct {
 	timestamp time.Time
-	values    []int64
+	values    int
+	mutex     sync.Mutex
 }
 
 func NewEntityMeasurement(start time.Time) *EntityMeasurement {
 
-	values := make([]int64, len(EntityFieldKeys))
+	values := len(EntityFieldKeys)
 
 	return &EntityMeasurement{
 		timestamp: start,
@@ -99,17 +97,30 @@ func NewEntityMeasurement(start time.Time) *EntityMeasurement {
 
 func (m *EntityMeasurement) Tick(d time.Duration) {
 	m.timestamp = m.timestamp.Add(d)
-
 }
 
 func (m *EntityMeasurement) ToPoint(p *common.Point) bool {
 	p.SetMeasurementName(EntityByteString)
-	p.SetTimestamp(&m.timestamp)
+	// p.SetTimestamp(&m.timestamp)
+	letterIdxBits := 7                           // 6 bits to represent a letter index
+	letterIdxMask := int64(1<<letterIdxBits - 1) // All 1-bits, as many as letterIdxBits
+	letterIdxMax := 63 / letterIdxBits
 
-	for i := range m.values {
-		index := rand.Intn(100)
-		p.AppendField(EntityFieldKeys[i], randomNumbers[i][index])
+	for i, cache, remain := m.values-1, rand.Int63(), letterIdxMax; i >= 0; {
+		if remain == 0 {
+			cache, remain = rand.Int63(), letterIdxMax
+		}
+		if idx := int(cache & letterIdxMask); idx < len(randomNumbers[i]) {
+			p.AppendField(EntityFieldKeys[i], randomNumbers[i][idx])
+			i--
+		}
+		cache >>= letterIdxBits
+		remain--
 	}
+	// for i := range m.values {
+	// 	index := rand.Intn(100)
+	// 	p.AppendField(EntityFieldKeys[i], randomNumbers[i][index])
+	// }
 	return true
 }
 

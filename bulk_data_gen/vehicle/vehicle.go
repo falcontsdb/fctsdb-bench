@@ -8,16 +8,6 @@ import (
 )
 
 var (
-
-	// Tag fields common to all inside sensors:
-	RoomTagKey = []byte("room_id")
-
-	// Tag fields common to all inside sensors:
-	SensorHomeTagKeys = [][]byte{
-		[]byte("sensor_id"),
-		[]byte("home_id"),
-	}
-
 	DefaultVehicleDateTimeStart = "2018-01-01T00:00:00Z"
 	DefaultVehicleDateTimeEnd   = "2018-01-01T00:00:01Z"
 )
