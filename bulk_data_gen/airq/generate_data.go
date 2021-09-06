@@ -1,6 +1,7 @@
 package airq
 
 import (
+	"sync/atomic"
 	"time"
 
 	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
@@ -78,8 +79,7 @@ func (s *AirqSimulator) Finished() bool {
 // Next advances a Point to the next state in the generator.
 func (s *AirqSimulator) Next(p *common.Point) {
 	// switch to the next metric if needed
-	// madePoint := atomic.AddInt64(&s.madePoints, 1)
-	var madePoint int64 = 10
+	madePoint := atomic.AddInt64(&s.madePoints, 1)
 	hostIndex := madePoint % int64(len(s.Hosts))
 
 	Airq := &s.Hosts[hostIndex]

@@ -97,6 +97,7 @@ func (w *HTTPWriter) WriteLineProtocol(body []byte, isGzip bool) (int64, error) 
 	lat := time.Since(start).Nanoseconds()
 	if err == nil {
 		sc := resp.StatusCode()
+		// fmt.Println("status code ", sc)
 		if sc == 500 && backpressurePred(resp.Body()) {
 			err = ErrorBackoff
 			log.Printf("backoff suggested, reason: %s", resp.Body())
