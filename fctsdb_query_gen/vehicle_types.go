@@ -1,7 +1,7 @@
 package bulk_query_fctsdb
 
 var (
-	Vehicle = NewQueryTypes("vehicle")
+	Vehicle = NewQueryCase("vehicle")
 )
 
 func init() {

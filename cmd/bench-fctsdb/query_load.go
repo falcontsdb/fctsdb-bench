@@ -16,7 +16,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type InfluxQueryLoad struct {
+type QueryLoad struct {
 	csvDaemonUrls   string
 	daemonUrls      []string
 	ingestRateLimit int
@@ -43,42 +43,42 @@ type InfluxQueryLoad struct {
 }
 
 var (
-	influxQueryLoad = &InfluxQueryLoad{}
-	queryWriteCmd   = &cobra.Command{
-		Use:   "run",
-		Short: "send the queries to db",
+	queryLoad    = &QueryLoad{}
+	queryLoadCmd = &cobra.Command{
+		Use:   "query-load",
+		Short: "从文件或者stdin载入查询语句，并发送查询到数据库，需要先使用query-gen命令",
 		Run: func(cmd *cobra.Command, args []string) {
-			RunQuery()
+			RunQueryLoad()
 		},
 	}
 )
 
 func init() {
-	influxQueryLoad.Init(queryWriteCmd)
-	queryCmd.AddCommand(queryWriteCmd)
+	queryLoad.Init(queryLoadCmd)
+	rootCmd.AddCommand(queryLoadCmd)
 }
 
-func RunQuery() {
-	influxQueryLoad.Validate()
+func RunQueryLoad() {
+	queryLoad.Validate()
 	exitCode := 0
 
 	var once sync.Once
 	var workersGroup sync.WaitGroup
 	syncChanDone := make(chan int)
-	influxQueryLoad.PrepareWorkers()
+	queryLoad.PrepareWorkers()
 
-	influxQueryLoad.respCollector.SetStart(time.Now())
-	for i := 0; i < influxQueryLoad.workers; i++ {
-		influxQueryLoad.PrepareProcess(i)
+	queryLoad.respCollector.SetStart(time.Now())
+	for i := 0; i < queryLoad.workers; i++ {
+		queryLoad.PrepareProcess(i)
 		workersGroup.Add(1)
 		go func(w int) {
-			err := influxQueryLoad.RunProcess(w, &workersGroup)
+			err := queryLoad.RunProcess(w, &workersGroup)
 			if err != nil {
 				log.Println(err.Error())
 				once.Do(func() {
-					if !influxQueryLoad.IsScanFinished() {
+					if !queryLoad.IsScanFinished() {
 						go func() {
-							influxQueryLoad.EmptyBatchChanel()
+							queryLoad.EmptyBatchChanel()
 						}()
 						syncChanDone <- 1
 					}
@@ -87,34 +87,35 @@ func RunQuery() {
 			}
 		}(i)
 		go func(w int) {
-			influxQueryLoad.AfterRunProcess(w)
+			queryLoad.AfterRunProcess(w)
 		}(i)
 	}
-	log.Printf("Started load with %d workers\n", influxQueryLoad.workers)
+	log.Printf("Started load with %d workers\n", queryLoad.workers)
 
 	// start := time.Now()
-	influxQueryLoad.RunScanner(influxQueryLoad.sourceReader, syncChanDone)
+	queryLoad.RunScanner(queryLoad.sourceReader, syncChanDone)
 
-	influxQueryLoad.SyncEnd()
+	queryLoad.SyncEnd()
 	close(syncChanDone)
 	workersGroup.Wait()
-	influxQueryLoad.respCollector.SetEnd(time.Now())
+	queryLoad.respCollector.SetEnd(time.Now())
 
-	influxQueryLoad.CleanUp()
+	queryLoad.CleanUp()
 
-	if influxQueryLoad.dataFile != "" {
-		influxQueryLoad.sourceReader.Close()
+	if queryLoad.dataFile != "" {
+		queryLoad.sourceReader.Close()
 	}
 
-	influxQueryLoad.GetRespResult()
+	queryLoad.GetRespResult()
 
 	if exitCode != 0 {
 		os.Exit(exitCode)
 	}
 }
 
-func (q *InfluxQueryLoad) Init(cmd *cobra.Command) {
+func (q *QueryLoad) Init(cmd *cobra.Command) {
 	writeFlag := cmd.Flags()
+
 	writeFlag.StringVar(&q.csvDaemonUrls, "urls", "http://localhost:8086", "InfluxDB URLs, comma-separated. Will be used in a round-robin fashion.")
 	writeFlag.DurationVar(&q.backoff, "backoff", time.Second, "Time to sleep between requests when server indicates backpressure is needed.")
 	writeFlag.DurationVar(&q.backoffTimeOut, "backoff-timeout", time.Minute*30, "Maximum time to spent when dealing with backoff messages in one shot")
@@ -127,38 +128,38 @@ func (q *InfluxQueryLoad) Init(cmd *cobra.Command) {
 	writeFlag.BoolVar(&q.debug, "debug", false, "Debug printing (default false).")
 }
 
-func (l *InfluxQueryLoad) Validate() {
+func (q *QueryLoad) Validate() {
 
-	if l.dataFile != "" {
-		if f, err := os.Open(l.dataFile); err == nil {
-			l.sourceReader = f
+	if q.dataFile != "" {
+		if f, err := os.Open(q.dataFile); err == nil {
+			q.sourceReader = f
 		} else {
-			log.Fatalf("Error opening %s: %v\n", l.dataFile, err)
+			log.Fatalf("Error opening %s: %v\n", q.dataFile, err)
 		}
 	}
-	if l.sourceReader == nil {
-		l.sourceReader = os.Stdin
+	if q.sourceReader == nil {
+		q.sourceReader = os.Stdin
 	}
 
-	l.daemonUrls = strings.Split(l.csvDaemonUrls, ",")
-	if len(l.daemonUrls) == 0 {
+	q.daemonUrls = strings.Split(q.csvDaemonUrls, ",")
+	if len(q.daemonUrls) == 0 {
 		log.Fatal("missing 'urls' flag")
 	}
-	log.Printf("daemon URLs: %v\n", l.daemonUrls)
+	log.Printf("daemon URLs: %v\n", q.daemonUrls)
 
-	if l.ingestRateLimit > 0 {
-		log.Printf("Using worker ingestion rate %v queries/s", l.ingestRateLimit)
+	if q.ingestRateLimit > 0 {
+		log.Printf("Using worker ingestion rate %v queries/s", q.ingestRateLimit)
 	} else {
 		log.Print("Ingestion rate control is off")
 	}
 
-	if l.timeLimit > 0 && l.backoffTimeOut > l.timeLimit {
-		l.backoffTimeOut = l.timeLimit
+	if q.timeLimit > 0 && q.backoffTimeOut > q.timeLimit {
+		q.backoffTimeOut = q.timeLimit
 	}
 
 }
 
-func (q *InfluxQueryLoad) PrepareProcess(i int) {
+func (q *QueryLoad) PrepareProcess(i int) {
 	q.configs[i] = &loadWorkerConfig{
 		url:            q.daemonUrls[i%len(q.daemonUrls)],
 		backingOffChan: make(chan bool, 100),
@@ -177,7 +178,7 @@ func (q *InfluxQueryLoad) PrepareProcess(i int) {
 	q.configs[i].writer = NewHTTPWriter(*c, url)
 }
 
-func (q *InfluxQueryLoad) PrepareWorkers() {
+func (q *QueryLoad) PrepareWorkers() {
 
 	q.bufPool = sync.Pool{
 		New: func() interface{} {
@@ -191,18 +192,18 @@ func (q *InfluxQueryLoad) PrepareWorkers() {
 	q.configs = make([]*loadWorkerConfig, q.workers)
 }
 
-func (q *InfluxQueryLoad) EmptyBatchChanel() {
+func (q *QueryLoad) EmptyBatchChanel() {
 	for range q.batchChan {
 		//read out remaining batches
 	}
 }
 
-func (q *InfluxQueryLoad) SyncEnd() {
+func (q *QueryLoad) SyncEnd() {
 	<-q.inputDone
 	close(q.batchChan)
 }
 
-func (q *InfluxQueryLoad) CleanUp() {
+func (q *QueryLoad) CleanUp() {
 	for _, c := range q.configs {
 		close(c.backingOffChan)
 		<-c.backingOffDone
@@ -213,36 +214,36 @@ func (q *InfluxQueryLoad) CleanUp() {
 	}
 }
 
-func (q *InfluxQueryLoad) GetScanner() Scanner {
+func (q *QueryLoad) GetScanner() Scanner {
 	return q
 }
 
-func (q *InfluxQueryLoad) RunProcess(i int, waitGroup *sync.WaitGroup) error {
+func (q *QueryLoad) RunProcess(i int, waitGroup *sync.WaitGroup) error {
 	return q.processBatches(q.configs[i].writer, q.configs[i].backingOffChan, fmt.Sprintf("%d", i), waitGroup)
 }
-func (q *InfluxQueryLoad) AfterRunProcess(i int) {
+func (q *QueryLoad) AfterRunProcess(i int) {
 	q.configs[i].backingOffSecs = processBackoffMessages(i, q.configs[i].backingOffChan, q.configs[i].backingOffDone)
 }
 
-func (q *InfluxQueryLoad) IsScanFinished() bool {
+func (q *QueryLoad) IsScanFinished() bool {
 	return q.scanFinished
 }
 
-func (q *InfluxQueryLoad) GetReadStatistics() (itemsRead, bytesRead, valuesRead int64) {
+func (q *QueryLoad) GetReadStatistics() (itemsRead, bytesRead, valuesRead int64) {
 	itemsRead = q.itemsRead
 	// bytesRead = q.bytesRead
 	// valuesRead = q.valuesRead
 	return
 }
 
-func (q *InfluxQueryLoad) GetRespResult() {
+func (q *QueryLoad) GetRespResult() {
 	// fmt.Println(q.respCollector.GetDetail())
 	q.respCollector.ShowDetail()
 }
 
 // scan reads one item at a time from stdin. 1 item = 1 line.
 // When the requested number of items per batch is met, send a batch over batchChan for the workers to write.
-func (q *InfluxQueryLoad) RunScanner(r io.Reader, syncChanDone chan int) {
+func (q *QueryLoad) RunScanner(r io.Reader, syncChanDone chan int) {
 	q.scanFinished = false
 	q.itemsRead = 0
 	// q.bytesRead = 0
@@ -310,7 +311,7 @@ outer:
 }
 
 // processBatches reads byte buffers from batchChan and writes them to the target server, while tracking stats on the write.
-func (q *InfluxQueryLoad) processBatches(w *HTTPWriter, backoffSrc chan bool, telemetryWorkerLabel string, workersGroup *sync.WaitGroup) error {
+func (q *QueryLoad) processBatches(w *HTTPWriter, backoffSrc chan bool, telemetryWorkerLabel string, workersGroup *sync.WaitGroup) error {
 	// var batchesSeen int64
 
 	defer workersGroup.Done()

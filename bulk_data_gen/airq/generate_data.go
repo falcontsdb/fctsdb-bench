@@ -98,5 +98,5 @@ func (s *AirqSimulator) Next(p *common.Point) {
 	// Populate measurement-specific tags and fields:
 	Airq.SimulatedMeasurements[0].ToPoint(p)
 
-	// atomic.AddInt64(&s.madeValues, int64(len(p.FieldValues)))
+	atomic.AddInt64(&s.madeValues, int64(len(p.FieldValues)))
 }

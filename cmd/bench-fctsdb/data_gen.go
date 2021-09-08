@@ -63,15 +63,15 @@ var (
 
 	dataCmd = &cobra.Command{
 		Use:   "data",
-		Short: "gen or write the data",
+		Short: "数据库写入测试",
 		Run: func(cmd *cobra.Command, args []string) {
 			fmt.Println(cmd.Help())
 		},
 	}
 
 	dataGenCmd = &cobra.Command{
-		Use:   "gen",
-		Short: "gen the data",
+		Use:   "data-gen",
+		Short: "生成不同场景（case）的数据，输出到stdout，搭配data-load使用",
 		Run: func(cmd *cobra.Command, args []string) {
 			DataGen()
 		},
@@ -82,8 +82,8 @@ var (
 func init() {
 
 	dataGenerator.Init(dataGenCmd)
-	dataCmd.AddCommand(dataGenCmd)
-	rootCmd.AddCommand(dataCmd)
+	// dataCmd.AddCommand(dataGenCmd)
+	rootCmd.AddCommand(dataGenCmd)
 }
 
 func DataGen() {

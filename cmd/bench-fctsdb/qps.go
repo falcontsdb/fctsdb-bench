@@ -99,6 +99,7 @@ func (c *ResponseCollector) ShowDetail() {
 			fmt.Printf("%s -- %v ms\n", t.Field(k).Name, v.Field(k).Interface())
 		}
 	}
+	fmt.Println("running time:", c.endTime.Sub(c.startTime).Seconds(), "s")
 }
 
 func AvgInt64(list []int64) int64 {

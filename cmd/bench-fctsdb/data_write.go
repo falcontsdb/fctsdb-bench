@@ -73,7 +73,7 @@ var (
 	dataWriteBenchmark = &DataWriteBenchmark{}
 	dataWriteCmd       = &cobra.Command{
 		Use:   "write",
-		Short: "generate data and write the data to db",
+		Short: "生成数据并直接发送至数据库，一种高效的方式替代query-gen和query-load两个命令",
 		Run: func(cmd *cobra.Command, args []string) {
 			RunWrite()
 		},
@@ -82,11 +82,12 @@ var (
 
 func init() {
 	dataWriteBenchmark.Init(dataWriteCmd)
-	dataCmd.AddCommand(dataWriteCmd)
+	rootCmd.AddCommand(dataWriteCmd)
 }
 
 func RunWrite() {
 
+	dataWriteBenchmark.format = "fctsdb"
 	dataWriteBenchmark.Validate()
 	if dataWriteBenchmark.doDBCreate {
 		dataWriteBenchmark.CreateDb()
@@ -137,25 +138,25 @@ func RunWrite() {
 
 func (d *DataWriteBenchmark) Init(cmd *cobra.Command) {
 	writeFlag := cmd.Flags()
-	writeFlag.StringVar(&d.format, "format", formatChoices[0], fmt.Sprintf("Format to emit. (choices: %s)", strings.Join(formatChoices, ", ")))
-	writeFlag.StringVar(&d.useCase, "use-case", CaseChoices[0], fmt.Sprintf("Use case to model. (choices: %s)", strings.Join(CaseChoices, ", ")))
-	writeFlag.BoolVar(&d.doDBCreate, "do-db-create", true, "Whether to create the database.")
-	writeFlag.Int64Var(&d.scaleVar, "scale-var", 1, "Scaling variable specific to the use case.")
-	writeFlag.Int64Var(&d.scaleVarOffset, "scale-var-offset", 0, "Scaling variable offset specific to the use case.")
-	writeFlag.DurationVar(&d.samplingInterval, "sampling-interval", time.Second, "Simulated sampling interval.")
-	writeFlag.StringVar(&d.timestampStartStr, "timestamp-start", common.DefaultDateTimeStart, "Beginning timestamp (RFC3339).")
-	writeFlag.StringVar(&d.timestampEndStr, "timestamp-end", common.DefaultDateTimeEnd, "Ending timestamp (RFC3339).")
-	writeFlag.Int64Var(&d.seed, "seed", 12345678, "PRNG seed (default 12345678, or 0, uses the current timestamp).")
-	writeFlag.IntVar(&d.debug, "debug", 0, "Debug printing (choices: 0, 1, 2) (default 0).")
-	writeFlag.StringVar(&d.cpuProfile, "cpu-profile", "", "Write CPU profile to `file`")
-	writeFlag.StringVar(&d.csvDaemonUrls, "urls", "http://localhost:8086", "InfluxDB URLs, comma-separated. Will be used in a round-robin fashion.")
-	writeFlag.DurationVar(&d.backoff, "backoff", time.Second, "Time to sleep between requests when server indicates backpressure is needed.")
-	writeFlag.DurationVar(&d.backoffTimeOut, "backoff-timeout", time.Minute*30, "Maximum time to spent when dealing with backoff messages in one shot")
-	writeFlag.BoolVar(&d.useGzip, "gzip", false, "Whether to gzip encode requests (default true).")
-	writeFlag.StringVar(&d.dbName, "db", "benchmark_db", "Database name.")
-	writeFlag.IntVar(&d.batchSize, "batch-size", 100, "Batch size (1 line of input = 1 item).")
-	writeFlag.IntVar(&d.workers, "workers", 1, "Number of parallel requests to make.")
-	writeFlag.DurationVar(&d.timeLimit, "time-limit", -1, "Maximum duration to run (-1 is the default: no limit).")
+	// writeFlag.StringVar(&d.format, "format", formatChoices[0], fmt.Sprintf("Format to emit. (choices: %s)", strings.Join(formatChoices, ", ")))
+	writeFlag.StringVar(&d.useCase, "use-case", CaseChoices[0], fmt.Sprintf("使用的测试场景(可选场景: %s)", strings.Join(CaseChoices, ", ")))
+	writeFlag.BoolVar(&d.doDBCreate, "do-db-create", true, "是否创建数据库")
+	writeFlag.Int64Var(&d.scaleVar, "scale-var", 1, "场景的变量，一般情况下是场景中模拟机的数量")
+	writeFlag.Int64Var(&d.scaleVarOffset, "scale-var-offset", 0, "场景偏移量，一般情况下是模拟机的起始MN编号 (default 0)")
+	writeFlag.DurationVar(&d.samplingInterval, "sampling-interval", time.Second, "模拟机的采样时间")
+	writeFlag.StringVar(&d.timestampStartStr, "timestamp-start", common.DefaultDateTimeStart, "模拟机开始采样的时间 (RFC3339)")
+	writeFlag.StringVar(&d.timestampEndStr, "timestamp-end", common.DefaultDateTimeEnd, "模拟机采样结束数据 (RFC3339)")
+	writeFlag.Int64Var(&d.seed, "seed", 12345678, "全局随机数种子(设置为0是使用当前时间作为随机数种子)")
+	writeFlag.IntVar(&d.debug, "debug", 0, "debug日志级别(choices: 0, 1, 2) (default 0).")
+	writeFlag.StringVar(&d.cpuProfile, "cpu-profile", "", "将cpu-profile信息写入文件的地址，用于自测此工具")
+	writeFlag.StringVar(&d.csvDaemonUrls, "urls", "http://localhost:8086", "被测数据库的地址")
+	writeFlag.DurationVar(&d.backoff, "backoff", time.Second, "产生背压的情况下，两次请求时间的等待时间")
+	writeFlag.DurationVar(&d.backoffTimeOut, "backoff-timeout", time.Minute*30, "一次测试中，背压等待累积的最大时间")
+	writeFlag.BoolVar(&d.useGzip, "gzip", false, "是否使用gzip (default false).")
+	writeFlag.StringVar(&d.dbName, "db", "benchmark_db", "数据库的database名称")
+	writeFlag.IntVar(&d.batchSize, "batch-size", 100, "1个http请求中携带Point个数")
+	writeFlag.IntVar(&d.workers, "workers", 1, "并发的http个数")
+	writeFlag.DurationVar(&d.timeLimit, "time-limit", -1, "最大测试时间(-1表示无限制)")
 }
 
 func (d *DataWriteBenchmark) Validate() {
@@ -170,16 +171,16 @@ func (d *DataWriteBenchmark) Validate() {
 		d.backoffTimeOut = d.timeLimit
 	}
 
-	validFormat := false
-	for _, s := range formatChoices {
-		if s == d.format {
-			validFormat = true
-			break
-		}
-	}
-	if !validFormat {
-		log.Fatalf("invalid format specifier: %v", d.format)
-	}
+	// validFormat := false
+	// for _, s := range formatChoices {
+	// 	if s == d.format {
+	// 		validFormat = true
+	// 		break
+	// 	}
+	// }
+	// if !validFormat {
+	// 	log.Fatalf("invalid format specifier: %v", d.format)
+	// }
 
 	// the default seed is the current timestamp:
 	if d.seed == 0 {
@@ -254,7 +255,7 @@ func (d *DataWriteBenchmark) PrepareWorkers() {
 			return bytes.NewBuffer(make([]byte, 0, 4*1024*1024))
 		},
 	}
-	d.pointByteChan = make(chan *[]byte, 100*d.workers)
+	d.pointByteChan = make(chan *[]byte, 10*d.workers)
 	d.pointPool = sync.Pool{
 		New: func() interface{} {
 			return common.MakeUsablePoint()
@@ -420,28 +421,28 @@ func (d *DataWriteBenchmark) RunSimulator() {
 
 	var serializer common.Serializer
 	switch d.format {
-	case "influx-bulk":
+	case "fctsdb":
 		serializer = common.NewSerializerInflux()
-	case "es-bulk":
-		serializer = common.NewSerializerElastic("5x")
-	case "es-bulk6x":
-		serializer = common.NewSerializerElastic("6x")
-	case "es-bulk7x":
-		serializer = common.NewSerializerElastic("7x")
-	case "cassandra":
-		serializer = common.NewSerializerCassandra()
-	case "mongo":
-		serializer = common.NewSerializerMongo()
-	case "opentsdb":
-		serializer = common.NewSerializerOpenTSDB()
-	case "timescaledb-sql":
-		serializer = common.NewSerializerTimescaleSql()
-	case "timescaledb-copyFrom":
-		serializer = common.NewSerializerTimescaleBin()
-	case "graphite-line":
-		serializer = common.NewSerializerGraphiteLine()
-	case "splunk-json":
-		serializer = common.NewSerializerSplunkJson()
+	// case "es-bulk":
+	// 	serializer = common.NewSerializerElastic("5x")
+	// case "es-bulk6x":
+	// 	serializer = common.NewSerializerElastic("6x")
+	// case "es-bulk7x":
+	// 	serializer = common.NewSerializerElastic("7x")
+	// case "cassandra":
+	// 	serializer = common.NewSerializerCassandra()
+	// case "mongo":
+	// 	serializer = common.NewSerializerMongo()
+	// case "opentsdb":
+	// 	serializer = common.NewSerializerOpenTSDB()
+	// case "timescaledb-sql":
+	// 	serializer = common.NewSerializerTimescaleSql()
+	// case "timescaledb-copyFrom":
+	// 	serializer = common.NewSerializerTimescaleBin()
+	// case "graphite-line":
+	// 	serializer = common.NewSerializerGraphiteLine()
+	// case "splunk-json":
+	// 	serializer = common.NewSerializerSplunkJson()
 	default:
 		panic("unreachable")
 	}

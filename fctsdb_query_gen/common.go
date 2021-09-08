@@ -18,26 +18,26 @@ type QueryType struct {
 	Generator QueryGenerator
 }
 
-type QueryTypes struct {
+type QueryCase struct {
 	CaseName string
 	Types    map[int]*QueryType
 	Count    int
 }
 
-func NewQueryTypes(caseName string) *QueryTypes {
-	return &QueryTypes{
+func NewQueryCase(caseName string) *QueryCase {
+	return &QueryCase{
 		Count:    0,
 		CaseName: caseName,
 		Types:    make(map[int]*QueryType),
 	}
 }
 
-func (qs *QueryTypes) Regist(q *QueryType) {
+func (qs *QueryCase) Regist(q *QueryType) {
 	qs.Count += 1
 	qs.Types[qs.Count] = q
 }
 
 type QueryGenerator interface {
 	Next() string
-	Init(interface{})
+	Init(interface{}) error
 }

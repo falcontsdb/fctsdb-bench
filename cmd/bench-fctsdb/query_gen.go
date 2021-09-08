@@ -12,11 +12,11 @@ import (
 	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/airq"
 	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
 	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/vehicle"
-	fctsdb "git.querycap.com/falcontsdb/fctsdb-bench/bulk_query_fctsdb"
+	fctsdb "git.querycap.com/falcontsdb/fctsdb-bench/fctsdb_query_gen"
 	"github.com/spf13/cobra"
 )
 
-type FctsdbQueryGenerator struct {
+type QueryGenerator struct {
 	useCase           string
 	scaleVar          int64
 	scaleVarOffset    int64
@@ -33,15 +33,15 @@ type FctsdbQueryGenerator struct {
 var (
 	queryCmd = &cobra.Command{
 		Use:   "query",
-		Short: "the command for query test",
+		Short: "数据库查询测试",
 		Run: func(cmd *cobra.Command, args []string) {
 			fmt.Println(cmd.Help())
 		},
 	}
 
 	queryGenCmd = &cobra.Command{
-		Use:   "gen",
-		Short: "gen the query",
+		Use:   "query-gen",
+		Short: "生成数据库查询语句，输出到stdout，搭配query-load使用",
 		Run: func(cmd *cobra.Command, args []string) {
 			RunGenerateQueries()
 		},
@@ -49,110 +49,110 @@ var (
 
 	listQueryCmd = &cobra.Command{
 		Use:   "list",
-		Short: "list query types",
+		Short: "展示所有场景（case）和对应的查询语句类型（query-type）",
 		Run: func(cmd *cobra.Command, args []string) {
 			ListQueryTypes()
 		},
 	}
 	listQueryWithDetail bool
 
-	fctsdbQueryGenerator = FctsdbQueryGenerator{}
+	queryGenerator = QueryGenerator{}
 )
 
 func init() {
-	queryCmd.AddCommand(queryGenCmd)
-	queryCmd.AddCommand(listQueryCmd)
+	rootCmd.AddCommand(queryGenCmd)
+	rootCmd.AddCommand(listQueryCmd)
 	// queryCmd.AddCommand(showQueryCmd)
 	listQueryCmd.Flags().BoolVar(&listQueryWithDetail, "detail", false, "show the detail of query-types")
-	rootCmd.AddCommand(queryCmd)
-	fctsdbQueryGenerator.Init(queryGenCmd)
+	// rootCmd.AddCommand(queryCmd)
+	queryGenerator.Init(queryGenCmd)
 }
 
 func RunGenerateQueries() {
-	fctsdbQueryGenerator.Validate()
-	fctsdbQueryGenerator.RunProcess()
+	queryGenerator.Validate()
+	queryGenerator.RunProcess()
 }
 
-func (f *FctsdbQueryGenerator) Init(cmd *cobra.Command) {
+func (q *QueryGenerator) Init(cmd *cobra.Command) {
 	queryGenFlag := cmd.Flags()
-	queryGenFlag.StringVar(&f.useCase, "use-case", CaseChoices[0], fmt.Sprintf("Use case to model. (choices: %s)", strings.Join(CaseChoices, ", ")))
-	queryGenFlag.Int64Var(&f.scaleVar, "scale-var", 1, "Scaling variable specific to the use case.")
-	queryGenFlag.Int64Var(&f.scaleVarOffset, "scale-var-offset", 0, "Scaling variable offset specific to the use case.")
-	queryGenFlag.IntVar(&f.queryTypeId, "query-type", 1, "Scaling variable offset specific to the use case.")
-	queryGenFlag.DurationVar(&f.samplingInterval, "sampling-interval", time.Second, "Simulated sampling interval.")
-	queryGenFlag.Int64Var(&f.queryCount, "queries", 1000, "Number of queries to generate.")
-	queryGenFlag.StringVar(&f.timestampStartStr, "timestamp-start", common.DefaultDateTimeStart, "Beginning timestamp (RFC3339).")
-	queryGenFlag.StringVar(&f.timestampEndStr, "timestamp-end", common.DefaultDateTimeEnd, "Ending timestamp (RFC3339).")
-	queryGenFlag.Int64Var(&f.seed, "seed", 12345678, "PRNG seed (default 12345678, or 0, uses the current timestamp).")
+	queryGenFlag.StringVar(&q.useCase, "use-case", CaseChoices[0], fmt.Sprintf("Use case to model. (choices: %s)", strings.Join(CaseChoices, ", ")))
+	queryGenFlag.Int64Var(&q.scaleVar, "scale-var", 1, "Scaling variable specific to the use case.")
+	queryGenFlag.Int64Var(&q.scaleVarOffset, "scale-var-offset", 0, "Scaling variable offset specific to the use case.")
+	queryGenFlag.IntVar(&q.queryTypeId, "query-type", 1, "Scaling variable offset specific to the use case.")
+	queryGenFlag.DurationVar(&q.samplingInterval, "sampling-interval", time.Second, "Simulated sampling interval.")
+	queryGenFlag.Int64Var(&q.queryCount, "query-count", 1000, "Number of queries to generate.")
+	queryGenFlag.StringVar(&q.timestampStartStr, "timestamp-start", common.DefaultDateTimeStart, "Beginning timestamp (RFC3339).")
+	queryGenFlag.StringVar(&q.timestampEndStr, "timestamp-end", common.DefaultDateTimeEnd, "Ending timestamp (RFC3339).")
+	queryGenFlag.Int64Var(&q.seed, "seed", 12345678, "PRNG seed (default 12345678, or 0, uses the current timestamp).")
 }
 
-func (f *FctsdbQueryGenerator) Validate() {
-	if f.seed == 0 {
-		f.seed = int64(time.Now().Nanosecond())
+func (q *QueryGenerator) Validate() {
+	if q.seed == 0 {
+		q.seed = int64(time.Now().Nanosecond())
 	}
-	log.Printf("using random seed %d\n", f.seed)
-	rand.Seed(f.seed)
+	log.Printf("using random seed %d\n", q.seed)
+	rand.Seed(q.seed)
 
 	// Parse timestamps:
 	var err error
-	f.timestampStart, err = time.Parse(time.RFC3339, f.timestampStartStr)
+	q.timestampStart, err = time.Parse(time.RFC3339, q.timestampStartStr)
 	if err != nil {
 		log.Fatal(err)
 	}
-	f.timestampStart = f.timestampStart.UTC()
-	f.timestampEnd, err = time.Parse(time.RFC3339, f.timestampEndStr)
+	q.timestampStart = q.timestampStart.UTC()
+	q.timestampEnd, err = time.Parse(time.RFC3339, q.timestampEndStr)
 	if err != nil {
 		log.Fatal(err)
 	}
-	f.timestampEnd = f.timestampEnd.UTC()
+	q.timestampEnd = q.timestampEnd.UTC()
 
-	if f.samplingInterval <= 0 {
+	if q.samplingInterval <= 0 {
 		log.Fatal("Invalid sampling interval")
 	}
 
-	log.Printf("Using sampling interval %v\n", f.samplingInterval)
+	log.Printf("Using sampling interval %v\n", q.samplingInterval)
 }
 
-func (f *FctsdbQueryGenerator) RunProcess() {
+func (q *QueryGenerator) RunProcess() {
 	out := bufio.NewWriterSize(os.Stdout, 4<<24) // most potimized size based on inspection via test regression
 	defer out.Flush()
 
 	var queryType *fctsdb.QueryType
 	var ok bool
 	var sim common.Simulator
-	switch f.useCase {
+	switch q.useCase {
 	case fctsdb.AirQuality.CaseName:
 		cfg := &airq.AirqSimulatorConfig{
-			Start:            f.timestampStart,
-			End:              f.timestampEnd,
-			SamplingInterval: f.samplingInterval,
-			AirqDeviceCount:  f.scaleVar,
-			AirqDeviceOffset: f.scaleVarOffset,
+			Start:            q.timestampStart,
+			End:              q.timestampEnd,
+			SamplingInterval: q.samplingInterval,
+			AirqDeviceCount:  q.scaleVar,
+			AirqDeviceOffset: q.scaleVarOffset,
 		}
 		sim = cfg.ToSimulator()
-		queryType, ok = fctsdb.AirQuality.Types[f.queryTypeId]
+		queryType, ok = fctsdb.AirQuality.Types[q.queryTypeId]
 		if !ok {
 			log.Fatal("the query-type out of range")
 		}
 
 	case fctsdb.Vehicle.CaseName:
 		cfg := &vehicle.VehicleSimulatorConfig{
-			Start:            f.timestampStart,
-			End:              f.timestampEnd,
-			SamplingInterval: f.samplingInterval,
-			VehicleCount:     f.scaleVar,
-			VehicleOffset:    f.scaleVarOffset,
+			Start:            q.timestampStart,
+			End:              q.timestampEnd,
+			SamplingInterval: q.samplingInterval,
+			VehicleCount:     q.scaleVar,
+			VehicleOffset:    q.scaleVarOffset,
 		}
 		sim = cfg.ToSimulator()
 
-		queryType, ok = fctsdb.Vehicle.Types[f.queryTypeId]
+		queryType, ok = fctsdb.Vehicle.Types[q.queryTypeId]
 		if !ok {
 			log.Fatal("the query-type out of range")
 		}
 	}
 
 	queryType.Generator.Init(sim)
-	for i := 0; i < int(f.queryCount); i++ {
+	for i := 0; i < int(q.queryCount); i++ {
 		_, err := out.WriteString(queryType.Generator.Next() + "\n")
 		if err != nil {
 			log.Println("Write queries error: ", err.Error())
@@ -175,6 +175,7 @@ func ListQueryTypes() {
 
 func ShowQueryTypes(qtype *fctsdb.QueryType, ID int, caseName string) {
 	if listQueryWithDetail {
+		fmt.Println("场景: ", caseName)
 		fmt.Println("名称: ", qtype.Name)
 		fmt.Println("ID: ", ID)
 		fmt.Println("sql示例: ", qtype.RawSql)

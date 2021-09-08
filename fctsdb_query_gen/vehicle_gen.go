@@ -3,7 +3,6 @@ package bulk_query_fctsdb
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"math/rand"
 	"time"
 
@@ -16,8 +15,9 @@ type VehicleBasicGenerator struct {
 	epoch string
 }
 
-func (g *VehicleBasicGenerator) Init(sim interface{}) {
+func (g *VehicleBasicGenerator) Init(sim interface{}) error {
 	g.sim = sim.(*vehicle.VehicleSimulator)
+	return nil
 }
 
 func (g *VehicleBasicGenerator) loadEpochFromEnd(d time.Duration) {
@@ -48,16 +48,18 @@ type CarsNewest struct {
 	perm  []int
 }
 
-func (g *CarsNewest) Init(sim interface{}) {
+func (g *CarsNewest) Init(sim interface{}) error {
 	g.sim = sim.(*vehicle.VehicleSimulator)
 	g.perm = rand.Perm(len(g.sim.Hosts))
+	if g.count >= len(g.sim.Hosts) {
+		return fmt.Errorf("query cars more than the count of cars in database")
+	}
+	// perm := rand.Perm(len(g.sim.Vehicles))
+	return nil
 }
 
 func (g *CarsNewest) Next() string {
-	if g.count >= len(g.sim.Hosts) {
-		log.Fatal("query cars more than the count of cars in database")
-	}
-	// perm := rand.Perm(len(g.sim.Vehicles))
+
 	index := rand.Intn(len(g.sim.Hosts) - g.count)
 	buf := bufPool.Get().(*bytes.Buffer)
 	buf.Write([]byte(`select * from vehicle where VIN in (`))
@@ -81,9 +83,10 @@ type CarPaging struct {
 	VehicleBasicGenerator
 }
 
-func (g *CarPaging) Init(sim interface{}) {
+func (g *CarPaging) Init(sim interface{}) error {
 	g.sim = sim.(*vehicle.VehicleSimulator)
 	g.loadEpochFromEnd(time.Hour * 24)
+	return nil
 }
 
 func (g *CarPaging) Next() string {
@@ -97,9 +100,10 @@ type OneCarMessageCountMonth struct {
 	VehicleBasicGenerator
 }
 
-func (g *OneCarMessageCountMonth) Init(sim interface{}) {
+func (g *OneCarMessageCountMonth) Init(sim interface{}) error {
 	g.sim = sim.(*vehicle.VehicleSimulator)
 	g.loadEpochFromEnd(time.Hour * 24 * 30)
+	return nil
 }
 
 func (g *OneCarMessageCountMonth) Next() string {
@@ -113,9 +117,10 @@ type CarsMessageCountMonth struct {
 	VehicleBasicGenerator
 }
 
-func (g *CarsMessageCountMonth) Init(sim interface{}) {
+func (g *CarsMessageCountMonth) Init(sim interface{}) error {
 	g.sim = sim.(*vehicle.VehicleSimulator)
 	g.loadEpochFromEnd(time.Hour * 24 * 30)
+	return nil
 }
 
 func (g *CarsMessageCountMonth) Next() string {
@@ -127,9 +132,10 @@ type CarsGroupMessageCountMonth struct {
 	VehicleBasicGenerator
 }
 
-func (g *CarsGroupMessageCountMonth) Init(sim interface{}) {
+func (g *CarsGroupMessageCountMonth) Init(sim interface{}) error {
 	g.sim = sim.(*vehicle.VehicleSimulator)
 	g.loadEpochFromEnd(time.Hour * 24 * 30)
+	return nil
 }
 
 func (g *CarsGroupMessageCountMonth) Next() string {
@@ -141,9 +147,10 @@ type OneCarMessageCountYear struct {
 	VehicleBasicGenerator
 }
 
-func (g *OneCarMessageCountYear) Init(sim interface{}) {
+func (g *OneCarMessageCountYear) Init(sim interface{}) error {
 	g.sim = sim.(*vehicle.VehicleSimulator)
 	g.loadEpochFromEnd(time.Hour * 24 * 365)
+	return nil
 }
 
 func (g *OneCarMessageCountYear) Next() string {
@@ -157,9 +164,10 @@ type CarsMessageCountYear struct {
 	VehicleBasicGenerator
 }
 
-func (g *CarsMessageCountYear) Init(sim interface{}) {
+func (g *CarsMessageCountYear) Init(sim interface{}) error {
 	g.sim = sim.(*vehicle.VehicleSimulator)
 	g.loadEpochFromEnd(time.Hour * 24 * 365)
+	return nil
 }
 
 func (g *CarsMessageCountYear) Next() string {
@@ -171,9 +179,10 @@ type CarsGroupMessageCountYear struct {
 	VehicleBasicGenerator
 }
 
-func (g *CarsGroupMessageCountYear) Init(sim interface{}) {
+func (g *CarsGroupMessageCountYear) Init(sim interface{}) error {
 	g.sim = sim.(*vehicle.VehicleSimulator)
 	g.loadEpochFromEnd(time.Hour * 24 * 365)
+	return nil
 }
 
 func (g *CarsGroupMessageCountYear) Next() string {
