@@ -489,7 +489,6 @@ func (d *DataWrite) RunSimulator() {
 	point := common.MakeUsablePoint()
 	d.simulator.Next(point)
 	serializer.SerializePoint(&counter, point)
-	fmt.Println(string(counter.bytes))
 	log.Printf("We will write about %d MBytes\n", int64(len(counter.bytes))*d.simulator.Total()/(1<<20))
 	d.pointByteChan <- &counter.bytes
 
@@ -497,14 +496,14 @@ func (d *DataWrite) RunSimulator() {
 	var count int
 	// 新增场景vehicle和air-quality是协程安全的，可以支撑多线程生成。原生场景只支持单协程生成。
 	if d.useCase == common.UseCaseVehicle || d.useCase == common.UseCaseAirQuality {
-		count = 1
-	} else {
 		count = runtime.NumCPU() / 4
+		if count < 1 {
+			count = 1
+		}
+	} else {
+		count = 1
 	}
 
-	if count < 1 {
-		count = 1
-	}
 	var wg sync.WaitGroup
 	pointChan := make(chan *common.Point, 1000)
 	// 单倍协程生成point
