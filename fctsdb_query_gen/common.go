@@ -1,13 +1,14 @@
 package bulk_query_fctsdb
 
 import (
-	"bytes"
 	"sync"
+
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
 )
 
 var bufPool = sync.Pool{
 	New: func() interface{} {
-		return bytes.NewBuffer(make([]byte, 0, 4*1024*1024))
+		return make([]byte, 0, 32*1024)
 	},
 }
 
@@ -18,26 +19,26 @@ type QueryType struct {
 	Generator QueryGenerator
 }
 
-type QueryTypes struct {
+type QueryCase struct {
 	CaseName string
 	Types    map[int]*QueryType
 	Count    int
 }
 
-func NewQueryTypes(caseName string) *QueryTypes {
-	return &QueryTypes{
+func NewQueryCase(caseName string) *QueryCase {
+	return &QueryCase{
 		Count:    0,
 		CaseName: caseName,
 		Types:    make(map[int]*QueryType),
 	}
 }
 
-func (qs *QueryTypes) Regist(q *QueryType) {
+func (qs *QueryCase) Regist(q *QueryType) {
 	qs.Count += 1
 	qs.Types[qs.Count] = q
 }
 
 type QueryGenerator interface {
 	Next() string
-	Init(interface{})
+	Init(common.Simulator) error
 }

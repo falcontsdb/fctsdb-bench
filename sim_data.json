@@ -1,0 +1,107 @@
+{
+    "Hosts": [
+        {
+            "SimulatedMeasurements": [
+                {}
+            ],
+            "Province": "5ZCJ5p6X55yB",
+            "City": "6ZW/5pil5biC",
+            "County": "5Yac5a6J5Y6/",
+            "SiteType": "5Zu95o6n56uZ",
+            "SiteID": "REVWMDAwMDAwMDAw"
+        },
+        {
+            "SimulatedMeasurements": [
+                {}
+            ],
+            "Province": "5rmW5Y2X55yB",
+            "City": "6YK16Ziz5biC",
+            "County": "6YK16Ziz5Y6/",
+            "SiteType": "5biC5o6n54K5",
+            "SiteID": "REVWMDAwMDAwMDAx"
+        },
+        {
+            "SimulatedMeasurements": [
+                {}
+            ],
+            "Province": "5Zub5bed55yB",
+            "City": "6Ieq6LSh5biC",
+            "County": "5a+M6aG65Y6/",
+            "SiteType": "55yB5o6n54K5",
+            "SiteID": "REVWMDAwMDAwMDAy"
+        },
+        {
+            "SimulatedMeasurements": [
+                {}
+            ],
+            "Province": "5rmW5Y2X55yB",
+            "City": "6YO05bee5biC",
+            "County": "5rC45YW05Y6/",
+            "SiteType": "5biC5o6n54K5",
+            "SiteID": "REVWMDAwMDAwMDAz"
+        },
+        {
+            "SimulatedMeasurements": [
+                {}
+            ],
+            "Province": "5rKz5Y2X55yB",
+            "City": "6K645piM5biC",
+            "County": "56a55bee5biC",
+            "SiteType": "5Zu95o6n56uZ",
+            "SiteID": "REVWMDAwMDAwMDA0"
+        },
+        {
+            "SimulatedMeasurements": [
+                {}
+            ],
+            "Province": "5rKz5YyX55yB",
+            "City": "55+z5a625bqE5biC",
+            "County": "5paw5Y2O5Yy6",
+            "SiteType": "5biC5o6n54K5",
+            "SiteID": "REVWMDAwMDAwMDA1"
+        },
+        {
+            "SimulatedMeasurements": [
+                {}
+            ],
+            "Province": "6YeN5bqG5biC",
+            "City": "6YeN5bqG5biC",
+            "County": "5aSn6Laz5Yy6",
+            "SiteType": "5Zu95o6n56uZ",
+            "SiteID": "REVWMDAwMDAwMDA2"
+        },
+        {
+            "SimulatedMeasurements": [
+                {}
+            ],
+            "Province": "5Zub5bed55yB",
+            "City": "5LmQ5bGx5biC",
+            "County": "6ams6L655b2d5peP6Ieq5rK75Y6/",
+            "SiteType": "5Zu95o6n56uZ",
+            "SiteID": "REVWMDAwMDAwMDA3"
+        },
+        {
+            "SimulatedMeasurements": [
+                {}
+            ],
+            "Province": "5rKz5YyX55yB",
+            "City": "5rKn5bee5biC",
+            "County": "6buE6aqF5biC",
+            "SiteType": "5Zu95o6n56uZ",
+            "SiteID": "REVWMDAwMDAwMDA4"
+        },
+        {
+            "SimulatedMeasurements": [
+                {}
+            ],
+            "Province": "5Zub5bed55yB",
+            "City": "5oiQ6YO95biC",
+            "County": "5paw5rSl5Y6/",
+            "SiteType": "5biC5o6n54K5",
+            "SiteID": "REVWMDAwMDAwMDA5"
+        }
+    ],
+    "SamplingInterval": 10000000000,
+    "TimestampStart": "2018-01-01T00:00:00Z",
+    "TimestampEnd": "2018-01-02T00:00:00Z"
+}

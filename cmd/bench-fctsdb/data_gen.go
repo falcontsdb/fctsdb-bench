@@ -17,9 +17,9 @@ package main
 
 import (
 	"bufio"
-	"flag"
 	"fmt"
 	"log"
+	"math/rand"
 	"os"
 	"runtime/pprof"
 	"strings"
@@ -27,7 +27,6 @@ import (
 
 	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/airq"
 	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
-	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/devops"
 	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/vehicle"
 	"github.com/spf13/cobra"
 )
@@ -35,14 +34,12 @@ import (
 // Output data format choices:
 var formatChoices = []string{"influx-bulk", "es-bulk", "es-bulk6x", "es-bulk7x", "cassandra", "mongo", "opentsdb", "timescaledb-sql", "timescaledb-copyFrom", "graphite-line", "splunk-json"}
 
-// Program option vars:
-var (
+type DataGenerator struct {
 	format           string
 	useCase          string
 	configFile       string
 	scaleVar         int64
 	scaleVarOffset   int64
-	cardinality      int64
 	samplingInterval time.Duration
 
 	timestampStartStr string
@@ -51,112 +48,98 @@ var (
 	timestampStart time.Time
 	timestampEnd   time.Time
 
-	interleavedGenerationGroupID uint
-	interleavedGenerationGroups  uint
-
 	seed  int64
 	debug int
 
 	cpuProfile string
+}
 
+// Program option vars:
+var (
 	CaseChoices = []string{
 		common.UseCaseVehicle,
 		common.UseCaseAirQuality,
+		common.UseCaseDevOps,
 	}
 
 	dataGenCmd = &cobra.Command{
-		Use:   "gen",
-		Short: "gen the data",
+		Use:   "data-gen",
+		Short: "生成不同场景（case）的数据，输出到stdout，搭配data-load使用",
 		Run: func(cmd *cobra.Command, args []string) {
 			DataGen()
 		},
+		Hidden: true,
 	}
+	dataGenerator = DataGenerator{}
 )
 
-const NHostSims = 9
-
-func isFlagPassed(name string) bool {
-	found := false
-	flag.Visit(func(f *flag.Flag) {
-		if f.Name == name {
-			found = true
-		}
-	})
-	return found
-}
-
-// Parse args:
 func init() {
-	dataGenFlag := dataGenCmd.Flags()
-	dataGenFlag.StringVar(&format, "format", formatChoices[0], fmt.Sprintf("Format to emit. (choices: %s)", strings.Join(formatChoices, ", ")))
 
-	dataGenFlag.StringVar(&useCase, "use-case", CaseChoices[0], fmt.Sprintf("Use case to model. (choices: %s)", strings.Join(CaseChoices, ", ")))
-	dataGenFlag.Int64Var(&scaleVar, "scale-var", 1, "Scaling variable specific to the use case.")
-	dataGenFlag.Int64Var(&cardinality, "cardinality", 1, "Target measures/tags unique counts (over writes the 'scale-var').")
-	dataGenFlag.Int64Var(&scaleVarOffset, "scale-var-offset", 0, "Scaling variable offset specific to the use case.")
-	dataGenFlag.DurationVar(&samplingInterval, "sampling-interval", devops.EpochDuration, "Simulated sampling interval.")
-	dataGenFlag.StringVar(&configFile, "config-file", "", "Simulator config file in TOML format (experimental)")
-
-	dataGenFlag.StringVar(&timestampStartStr, "timestamp-start", common.DefaultDateTimeStart, "Beginning timestamp (RFC3339).")
-	dataGenFlag.StringVar(&timestampEndStr, "timestamp-end", common.DefaultDateTimeEnd, "Ending timestamp (RFC3339).")
-
-	dataGenFlag.Int64Var(&seed, "seed", 12345678, "PRNG seed (default 12345678, or 0, uses the current timestamp).")
-	dataGenFlag.IntVar(&debug, "debug", 0, "Debug printing (choices: 0, 1, 2) (default 0).")
-
-	dataGenFlag.UintVar(&interleavedGenerationGroupID, "interleaved-generation-group-id", 0, "Group (0-indexed) to perform round-robin serialization within. Use this to scale up data generation to multiple processes.")
-	dataGenFlag.UintVar(&interleavedGenerationGroups, "interleaved-generation-groups", 1, "The number of round-robin serialization groups. Use this to scale up data generation to multiple processes.")
-
-	dataGenFlag.StringVar(&cpuProfile, "cpu-profile", "", "Write CPU profile to `file`")
+	dataGenerator.Init(dataGenCmd)
+	// dataCmd.AddCommand(dataGenCmd)
 	rootCmd.AddCommand(dataGenCmd)
 }
 
-func Validate() {
-	if !(interleavedGenerationGroupID < interleavedGenerationGroups) {
-		log.Fatal("incorrect interleaved groups configuration")
-	}
+func DataGen() {
+	dataGenerator.Validate()
+	dataGenerator.RunProcess()
+}
+
+// Parse args:
+func (g *DataGenerator) Init(cmd *cobra.Command) {
+	dataGenFlag := cmd.Flags()
+	dataGenFlag.StringVar(&g.format, "format", formatChoices[0], fmt.Sprintf("Format to emit. (choices: %s)", strings.Join(formatChoices, ", ")))
+	dataGenFlag.StringVar(&g.useCase, "use-case", CaseChoices[0], fmt.Sprintf("Use case to model. (choices: %s)", strings.Join(CaseChoices, ", ")))
+	dataGenFlag.Int64Var(&g.scaleVar, "scale-var", 1, "Scaling variable specific to the use case.")
+	dataGenFlag.Int64Var(&g.scaleVarOffset, "scale-var-offset", 0, "Scaling variable offset specific to the use case.")
+	dataGenFlag.DurationVar(&g.samplingInterval, "sampling-interval", time.Second, "Simulated sampling interval.")
+	dataGenFlag.StringVar(&g.configFile, "config-file", "", "Simulator config file in TOML format (experimental)")
+	dataGenFlag.StringVar(&g.timestampStartStr, "timestamp-start", common.DefaultDateTimeStart, "Beginning timestamp (RFC3339).")
+	dataGenFlag.StringVar(&g.timestampEndStr, "timestamp-end", common.DefaultDateTimeEnd, "Ending timestamp (RFC3339).")
+	dataGenFlag.Int64Var(&g.seed, "seed", 12345678, "PRNG seed (default 12345678, or 0, uses the current timestamp).")
+	dataGenFlag.IntVar(&g.debug, "debug", 0, "Debug printing (choices: 0, 1, 2) (default 0).")
+	dataGenFlag.StringVar(&g.cpuProfile, "cpu-profile", "", "Write CPU profile to `file`")
+}
+
+func (g *DataGenerator) Validate() {
 
 	validFormat := false
 	for _, s := range formatChoices {
-		if s == format {
+		if s == g.format {
 			validFormat = true
 			break
 		}
 	}
 	if !validFormat {
-		log.Fatalf("invalid format specifier: %v", format)
+		log.Fatalf("invalid format specifier: %v", g.format)
 	}
 
 	// the default seed is the current timestamp:
-	if seed == 0 {
-		seed = int64(time.Now().Nanosecond())
+	if g.seed == 0 {
+		g.seed = int64(time.Now().Nanosecond())
 	}
-	fmt.Fprintf(os.Stderr, "using random seed %d\n", seed)
+	log.Printf("using random seed %d\n", g.seed)
+
+	rand.Seed(g.seed)
 
 	// Parse timestamps:
 	var err error
-	timestampStart, err = time.Parse(time.RFC3339, timestampStartStr)
+	g.timestampStart, err = time.Parse(time.RFC3339, g.timestampStartStr)
 	if err != nil {
 		log.Fatal(err)
 	}
-	timestampStart = timestampStart.UTC()
-	timestampEnd, err = time.Parse(time.RFC3339, timestampEndStr)
+	g.timestampStart = g.timestampStart.UTC()
+	g.timestampEnd, err = time.Parse(time.RFC3339, g.timestampEndStr)
 	if err != nil {
 		log.Fatal(err)
 	}
-	timestampEnd = timestampEnd.UTC()
+	g.timestampEnd = g.timestampEnd.UTC()
 
-	if samplingInterval <= 0 {
+	if g.samplingInterval <= 0 {
 		log.Fatal("Invalid sampling interval")
 	}
-	devops.EpochDuration = samplingInterval
-	log.Printf("Using sampling interval %v\n", devops.EpochDuration)
 
-	if isFlagPassed("cardinality") {
-		scaleVar = cardinality / NHostSims
-	} else {
-		cardinality = scaleVar * NHostSims
-	}
-	log.Printf("Using cardinality of %v\n", cardinality)
+	log.Printf("Using sampling interval %v\n", g.samplingInterval)
 
 }
 
@@ -165,12 +148,11 @@ func timeTrack(start time.Time, name string) {
 	log.Printf("%s took %s", name, elapsed)
 }
 
-func DataGen() {
-	Validate()
+func (g *DataGenerator) RunProcess() {
 	defer timeTrack(time.Now(), "bulk_data_gen - main()")
 
-	if cpuProfile != "" {
-		f, err := os.Create(cpuProfile)
+	if g.cpuProfile != "" {
+		f, err := os.Create(g.cpuProfile)
 		if err != nil {
 			log.Fatal("could not create CPU profile: ", err)
 		}
@@ -180,15 +162,13 @@ func DataGen() {
 		defer pprof.StopCPUProfile()
 	}
 
-	common.Seed(seed)
-
-	if configFile != "" {
-		c, err := common.NewConfig(configFile)
+	if g.configFile != "" {
+		c, err := common.NewConfig(g.configFile)
 		if err != nil {
 			log.Fatalf("external config error: %v", err)
 		}
 		common.Config = c
-		log.Printf("Using config file %s\n", configFile)
+		log.Printf("Using config file %s\n", g.configFile)
 	}
 
 	//out := bufio.NewWriterSize(os.Stdout, 4<<20) //original buffer size
@@ -197,22 +177,23 @@ func DataGen() {
 
 	var sim common.Simulator
 
-	switch useCase {
+	switch g.useCase {
 	case CaseChoices[0]:
 		cfg := &vehicle.VehicleSimulatorConfig{
-			Start:         timestampStart,
-			End:           timestampEnd,
-			VehicleCount:  scaleVar,
-			VehicleOffset: scaleVarOffset,
+			Start:            g.timestampStart,
+			End:              g.timestampEnd,
+			SamplingInterval: g.samplingInterval,
+			VehicleCount:     g.scaleVar,
+			VehicleOffset:    g.scaleVarOffset,
 		}
 		sim = cfg.ToSimulator()
 	case CaseChoices[1]:
 		cfg := &airq.AirqSimulatorConfig{
-			Start: timestampStart,
-			End:   timestampEnd,
-
-			AirqDeviceCount:  scaleVar,
-			AirqDeviceOffset: scaleVarOffset,
+			Start:            g.timestampStart,
+			End:              g.timestampEnd,
+			SamplingInterval: g.samplingInterval,
+			AirqDeviceCount:  g.scaleVar,
+			AirqDeviceOffset: g.scaleVarOffset,
 		}
 		sim = cfg.ToSimulator()
 
@@ -221,7 +202,7 @@ func DataGen() {
 	}
 
 	var serializer common.Serializer
-	switch format {
+	switch g.format {
 	case "influx-bulk":
 		serializer = common.NewSerializerInflux()
 	case "es-bulk":
@@ -248,29 +229,18 @@ func DataGen() {
 		panic("unreachable")
 	}
 
-	var currentInterleavedGroup uint = 0
-
 	t := time.Now()
 	point := common.MakeUsablePoint()
 	n := int64(0)
 	for !sim.Finished() {
 		sim.Next(point)
 		n++
-		// in the default case this is always true
-		if currentInterleavedGroup == interleavedGenerationGroupID {
-			//println("printing")
-			err := serializer.SerializePoint(out, point)
-			if err != nil {
-				log.Fatal(err)
-			}
-
+		err := serializer.SerializePoint(out, point)
+		if err != nil {
+			log.Fatal(err)
 		}
+
 		point.Reset()
-
-		currentInterleavedGroup++
-		if currentInterleavedGroup == interleavedGenerationGroups {
-			currentInterleavedGroup = 0
-		}
 	}
 	if n != sim.SeenPoints() {
 		panic(fmt.Sprintf("Logic error, written %d points, generated %d points", n, sim.SeenPoints()))

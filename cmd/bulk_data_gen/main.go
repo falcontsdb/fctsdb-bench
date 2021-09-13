@@ -20,6 +20,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math/rand"
 	"os"
 	"runtime/pprof"
 	"strings"
@@ -168,7 +169,7 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
-	common.Seed(seed)
+	rand.Seed(seed)
 
 	if configFile != "" {
 		c, err := common.NewConfig(configFile)

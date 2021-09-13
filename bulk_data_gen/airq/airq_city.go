@@ -2,10 +2,10 @@ package airq
 
 import (
 	"math/rand"
-	"strings"
 	"time"
+	"unsafe"
 
-	. "git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
 )
 
 var (
@@ -40,9 +40,9 @@ func (m *CityAirQualityMeasurement) Tick(d time.Duration) {
 	m.timestamp = m.timestamp.Add(d)
 }
 
-func (m *CityAirQualityMeasurement) ToPoint(p *Point) bool {
+func (m *CityAirQualityMeasurement) ToPoint(p *common.Point) bool {
 	p.SetMeasurementName(CityAirQualityByteString)
-	p.SetTimestamp(&m.timestamp)
+	// p.SetTimestamp(&m.timestamp)
 
 	p.AppendField(CityAirQualityFieldKeys[0], rand.Intn(490)+10)
 	p.AppendField(CityAirQualityFieldKeys[1], rand.Intn(490)+10)
@@ -62,20 +62,23 @@ func RandomString(n int) string {
 	letterIdxMask := int64(1<<letterIdxBits - 1) // All 1-bits, as many as letterIdxBits
 	letterIdxMax := 63 / letterIdxBits           // # of letter indices fitting in 63 bits
 
-	sb := strings.Builder{}
-	sb.Grow(n)
+	// sb := strings.Builder{}
+	// sb.Grow(n)
+	buf := make([]byte, n)
 	// A src.Int63() generates 63 random bits, enough for letterIdxMax characters!
 	for i, cache, remain := n-1, rand.Int63(), letterIdxMax; i >= 0; {
 		if remain == 0 {
 			cache, remain = rand.Int63(), letterIdxMax
 		}
 		if idx := int(cache & letterIdxMask); idx < len(letterBytes) {
-			sb.WriteByte(letterBytes[idx])
+			// sb.WriteByte(letterBytes[idx])
+			buf[i] = letterBytes[idx]
 			i--
 		}
 		cache >>= letterIdxBits
 		remain--
 	}
 
-	return sb.String()
+	// return sb.String()
+	return *(*string)(unsafe.Pointer(&buf))
 }

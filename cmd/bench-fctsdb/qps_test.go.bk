@@ -1,0 +1,35 @@
+package main
+
+import (
+	"fmt"
+	"net/url"
+	"testing"
+)
+
+func TestQps(t *testing.T) {
+	r := RespTimeResult{
+		P50:    642,
+		P90:    8915,
+		P95:    9718,
+		P99:    11404,
+		Min:    86,
+		Max:    114093425,
+		Avg:    3044,
+		Qps:    20.65622350133474,
+		Fail:   600,
+		Total:  600,
+		RunSec: 29.046935901,
+	}
+	r.Show()
+}
+
+func TestUrl(t *testing.T) {
+	u, err := url.Parse("www.baidu.com/")
+	if err != nil {
+		fmt.Print(err.Error())
+	}
+	u.Path = "/start"
+	if u.Scheme == "" {
+		fmt.Println(111)
+	}
+}
