@@ -27,6 +27,7 @@ import (
 
 	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/airq"
 	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/devops"
 	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/vehicle"
 	"github.com/spf13/cobra"
 )
@@ -196,7 +197,15 @@ func (g *DataGenerator) RunProcess() {
 			AirqDeviceOffset: g.scaleVarOffset,
 		}
 		sim = cfg.ToSimulator()
+	case CaseChoices[2]:
+		cfg := &devops.DevopsSimulatorConfig{
+			Start: g.timestampStart,
+			End:   g.timestampEnd,
 
+			HostCount:  g.scaleVar,
+			HostOffset: g.scaleVarOffset,
+		}
+		sim = cfg.ToSimulator()
 	default:
 		panic("unreachable")
 	}
