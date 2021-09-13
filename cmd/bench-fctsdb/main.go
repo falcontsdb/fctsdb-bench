@@ -4,6 +4,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -38,8 +39,8 @@ func mockFctsdb() {
 	server := &http.Server{
 		Addr:              "",
 		Handler:           nil,
-		ReadTimeout:       0,
-		ReadHeaderTimeout: 0}
+		ReadTimeout:       time.Second * 10,
+		ReadHeaderTimeout: time.Second * 10}
 
 	http.HandleFunc("/write", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(204)
