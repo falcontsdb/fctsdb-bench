@@ -84,7 +84,7 @@ func init() {
 }
 
 func RunQueryWrite(arg string) {
-	csvFileName := time.Now().Format("Q-Jan2(15-04-05)") + ".csv"
+	csvFileName := time.Now().Format("Q-Jan2_15-04-05") + ".csv"
 	queryWrite.Validate()
 	if arg == "all" {
 		for typeID := 1; typeID <= queryWrite.queryCase.Count; typeID++ {

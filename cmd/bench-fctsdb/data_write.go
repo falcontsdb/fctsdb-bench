@@ -75,7 +75,7 @@ var (
 		Use:   "write",
 		Short: "生成数据并直接发送至数据库",
 		Run: func(cmd *cobra.Command, args []string) {
-			RunWrite()
+			dataWrite.RunWrite()
 		},
 	}
 )
@@ -85,53 +85,52 @@ func init() {
 	rootCmd.AddCommand(dataWriteCmd)
 }
 
-func RunWrite() map[string]string {
+func (d *DataWrite) RunWrite() map[string]string {
 
-	dataWrite.format = "fctsdb"
-	dataWrite.Validate()
-	if dataWrite.doDBCreate {
-		dataWrite.CreateDb()
+	d.format = "fctsdb"
+	d.Validate()
+	if d.doDBCreate {
+		d.CreateDb()
 	}
 
 	var workersGroup sync.WaitGroup
 
-	dataWrite.PrepareWorkers()
-	dataWrite.PrepareSimulator()
+	d.PrepareWorkers()
+	d.PrepareSimulator()
 
-	for i := 0; i < dataWrite.workers; i++ {
-		dataWrite.PrepareProcess(i)
-		dataWrite.parallelSimulator++
+	for i := 0; i < d.workers; i++ {
+		d.PrepareProcess(i)
+		d.parallelSimulator++
 		workersGroup.Add(1)
-
 		go func(w int) {
-			err := dataWrite.RunProcess(w, &workersGroup)
+			err := d.RunProcess(w, &workersGroup)
 			if err != nil {
 				log.Println(err.Error())
 			}
 		}(i)
 
 		go func(w int) {
-			dataWrite.AfterRunProcess(w)
+			d.AfterRunProcess(w)
 		}(i)
 	}
-	log.Printf("Started load with %d workers\n", dataWrite.workers)
+	log.Printf("Started load with %d workers\n", d.workers)
 
 	// 定时运行状态日志
-	dataWrite.SyncShowStatistics()
+	d.SyncShowStatistics()
 	start := time.Now()
 	// 启动模拟器，生成point
-	dataWrite.RunSimulator()
-	dataWrite.respCollector.SetStart(start)
+	d.RunSimulator()
+	d.respCollector.SetStart(start)
 	workersGroup.Wait()
-	dataWrite.SyncEnd()
-	dataWrite.CleanUp() // 目前cleanup主要处理背压相关的channel问题
+	d.SyncEnd()
+	d.CleanUp() // 目前cleanup主要处理背压相关的channel问题
 	end := time.Now()
-	dataWrite.respCollector.SetEnd(end)
+	d.respCollector.SetEnd(end)
 	took := end.Sub(start)
 
 	// 总结果输出
 
-	itemsRead, bytesRead, valuesRead := dataWrite.GetReadStatistics()
+	itemsRead, bytesRead, valuesRead := d.GetReadStatistics()
 
 	itemsRate := float64(itemsRead) / took.Seconds()
 	bytesRate := float64(bytesRead) / took.Seconds()
@@ -139,10 +138,10 @@ func RunWrite() map[string]string {
 
 	loadTime := took.Seconds()
 	convertedBytesRate := bytesRate / (1 << 20)
-	log.Printf("loaded %d items in %fsec with %d workers (mean point rate %.2f/sec, mean value rate %.2f/s, %.2fMB/sec)\n", itemsRead, loadTime, dataWrite.workers, itemsRate, valuesRate, convertedBytesRate)
-	dataWrite.respCollector.GetDetail().Show()
+	log.Printf("loaded %d items in %fsec with %d workers (mean point rate %.2f/sec, mean value rate %.2f/s, %.2fMB/sec)\n", itemsRead, loadTime, d.workers, itemsRate, valuesRate, convertedBytesRate)
+	d.respCollector.GetDetail().Show()
 
-	result := dataWrite.respCollector.GetDetail().ToMap()
+	result := d.respCollector.GetDetail().ToMap()
 	result["PointRate(p/s)"] = fmt.Sprintf("%.2f", itemsRate)
 	result["ValueRate(v/s)"] = fmt.Sprintf("%.2f", valuesRate)
 	result["BytesRate(MB/s)"] = fmt.Sprintf("%.2f", convertedBytesRate)
@@ -373,7 +372,6 @@ func (d *DataWrite) PrepareProcess(i int) {
 		BackingOffDone: d.configs[i].backingOffDone,
 	}
 	url = c.Host + "/write?db=" + neturl.QueryEscape(c.Database)
-
 	d.configs[i].writer = NewHTTPWriter(*c, url)
 }
 
@@ -585,6 +583,7 @@ func (d *DataWrite) processBatches(w *HTTPWriter, buf *bytes.Buffer, backoffSrc 
 	}
 	if err != nil {
 		d.respCollector.AddOne(w.c.Database, lat, false)
+		// log.Println(err.Error())
 		return fmt.Errorf("error writing: %s", err.Error())
 	}
 	d.respCollector.AddOne(w.c.Database, lat, true)

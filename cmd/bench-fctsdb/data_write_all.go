@@ -134,14 +134,14 @@ func (d *DataWriteConfig) CopyToDataWrite(dw *DataWrite) error {
 func (d *DataWriteAll) Init(cmd *cobra.Command) {
 	flags := cmd.Flags()
 	flags.StringVar(&d.configsPath, "config-file", "", "config路径")
-	flags.StringVar(&d.agentEndpoint, "agent", "http://localhost:8966", "数据库代理服务地址")
+	flags.StringVar(&d.agentEndpoint, "agent", "", "数据库代理服务地址，为空表示不使用")
 }
 
 func (d *DataWriteAll) Validate() {
 }
 
 func (d *DataWriteAll) Run() {
-	fileName := time.Now().Format("W-Jan2(15-04-05)") + ".csv"
+	fileName := time.Now().Format("W-Jan2_15-04-05") + ".csv"
 	if d.configsPath != "" {
 		configsFile, err := os.Open(d.configsPath)
 		if err != nil {
@@ -162,14 +162,13 @@ func (d *DataWriteAll) Run() {
 				log.Println(err.Error())
 				continue
 			}
-			result := RunWrite()
+			result := dataWrite.RunWrite()
 			var writeHead bool = true
 			if lindID > 1 {
 				writeHead = false
 			}
 			d.WriteResult(fileName, result, config, writeHead)
 			d.AfterRun()
-
 		}
 	} else {
 		i := 0
@@ -180,7 +179,7 @@ func (d *DataWriteAll) Run() {
 				log.Println(err.Error())
 				continue
 			}
-			result := RunWrite()
+			result := dataWrite.RunWrite()
 			var writeHead bool = true
 			if i > 1 {
 				writeHead = false
@@ -226,10 +225,12 @@ func (d *DataWriteAll) WriteResult(fileName string, r map[string]string, c DataW
 }
 
 func (d *DataWriteAll) AfterRun() {
-	d.HttpGet("/clean")
-	time.Sleep(time.Second * 2)
-	d.HttpGet("/start")
-	time.Sleep(time.Second * 10)
+	if d.agentEndpoint != "" {
+		d.HttpGet("/clean")
+		time.Sleep(time.Second * 2)
+		d.HttpGet("/start")
+		time.Sleep(time.Second * 10)
+	}
 }
 
 func (d *DataWriteAll) HttpGet(path string) ([]byte, error) {
