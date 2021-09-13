@@ -2,10 +2,12 @@ package main
 
 import (
 	"bytes"
+	"encoding/csv"
 	"fmt"
 	"log"
 	"math/rand"
 	neturl "net/url"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -35,6 +37,7 @@ type QueryWrite struct {
 	dbName           string
 	timeLimit        time.Duration
 	debug            bool
+	toCsv            bool
 
 	//runtime vars
 	bufPool          sync.Pool
@@ -56,7 +59,7 @@ var (
 	queryWrite    = &QueryWrite{}
 	queryWriteCmd = &cobra.Command{
 		Use:   "query <query-types>",
-		Short: "生成查询语句并直接发送至数据库，一种高效的方式替代query-gen和query-load两个命令",
+		Short: "生成查询语句并直接发送至数据库",
 		// Args:  cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) < 1 {
@@ -81,19 +84,29 @@ func init() {
 }
 
 func RunQueryWrite(arg string) {
-
+	csvFileName := time.Now().Format("Q-Jan2(15-04-05)") + ".csv"
 	queryWrite.Validate()
 	if arg == "all" {
-		for typeID := 1; typeID <= fctsdb.AirQuality.Count; typeID++ {
+		for typeID := 1; typeID <= queryWrite.queryCase.Count; typeID++ {
 			queryWrite.RunOneQueryType(typeID)
+			if typeID == 1 {
+				queryWrite.WriteResultToCsv(csvFileName, true)
+			} else {
+				queryWrite.WriteResultToCsv(csvFileName, false)
+			}
 		}
 	} else {
-		for _, ids := range strings.Split(arg, ",") {
+		for i, ids := range strings.Split(arg, ",") {
 			typeID, err := strconv.Atoi(ids)
 			if err != nil {
 				fmt.Println("the query-type is unsupported: ", ids)
 			} else {
 				queryWrite.RunOneQueryType(typeID)
+				if i < 1 {
+					queryWrite.WriteResultToCsv(csvFileName, true)
+				} else {
+					queryWrite.WriteResultToCsv(csvFileName, false)
+				}
 			}
 		}
 	}
@@ -104,7 +117,7 @@ func (q *QueryWrite) Init(cmd *cobra.Command) {
 	writeFlag.StringVar(&q.useCase, "use-case", CaseChoices[0], fmt.Sprintf("使用的测试场景(可选场景: %s)", strings.Join(CaseChoices, ", ")))
 	writeFlag.Int64Var(&q.scaleVar, "scale-var", 1, "场景的变量，一般情况下是场景中模拟机的数量")
 	writeFlag.Int64Var(&q.scaleVarOffset, "scale-var-offset", 0, "场景偏移量，一般情况下是模拟机的起始MN编号 (default 0)")
-	// writeFlag.IntVar(&q.queryTypeId, "query-type", 1, "Scaling variable offset specific to the use case.")
+	writeFlag.BoolVar(&q.toCsv, "to-csv", false, "是否记录结果到csv文件")
 	writeFlag.DurationVar(&q.samplingInterval, "sampling-interval", time.Second, "模拟机的采样时间")
 	writeFlag.Int64Var(&q.queryCount, "query-count", 1000, "生成的查询语句数量")
 	writeFlag.StringVar(&q.timestampStartStr, "timestamp-start", common.DefaultDateTimeStart, "模拟机开始采样的时间 (RFC3339)")
@@ -178,9 +191,8 @@ func (q *QueryWrite) Validate() {
 }
 
 func (q *QueryWrite) RunOneQueryType(typeID int) {
-
-	log.Printf("*** Run the case: %s, query type id: %d, name: %s\n", q.useCase, typeID, q.queryCase.Types[typeID].Name)
-
+	log.Printf("*****************************************************************************************")
+	log.Printf("Run the case: %s, query type id: %d, name: %s\n", q.useCase, typeID, q.queryCase.Types[typeID].Name)
 	var workersGroup sync.WaitGroup
 	q.queryTypeID = typeID
 	q.PrepareWorkers()
@@ -350,7 +362,43 @@ func (q *QueryWrite) GetReadStatistics() (itemsRead, bytesRead, valuesRead int64
 }
 
 func (q *QueryWrite) GetRespResult() {
-	q.respCollector.ShowDetail()
+	fmt.Println()
+	q.respCollector.GetDetail().Show()
+	fmt.Println()
+}
+
+func (q *QueryWrite) WriteResultToCsv(fileName string, writeHead bool) {
+	csvFile, err := os.OpenFile(fileName, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0666)
+	if err != nil {
+		log.Println("open result csv failed, error:", err.Error())
+	}
+	defer csvFile.Close()
+	csvWriter := csv.NewWriter(csvFile)
+
+	heads := []string{"UseCase", "TypeID", "P50(ms)", "P90(ms)", "P95(ms)", "P99(ms)", "Min(ms)",
+		"Max(ms)", "Avg(ms)", "Fail", "Total", "RunSec(s)", "Qps", "TypeName"}
+
+	r := q.respCollector.GetDetail().ToMap()
+	r["UseCase"] = q.useCase
+	r["TypeID"] = fmt.Sprintf("%d", q.queryTypeID)
+	r["TypeName"] = q.queryCase.Types[q.queryTypeID].Name
+
+	if writeHead {
+		err := csvWriter.Write(heads)
+		if err != nil {
+			log.Println("write result csv failed, error:", err.Error())
+		}
+	}
+
+	oneLine := make([]string, len(heads))
+	for i := 0; i < len(heads); i++ {
+		oneLine[i] = r[heads[i]]
+	}
+	err = csvWriter.Write(oneLine)
+	if err != nil {
+		log.Println("write result csv failed, error:", err.Error())
+	}
+	csvWriter.Flush()
 }
 
 // scan reads one item at a time from stdin. 1 item = 1 line.

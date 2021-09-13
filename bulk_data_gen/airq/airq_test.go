@@ -555,3 +555,51 @@ func TestTime(t *testing.T) {
 	fmt.Println(now)
 	fmt.Println(add)
 }
+
+func BenchmarkRandomString(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		RandomString(10)
+	}
+}
+
+func BenchmarkNewPointVehicleEasy(b *testing.B) {
+
+	now := time.Now()
+
+	cfg := &vehicle.VehicleSimulatorConfig{
+		Start:            now.Add(time.Hour * -24000),
+		End:              now,
+		SamplingInterval: time.Second,
+		VehicleCount:     100000,
+		VehicleOffset:    1,
+	}
+	sim := cfg.ToSimulator()
+
+	point := common.MakeUsablePoint()
+	for i := 0; i < b.N; i++ {
+		sim.Next(point)
+		point.Reset()
+	}
+}
+
+func BenchmarkNewPointAirqEasy(b *testing.B) {
+
+	now := time.Now()
+
+	cfg := &AirqSimulatorConfig{
+		Start:            now.Add(time.Hour * -24000),
+		End:              now,
+		SamplingInterval: time.Second,
+		AirqDeviceCount:  100000,
+		AirqDeviceOffset: 1,
+	}
+	sim := cfg.ToSimulator()
+
+	point := common.MakeUsablePoint()
+	for i := 0; i < b.N; i++ {
+		// host := sim.Hosts[i%len(sim.Hosts)]
+		// _ = string(host.SiteID)
+		sim.Next(point)
+		point.Reset()
+	}
+}

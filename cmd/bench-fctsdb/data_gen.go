@@ -59,14 +59,7 @@ var (
 	CaseChoices = []string{
 		common.UseCaseVehicle,
 		common.UseCaseAirQuality,
-	}
-
-	dataCmd = &cobra.Command{
-		Use:   "data",
-		Short: "数据库写入测试",
-		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println(cmd.Help())
-		},
+		common.UseCaseDevOps,
 	}
 
 	dataGenCmd = &cobra.Command{
@@ -75,6 +68,7 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 			DataGen()
 		},
+		Hidden: true,
 	}
 	dataGenerator = DataGenerator{}
 )

@@ -1,12 +1,13 @@
 package bulk_query_fctsdb
 
 import (
-	"bytes"
 	"fmt"
 	"math/rand"
 	"time"
+	"unsafe"
 
 	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/airq"
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
 )
 
 type AirqBasicGenerator struct {
@@ -15,7 +16,7 @@ type AirqBasicGenerator struct {
 	epoch string
 }
 
-func (g *AirqBasicGenerator) Init(sim interface{}) error {
+func (g *AirqBasicGenerator) Init(sim common.Simulator) error {
 	g.sim = sim.(*airq.AirqSimulator)
 	return nil
 }
@@ -45,36 +46,46 @@ type airqFromSitesNewest struct {
 	// case 2
 	AirqBasicGenerator
 	count int // 需要查询的设备数
-	perm  []int
+	// perm  []int
 }
 
-func (g *airqFromSitesNewest) Init(sim interface{}) error {
+func (g *airqFromSitesNewest) Init(sim common.Simulator) error {
 	g.sim = sim.(*airq.AirqSimulator)
-	g.perm = rand.Perm(len(g.sim.Hosts))
+	// g.perm = rand.Perm(len(g.sim.Hosts))
 	if g.count >= len(g.sim.Hosts) {
 		return fmt.Errorf("site num the query needed is more than the count of sites in database")
 	}
+	shuffleAirqHost(g.sim.Hosts)
 	return nil
+}
+
+func shuffleAirqHost(slice []airq.AirqDevice) {
+	n := len(slice)
+	for i := 0; i < len(slice); i++ {
+		randIndex := rand.Intn(n)
+		slice[i], slice[randIndex] = slice[randIndex], slice[i]
+	}
 }
 
 func (g *airqFromSitesNewest) Next() string {
 
-	index := rand.Intn(len(g.sim.Hosts) - g.count)
-	buf := bufPool.Get().(*bytes.Buffer)
-	buf.Write([]byte(`select * from city_air_quality where site_id in (`))
+	index := rand.Intn(len(g.sim.Hosts))
+	buf := bufPool.Get().([]byte)
+	buf = append(buf, []byte(`select * from city_air_quality where site_id in (`)...)
 	for i := 0; i < g.count; i++ {
-		buf.Write([]byte(`'`))
-		buf.Write(g.sim.Hosts[g.perm[index+i]].SiteID)
-		buf.Write([]byte(`'`))
+		buf = append(buf, '\'')
+		buf = append(buf, g.sim.Hosts[(index+i)%len(g.sim.Hosts)].SiteID...)
+		buf = append(buf, '\'')
 		if i != g.count-1 {
-			buf.Write([]byte(`,`))
+			buf = append(buf, ',')
 		}
 	}
-	buf.Write([]byte(") group by site_id order by time desc limit 1;"))
-	sql := buf.String()
-	buf.Reset()
-	bufPool.Put(buf)
-	return sql
+	buf = append(buf, []byte(") group by site_id order by time desc limit 1;")...)
+	defer func() {
+		buf = buf[:0]
+		bufPool.Put(buf)
+	}()
+	return *(*string)(unsafe.Pointer(&buf))
 }
 
 type countOfDataFromOneSite struct {
@@ -83,7 +94,7 @@ type countOfDataFromOneSite struct {
 	Period time.Duration
 }
 
-func (g *countOfDataFromOneSite) Init(sim interface{}) error {
+func (g *countOfDataFromOneSite) Init(sim common.Simulator) error {
 	g.sim = sim.(*airq.AirqSimulator)
 	g.loadEpochFromEnd(g.Period)
 	return nil
@@ -101,7 +112,7 @@ type limitOffsetWithTimeOfOneSite struct {
 	Period time.Duration
 }
 
-func (g *limitOffsetWithTimeOfOneSite) Init(sim interface{}) error {
+func (g *limitOffsetWithTimeOfOneSite) Init(sim common.Simulator) error {
 	g.sim = sim.(*airq.AirqSimulator)
 	g.loadEpochFromEnd(g.Period)
 	return nil
@@ -122,7 +133,7 @@ type countOfData struct {
 	Period time.Duration
 }
 
-func (g *countOfData) Init(sim interface{}) error {
+func (g *countOfData) Init(sim common.Simulator) error {
 	g.sim = sim.(*airq.AirqSimulator)
 	g.loadEpochFromEnd(g.Period)
 	return nil
@@ -138,7 +149,7 @@ type countOfDataGroupByTag struct {
 	Period time.Duration
 }
 
-func (g *countOfDataGroupByTag) Init(sim interface{}) error {
+func (g *countOfDataGroupByTag) Init(sim common.Simulator) error {
 	g.sim = sim.(*airq.AirqSimulator)
 	g.loadEpochFromEnd(g.Period)
 	return nil
@@ -156,7 +167,7 @@ type countOfDataGroupByCity struct {
 	Period time.Duration
 }
 
-func (g *countOfDataGroupByCity) Init(sim interface{}) error {
+func (g *countOfDataGroupByCity) Init(sim common.Simulator) error {
 	g.sim = sim.(*airq.AirqSimulator)
 	g.loadEpochFromEnd(g.Period)
 	return nil
@@ -195,7 +206,7 @@ type meanOfOneSiteGroupByTime struct {
 	GroupByPeriod time.Duration
 }
 
-func (g *meanOfOneSiteGroupByTime) Init(sim interface{}) error {
+func (g *meanOfOneSiteGroupByTime) Init(sim common.Simulator) error {
 	g.sim = sim.(*airq.AirqSimulator)
 	g.loadEpochFromEnd(g.Period)
 	return nil
@@ -214,7 +225,7 @@ type meanOfOneCityGroupByTime struct {
 	GroupByPeriod time.Duration
 }
 
-func (g *meanOfOneCityGroupByTime) Init(sim interface{}) error {
+func (g *meanOfOneCityGroupByTime) Init(sim common.Simulator) error {
 	g.sim = sim.(*airq.AirqSimulator)
 	g.loadEpochFromEnd(g.Period)
 	return nil
@@ -244,7 +255,7 @@ type countOfMeanGroupBytime struct {
 	GroupByPeriod time.Duration
 }
 
-func (g *countOfMeanGroupBytime) Init(sim interface{}) error {
+func (g *countOfMeanGroupBytime) Init(sim common.Simulator) error {
 	g.sim = sim.(*airq.AirqSimulator)
 	g.loadEpochFromEnd(g.Period)
 	return nil
@@ -263,7 +274,7 @@ type countOfMeanGroupBytime1 struct {
 	GroupByPeriod time.Duration
 }
 
-func (g *countOfMeanGroupBytime1) Init(sim interface{}) error {
+func (g *countOfMeanGroupBytime1) Init(sim common.Simulator) error {
 	g.sim = sim.(*airq.AirqSimulator)
 	g.loadEpochFromEnd(g.Period)
 	return nil
@@ -281,7 +292,7 @@ type topOfMeanGroupByCity struct {
 	Period time.Duration
 }
 
-func (g *topOfMeanGroupByCity) Init(sim interface{}) error {
+func (g *topOfMeanGroupByCity) Init(sim common.Simulator) error {
 	g.sim = sim.(*airq.AirqSimulator)
 	g.loadEpochFromEnd(g.Period)
 	return nil
@@ -299,7 +310,7 @@ type topOfMeanGroupByCity1 struct {
 	Period time.Duration
 }
 
-func (g *topOfMeanGroupByCity1) Init(sim interface{}) error {
+func (g *topOfMeanGroupByCity1) Init(sim common.Simulator) error {
 	g.sim = sim.(*airq.AirqSimulator)
 	g.loadEpochFromEnd(g.Period)
 	return nil
@@ -316,7 +327,7 @@ type meanOfOneCityAndMonthGroupByDay struct {
 	timeIndex int
 }
 
-func (g *meanOfOneCityAndMonthGroupByDay) Init(sim interface{}) error {
+func (g *meanOfOneCityAndMonthGroupByDay) Init(sim common.Simulator) error {
 	g.sim = sim.(*airq.AirqSimulator)
 	g.timeNow = g.sim.TimestampStart
 	g.timeIndex = 0

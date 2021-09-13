@@ -6,6 +6,7 @@ import (
 	"math"
 	"reflect"
 	"sort"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -17,16 +18,17 @@ type RespStat struct {
 }
 
 type RespTimeResult struct {
-	Min     int //min response time (ms)
-	Max     int
-	Avg     int
-	P50     int
-	P90     int
-	P95     int
-	P99     int
-	Qps     float64
-	Success int64
-	Count   int64
+	P50    float64
+	P90    float64
+	P95    float64
+	P99    float64
+	Min    float64 //min response time (ms)
+	Max    float64
+	Avg    float64
+	Fail   int
+	Total  int
+	RunSec float64
+	Qps    float64
 }
 
 type ResponseCollector struct {
@@ -72,34 +74,107 @@ func (c *ResponseCollector) GetDetail() RespTimeResult {
 
 	if len(respTimes) > 0 {
 		sort.Slice(respTimes, func(i, j int) bool { return respTimes[i] < respTimes[j] })
+		qps := float64(successCount) / c.endTime.Sub(c.startTime).Seconds()
+		runSec := c.endTime.Sub(c.startTime).Seconds()
 		return RespTimeResult{
-			P50:     int(respTimes[int(0.5*float64(successCount))] / 1e6),  //50%
-			P90:     int(respTimes[int(0.9*float64(successCount))] / 1e6),  //90%
-			P95:     int(respTimes[int(0.95*float64(successCount))] / 1e6), //95%
-			P99:     int(respTimes[int(0.99*float64(successCount))] / 1e6), //99%
-			Min:     int(respTimes[0]) / 1e6,                               //MIN
-			Max:     int(respTimes[successCount-1]) / 1e6,                  //MAX
-			Avg:     int(AvgInt64(respTimes)) / 1e6,
-			Success: int64(successCount),
-			Count:   int64(len(c.stats)),
-			Qps:     float64(successCount) / float64(c.endTime.Sub(c.startTime).Seconds()),
+			P50:    Round(float64(respTimes[int(0.5*float64(successCount))])/1e6, 1),  //50%
+			P90:    Round(float64(respTimes[int(0.9*float64(successCount))])/1e6, 1),  //90%
+			P95:    Round(float64(respTimes[int(0.95*float64(successCount))])/1e6, 1), //95%
+			P99:    Round(float64(respTimes[int(0.99*float64(successCount))])/1e6, 1), //99%
+			Min:    Round(float64(respTimes[0])/1e6, 1),                               //MIN
+			Max:    Round(float64(respTimes[successCount-1])/1e6, 1),                  //MAX
+			Avg:    Round(float64(AvgInt64(respTimes))/1e6, 1),
+			Fail:   len(c.stats) - successCount,
+			Total:  len(c.stats),
+			Qps:    Round(qps, 3),
+			RunSec: Round(runSec, 3),
 		}
 	}
 	return RespTimeResult{}
 }
 
-func (c *ResponseCollector) ShowDetail() {
-	r := c.GetDetail()
+func Round(f float64, bit int) float64 {
+	v, _ := strconv.ParseFloat(fmt.Sprintf("%."+strconv.Itoa(bit)+"f", f), 64)
+	return v
+}
+
+func stringComplement(src string, bit int, sep string) string {
+	sepb := []byte(sep)
+	srcb := []byte(src)
+	for i := 0; i < bit; i++ {
+		srcb = append(srcb, sepb...)
+	}
+	return string(srcb)
+}
+
+func (r RespTimeResult) Show() {
+	// 利用反射
 	t := reflect.TypeOf(r)
 	v := reflect.ValueOf(r)
+	keys := make([]string, t.NumField())
+	values := make([]string, t.NumField())
+
+	// 下面3步核心思想是，取key和value两个的长度，key更长，就将value长度补位空字符和key一样长，value更长，就补位key
+	// 最终需要得到以下格式：
+	// P50(ms) P90(ms) P95(ms) P99(ms) Min(ms) Max(ms) Avg(ms) Qps Fail Total RunSec(s)
+	// 676     826     837     867     60      869     608     281 0    864   3.072
+	//
+	// 第1步：先遍历一变，按照key的长度，格式化value并记录下来
 	for k := 0; k < t.NumField(); k++ {
-		if t.Field(k).Name == "Qps" || t.Field(k).Name == "Success" || t.Field(k).Name == "Count" {
-			fmt.Printf("%s -- %v \n", t.Field(k).Name, v.Field(k).Interface())
+		var key string
+		// 合入单位
+		if t.Field(k).Name == "Qps" || t.Field(k).Name == "Fail" || t.Field(k).Name == "Total" {
+			key = fmt.Sprintf("%v ", t.Field(k).Name)
+		} else if t.Field(k).Name == "RunSec" {
+			key = fmt.Sprintf("%v(s) ", t.Field(k).Name)
 		} else {
-			fmt.Printf("%s -- %v ms\n", t.Field(k).Name, v.Field(k).Interface())
+			key = fmt.Sprintf("%v(ms) ", t.Field(k).Name)
+		}
+
+		keys[k] = key
+
+		// key长度大于value，将value补位；key长度小于value，则保持value
+		value := fmt.Sprintf("%v", v.Field(k).Interface())
+		if len(key) > len(value) {
+			values[k] = stringComplement(fmt.Sprintf("%v", value), len(key)-len(value), " ")
+		} else {
+			values[k] = value + " "
 		}
 	}
-	fmt.Println("running time:", c.endTime.Sub(c.startTime).Seconds(), "s")
+
+	// 第2步：按value长度打印key，不足补位空字符串
+	for k := 0; k < t.NumField(); k++ {
+		fmt.Print(stringComplement(keys[k], len(values[k])-len(keys[k]), " "))
+	}
+	fmt.Print("\n")
+
+	// 第3步：输出value
+	for k := 0; k < t.NumField(); k++ {
+		fmt.Print(values[k], "")
+	}
+	fmt.Print("\n")
+}
+
+func (r RespTimeResult) ToMap() map[string]string {
+	// 利用反射
+	t := reflect.TypeOf(r)
+	v := reflect.ValueOf(r)
+
+	m := make(map[string]string)
+	for k := 0; k < t.NumField(); k++ {
+		var key string
+		// 合入单位
+		if t.Field(k).Name == "Qps" || t.Field(k).Name == "Fail" || t.Field(k).Name == "Total" {
+			key = fmt.Sprintf("%v", t.Field(k).Name)
+		} else if t.Field(k).Name == "RunSec" {
+			key = fmt.Sprintf("%v(s)", t.Field(k).Name)
+		} else {
+			key = fmt.Sprintf("%v(ms)", t.Field(k).Name)
+		}
+		value := fmt.Sprintf("%v", v.Field(k).Interface())
+		m[key] = value
+	}
+	return m
 }
 
 func AvgInt64(list []int64) int64 {

@@ -50,6 +50,7 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 			RunQueryLoad()
 		},
+		Hidden: true,
 	}
 )
 
@@ -238,7 +239,7 @@ func (q *QueryLoad) GetReadStatistics() (itemsRead, bytesRead, valuesRead int64)
 
 func (q *QueryLoad) GetRespResult() {
 	// fmt.Println(q.respCollector.GetDetail())
-	q.respCollector.ShowDetail()
+	q.respCollector.GetDetail().Show()
 }
 
 // scan reads one item at a time from stdin. 1 item = 1 line.

@@ -31,20 +31,13 @@ type QueryGenerator struct {
 }
 
 var (
-	queryCmd = &cobra.Command{
-		Use:   "query",
-		Short: "数据库查询测试",
-		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println(cmd.Help())
-		},
-	}
-
 	queryGenCmd = &cobra.Command{
 		Use:   "query-gen",
 		Short: "生成数据库查询语句，输出到stdout，搭配query-load使用",
 		Run: func(cmd *cobra.Command, args []string) {
 			RunGenerateQueries()
 		},
+		Hidden: true,
 	}
 
 	listQueryCmd = &cobra.Command{

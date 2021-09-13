@@ -1,11 +1,12 @@
 package bulk_query_fctsdb
 
 import (
-	"bytes"
 	"fmt"
 	"math/rand"
 	"time"
+	"unsafe"
 
+	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
 	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/vehicle"
 )
 
@@ -15,7 +16,7 @@ type VehicleBasicGenerator struct {
 	epoch string
 }
 
-func (g *VehicleBasicGenerator) Init(sim interface{}) error {
+func (g *VehicleBasicGenerator) Init(sim common.Simulator) error {
 	g.sim = sim.(*vehicle.VehicleSimulator)
 	return nil
 }
@@ -45,37 +46,46 @@ func (g *OneCarNewest) Next() string {
 type CarsNewest struct {
 	VehicleBasicGenerator
 	count int
-	perm  []int
 }
 
-func (g *CarsNewest) Init(sim interface{}) error {
+func (g *CarsNewest) Init(sim common.Simulator) error {
 	g.sim = sim.(*vehicle.VehicleSimulator)
-	g.perm = rand.Perm(len(g.sim.Hosts))
 	if g.count >= len(g.sim.Hosts) {
 		return fmt.Errorf("query cars more than the count of cars in database")
 	}
-	// perm := rand.Perm(len(g.sim.Vehicles))
+	shuffleVehicleHost(g.sim.Hosts)
 	return nil
+}
+
+func shuffleVehicleHost(slice []vehicle.Vehicle) {
+	n := len(slice)
+	for i := 0; i < len(slice); i++ {
+		randIndex := rand.Intn(n)
+		slice[i], slice[randIndex] = slice[randIndex], slice[i]
+	}
 }
 
 func (g *CarsNewest) Next() string {
 
-	index := rand.Intn(len(g.sim.Hosts) - g.count)
-	buf := bufPool.Get().(*bytes.Buffer)
-	buf.Write([]byte(`select * from vehicle where VIN in (`))
+	index := rand.Intn(len(g.sim.Hosts))
+	buf := bufPool.Get().([]byte)
+	// buf := make([]byte, 0, 100+g.count*20)
+	buf = append(buf, []byte(`select * from vehicle where VIN in (`)...)
 	for i := 0; i < g.count; i++ {
-		buf.Write([]byte(`'`))
-		buf.Write(g.sim.Hosts[g.perm[index+i]].Name)
-		buf.Write([]byte(`'`))
+		buf = append(buf, '\'')
+		buf = append(buf, g.sim.Hosts[(index+i)%len(g.sim.Hosts)].Name...)
+		buf = append(buf, '\'')
 		if i != g.count-1 {
-			buf.Write([]byte(`,`))
+			buf = append(buf, ',')
 		}
 	}
-	buf.Write([]byte(") group by VIN order by time desc limit 1;"))
-	sql := buf.String()
-	buf.Reset()
-	bufPool.Put(buf)
-	return sql
+	buf = append(buf, []byte(") group by VIN order by time desc limit 1;")...)
+	defer func() {
+		buf = buf[:0]
+		bufPool.Put(buf)
+	}()
+
+	return *(*string)(unsafe.Pointer(&buf))
 }
 
 // case 3
@@ -83,7 +93,7 @@ type CarPaging struct {
 	VehicleBasicGenerator
 }
 
-func (g *CarPaging) Init(sim interface{}) error {
+func (g *CarPaging) Init(sim common.Simulator) error {
 	g.sim = sim.(*vehicle.VehicleSimulator)
 	g.loadEpochFromEnd(time.Hour * 24)
 	return nil
@@ -100,7 +110,7 @@ type OneCarMessageCountMonth struct {
 	VehicleBasicGenerator
 }
 
-func (g *OneCarMessageCountMonth) Init(sim interface{}) error {
+func (g *OneCarMessageCountMonth) Init(sim common.Simulator) error {
 	g.sim = sim.(*vehicle.VehicleSimulator)
 	g.loadEpochFromEnd(time.Hour * 24 * 30)
 	return nil
@@ -117,7 +127,7 @@ type CarsMessageCountMonth struct {
 	VehicleBasicGenerator
 }
 
-func (g *CarsMessageCountMonth) Init(sim interface{}) error {
+func (g *CarsMessageCountMonth) Init(sim common.Simulator) error {
 	g.sim = sim.(*vehicle.VehicleSimulator)
 	g.loadEpochFromEnd(time.Hour * 24 * 30)
 	return nil
@@ -132,7 +142,7 @@ type CarsGroupMessageCountMonth struct {
 	VehicleBasicGenerator
 }
 
-func (g *CarsGroupMessageCountMonth) Init(sim interface{}) error {
+func (g *CarsGroupMessageCountMonth) Init(sim common.Simulator) error {
 	g.sim = sim.(*vehicle.VehicleSimulator)
 	g.loadEpochFromEnd(time.Hour * 24 * 30)
 	return nil
@@ -147,7 +157,7 @@ type OneCarMessageCountYear struct {
 	VehicleBasicGenerator
 }
 
-func (g *OneCarMessageCountYear) Init(sim interface{}) error {
+func (g *OneCarMessageCountYear) Init(sim common.Simulator) error {
 	g.sim = sim.(*vehicle.VehicleSimulator)
 	g.loadEpochFromEnd(time.Hour * 24 * 365)
 	return nil
@@ -164,7 +174,7 @@ type CarsMessageCountYear struct {
 	VehicleBasicGenerator
 }
 
-func (g *CarsMessageCountYear) Init(sim interface{}) error {
+func (g *CarsMessageCountYear) Init(sim common.Simulator) error {
 	g.sim = sim.(*vehicle.VehicleSimulator)
 	g.loadEpochFromEnd(time.Hour * 24 * 365)
 	return nil
@@ -179,7 +189,7 @@ type CarsGroupMessageCountYear struct {
 	VehicleBasicGenerator
 }
 
-func (g *CarsGroupMessageCountYear) Init(sim interface{}) error {
+func (g *CarsGroupMessageCountYear) Init(sim common.Simulator) error {
 	g.sim = sim.(*vehicle.VehicleSimulator)
 	g.loadEpochFromEnd(time.Hour * 24 * 365)
 	return nil

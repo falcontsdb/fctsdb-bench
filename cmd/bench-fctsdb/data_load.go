@@ -76,6 +76,7 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 			RunLoad()
 		},
+		Hidden: true,
 	}
 )
 
@@ -567,7 +568,9 @@ func processBackoffMessages(workerId int, src chan bool, dst chan struct{}) floa
 			start = time.Now()
 		}
 	}
-	log.Printf("[worker %d] backoffs took a total of %fsec of runtime\n", workerId, totalBackoffSecs)
+	if totalBackoffSecs > 0 {
+		log.Printf("[worker %d] backoffs took a total of %fsec of runtime\n", workerId, totalBackoffSecs)
+	}
 	dst <- struct{}{}
 	return totalBackoffSecs
 }

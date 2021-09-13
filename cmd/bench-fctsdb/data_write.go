@@ -29,7 +29,7 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-type DataWriteBenchmark struct {
+type DataWrite struct {
 	// Program option vars:
 	csvDaemonUrls     string
 	backoff           time.Duration
@@ -70,10 +70,10 @@ type DataWriteBenchmark struct {
 }
 
 var (
-	dataWriteBenchmark = &DataWriteBenchmark{}
-	dataWriteCmd       = &cobra.Command{
+	dataWrite    = &DataWrite{}
+	dataWriteCmd = &cobra.Command{
 		Use:   "write",
-		Short: "生成数据并直接发送至数据库，一种高效的方式替代query-gen和query-load两个命令",
+		Short: "生成数据并直接发送至数据库",
 		Run: func(cmd *cobra.Command, args []string) {
 			RunWrite()
 		},
@@ -81,63 +81,77 @@ var (
 )
 
 func init() {
-	dataWriteBenchmark.Init(dataWriteCmd)
+	dataWrite.Init(dataWriteCmd)
 	rootCmd.AddCommand(dataWriteCmd)
 }
 
-func RunWrite() {
+func RunWrite() map[string]string {
 
-	dataWriteBenchmark.format = "fctsdb"
-	dataWriteBenchmark.Validate()
-	if dataWriteBenchmark.doDBCreate {
-		dataWriteBenchmark.CreateDb()
+	dataWrite.format = "fctsdb"
+	dataWrite.Validate()
+	if dataWrite.doDBCreate {
+		dataWrite.CreateDb()
 	}
 
 	var workersGroup sync.WaitGroup
 
-	dataWriteBenchmark.PrepareWorkers()
-	dataWriteBenchmark.PrepareSimulator()
+	dataWrite.PrepareWorkers()
+	dataWrite.PrepareSimulator()
 
-	for i := 0; i < dataWriteBenchmark.workers; i++ {
-		dataWriteBenchmark.PrepareProcess(i)
-		dataWriteBenchmark.parallelSimulator++
+	for i := 0; i < dataWrite.workers; i++ {
+		dataWrite.PrepareProcess(i)
+		dataWrite.parallelSimulator++
 		workersGroup.Add(1)
 
 		go func(w int) {
-			err := dataWriteBenchmark.RunProcess(w, &workersGroup)
+			err := dataWrite.RunProcess(w, &workersGroup)
 			if err != nil {
 				log.Println(err.Error())
 			}
 		}(i)
+
 		go func(w int) {
-			dataWriteBenchmark.AfterRunProcess(w)
+			dataWrite.AfterRunProcess(w)
 		}(i)
 	}
-	log.Printf("Started load with %d workers\n", dataWriteBenchmark.workers)
+	log.Printf("Started load with %d workers\n", dataWrite.workers)
 
+	// 定时运行状态日志
+	dataWrite.SyncShowStatistics()
 	start := time.Now()
-	dataWriteBenchmark.RunSimulator()
-	dataWriteBenchmark.respCollector.SetStart(start)
+	// 启动模拟器，生成point
+	dataWrite.RunSimulator()
+	dataWrite.respCollector.SetStart(start)
 	workersGroup.Wait()
-	dataWriteBenchmark.CleanUp()
+	dataWrite.SyncEnd()
+	dataWrite.CleanUp() // 目前cleanup主要处理背压相关的channel问题
 	end := time.Now()
-	dataWriteBenchmark.respCollector.SetEnd(end)
+	dataWrite.respCollector.SetEnd(end)
 	took := end.Sub(start)
 
-	itemsRead, bytesRead, valuesRead := dataWriteBenchmark.GetReadStatistics()
+	// 总结果输出
 
-	itemsRate := float64(itemsRead) / float64(took.Seconds())
-	bytesRate := float64(bytesRead) / float64(took.Seconds())
-	valuesRate := float64(valuesRead) / float64(took.Seconds())
+	itemsRead, bytesRead, valuesRead := dataWrite.GetReadStatistics()
+
+	itemsRate := float64(itemsRead) / took.Seconds()
+	bytesRate := float64(bytesRead) / took.Seconds()
+	valuesRate := float64(valuesRead) / took.Seconds()
 
 	loadTime := took.Seconds()
 	convertedBytesRate := bytesRate / (1 << 20)
-	log.Printf("loaded %d items in %fsec with %d workers (mean point rate %f/sec, mean value rate %f/s, %.2fMB/sec from stdin)\n", itemsRead, loadTime, dataWriteBenchmark.workers, itemsRate, valuesRate, convertedBytesRate)
-	dataWriteBenchmark.respCollector.ShowDetail()
+	log.Printf("loaded %d items in %fsec with %d workers (mean point rate %.2f/sec, mean value rate %.2f/s, %.2fMB/sec)\n", itemsRead, loadTime, dataWrite.workers, itemsRate, valuesRate, convertedBytesRate)
+	dataWrite.respCollector.GetDetail().Show()
+
+	result := dataWrite.respCollector.GetDetail().ToMap()
+	result["PointRate(p/s)"] = fmt.Sprintf("%.2f", itemsRate)
+	result["ValueRate(v/s)"] = fmt.Sprintf("%.2f", valuesRate)
+	result["BytesRate(MB/s)"] = fmt.Sprintf("%.2f", convertedBytesRate)
+	result["Points"] = fmt.Sprintf("%d", itemsRead)
+	return result
 }
 
-func (d *DataWriteBenchmark) Init(cmd *cobra.Command) {
-	writeFlag := cmd.Flags()
+func (d *DataWrite) Init(cmd *cobra.Command) {
+	writeFlag := cmd.PersistentFlags()
 	// writeFlag.StringVar(&d.format, "format", formatChoices[0], fmt.Sprintf("Format to emit. (choices: %s)", strings.Join(formatChoices, ", ")))
 	writeFlag.StringVar(&d.useCase, "use-case", CaseChoices[0], fmt.Sprintf("使用的测试场景(可选场景: %s)", strings.Join(CaseChoices, ", ")))
 	writeFlag.BoolVar(&d.doDBCreate, "do-db-create", true, "是否创建数据库")
@@ -156,10 +170,10 @@ func (d *DataWriteBenchmark) Init(cmd *cobra.Command) {
 	writeFlag.StringVar(&d.dbName, "db", "benchmark_db", "数据库的database名称")
 	writeFlag.IntVar(&d.batchSize, "batch-size", 100, "1个http请求中携带Point个数")
 	writeFlag.IntVar(&d.workers, "workers", 1, "并发的http个数")
-	writeFlag.DurationVar(&d.timeLimit, "time-limit", -1, "最大测试时间(-1表示无限制)")
+	// writeFlag.DurationVar(&d.timeLimit, "time-limit", -1, "最大测试时间(-1表示无限制)")
 }
 
-func (d *DataWriteBenchmark) Validate() {
+func (d *DataWrite) Validate() {
 
 	d.daemonUrls = strings.Split(d.csvDaemonUrls, ",")
 	if len(d.daemonUrls) == 0 {
@@ -211,14 +225,15 @@ func (d *DataWriteBenchmark) Validate() {
 
 }
 
-func (d *DataWriteBenchmark) CreateDb() {
+func (d *DataWrite) CreateDb() {
 	listDatabasesFn := d.listDatabases
 	createDbFn := d.createDb
 
 	// this also test db connection
 	existingDatabases, err := listDatabasesFn(d.daemonUrls[0])
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
+		log.Fatal("如果被测数据库是mock的，请使用--do-db-create=false跳过此步骤")
 	}
 
 	delete(existingDatabases, "_internal")
@@ -245,10 +260,9 @@ func (d *DataWriteBenchmark) CreateDb() {
 		time.Sleep(1000 * time.Millisecond)
 		log.Printf("Database %s [%s] created", d.dbName, id)
 	}
-
 }
 
-func (d *DataWriteBenchmark) PrepareWorkers() {
+func (d *DataWrite) PrepareWorkers() {
 
 	d.bufPool = sync.Pool{
 		New: func() interface{} {
@@ -263,10 +277,14 @@ func (d *DataWriteBenchmark) PrepareWorkers() {
 	}
 	d.inputDone = make(chan struct{})
 	d.configs = make([]*loadWorkerConfig, d.workers)
+	d.itemsRead = 0
+	d.valuesRead = 0
+	d.bytesRead = 0
+	d.respCollector = ResponseCollector{}
 
 }
 
-func (d *DataWriteBenchmark) PrepareSimulator() {
+func (d *DataWrite) PrepareSimulator() {
 
 	switch d.useCase {
 	case common.UseCaseVehicle:
@@ -300,19 +318,36 @@ func (d *DataWriteBenchmark) PrepareSimulator() {
 	default:
 		panic("unreachable")
 	}
+
+	log.Printf("We will write %d points", d.simulator.Total())
 }
 
-func (d *DataWriteBenchmark) EmptyPointChanel() {
+func (d *DataWrite) EmptyPointChanel() {
 	for range d.pointByteChan {
 	}
 }
 
-func (d *DataWriteBenchmark) SyncEnd() {
-	<-d.inputDone
-	close(d.pointByteChan)
+func (d *DataWrite) SyncShowStatistics() {
+	ticker := time.NewTicker(time.Second * 5)
+	go func() {
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				itemsRead, bytesRead, _ := d.GetReadStatistics()
+				log.Printf("Has writen %d point, %.2fMB", itemsRead, float64(bytesRead)/(1<<20))
+			case <-d.inputDone:
+				return
+			}
+		}
+	}()
 }
 
-func (d *DataWriteBenchmark) CleanUp() {
+func (d *DataWrite) SyncEnd() {
+	d.inputDone <- struct{}{}
+}
+
+func (d *DataWrite) CleanUp() {
 	for _, c := range d.configs {
 		close(c.backingOffChan)
 		<-c.backingOffDone
@@ -323,7 +358,7 @@ func (d *DataWriteBenchmark) CleanUp() {
 	}
 }
 
-func (d *DataWriteBenchmark) PrepareProcess(i int) {
+func (d *DataWrite) PrepareProcess(i int) {
 	d.configs[i] = &loadWorkerConfig{
 		url:            d.daemonUrls[i%len(d.daemonUrls)],
 		backingOffChan: make(chan bool, 100),
@@ -342,7 +377,7 @@ func (d *DataWriteBenchmark) PrepareProcess(i int) {
 	d.configs[i].writer = NewHTTPWriter(*c, url)
 }
 
-func (d *DataWriteBenchmark) RunProcess(i int, waitGroup *sync.WaitGroup) error {
+func (d *DataWrite) RunProcess(i int, waitGroup *sync.WaitGroup) error {
 	defer waitGroup.Done()
 
 	var batchItemCount int
@@ -361,11 +396,12 @@ func (d *DataWriteBenchmark) RunProcess(i int, waitGroup *sync.WaitGroup) error 
 
 		// 达到batchSize
 		if batchItemCount >= d.batchSize {
-			batchItemCount = 0
-			atomic.AddInt64(&d.bytesRead, int64(buf.Len()))
-			err = d.processBatches(d.configs[i].writer, buf, d.configs[i].backingOffChan, fmt.Sprintf("%d", i))
 
+			err = d.processBatches(d.configs[i].writer, buf, d.configs[i].backingOffChan, fmt.Sprintf("%d", i))
+			atomic.AddInt64(&d.bytesRead, int64(buf.Len()))
+			atomic.AddInt64(&d.itemsRead, int64(batchItemCount))
 			// Return the point buffer to the pool.
+			batchItemCount = 0
 			buf.Reset()
 			d.bufPool.Put(buf)
 			buf = d.bufPool.Get().(*bytes.Buffer)
@@ -373,17 +409,18 @@ func (d *DataWriteBenchmark) RunProcess(i int, waitGroup *sync.WaitGroup) error 
 
 	}
 	if batchItemCount > 0 {
-		atomic.AddInt64(&d.bytesRead, int64(buf.Len()))
 		err = d.processBatches(d.configs[i].writer, buf, d.configs[i].backingOffChan, fmt.Sprintf("%d", i))
+		atomic.AddInt64(&d.bytesRead, int64(buf.Len()))
+		atomic.AddInt64(&d.itemsRead, int64(batchItemCount))
 	}
 	return err
 }
 
-func (d *DataWriteBenchmark) AfterRunProcess(i int) {
+func (d *DataWrite) AfterRunProcess(i int) {
 	d.configs[i].backingOffSecs = processBackoffMessages(i, d.configs[i].backingOffChan, d.configs[i].backingOffDone)
 }
 
-func (d *DataWriteBenchmark) UpdateReport(params *report.LoadReportParams) (reportTags [][2]string, extraVals []report.ExtraVal) {
+func (d *DataWrite) UpdateReport(params *report.LoadReportParams) (reportTags [][2]string, extraVals []report.ExtraVal) {
 
 	reportTags = [][2]string{{"back_off", strconv.Itoa(int(d.backoff.Seconds()))}}
 
@@ -400,14 +437,14 @@ func (d *DataWriteBenchmark) UpdateReport(params *report.LoadReportParams) (repo
 	return
 }
 
-func (d *DataWriteBenchmark) GetReadStatistics() (itemsRead, bytesRead, valuesRead int64) {
+func (d *DataWrite) GetReadStatistics() (itemsRead, bytesRead, valuesRead int64) {
 	itemsRead = d.itemsRead
 	bytesRead = d.bytesRead
 	valuesRead = d.valuesRead
 	return
 }
 
-func (d *DataWriteBenchmark) Write(p []byte) (n int, err error) {
+func (d *DataWrite) Write(p []byte) (n int, err error) {
 	b := make([]byte, len(p))
 	copy(b, p)
 	d.pointByteChan <- &b
@@ -417,7 +454,7 @@ func (d *DataWriteBenchmark) Write(p []byte) (n int, err error) {
 
 // scan reads one item at a time from stdin. 1 item = 1 line.
 // When the requested number of items per batch is met, send a batch over batchChan for the workers to write.
-func (d *DataWriteBenchmark) RunSimulator() {
+func (d *DataWrite) RunSimulator() {
 
 	var serializer common.Serializer
 	switch d.format {
@@ -447,7 +484,24 @@ func (d *DataWriteBenchmark) RunSimulator() {
 		panic("unreachable")
 	}
 
-	count := runtime.NumCPU() / 4
+	// 先生产一条数据，计算一下总的数据流
+	var counter CountWriter
+	point := common.MakeUsablePoint()
+	d.simulator.Next(point)
+	serializer.SerializePoint(&counter, point)
+	fmt.Println(string(counter.bytes))
+	log.Printf("We will write about %d MBytes\n", int64(len(counter.bytes))*d.simulator.Total()/(1<<20))
+	d.pointByteChan <- &counter.bytes
+
+	// 开启协程生产数据
+	var count int
+	// 新增场景vehicle和air-quality是协程安全的，可以支撑多线程生成。原生场景只支持单协程生成。
+	if d.useCase == common.UseCaseVehicle || d.useCase == common.UseCaseAirQuality {
+		count = 1
+	} else {
+		count = runtime.NumCPU() / 4
+	}
+
 	if count < 1 {
 		count = 1
 	}
@@ -465,7 +519,6 @@ func (d *DataWriteBenchmark) RunSimulator() {
 			}
 		}()
 	}
-
 	var wg2 sync.WaitGroup
 	// 双倍协程将point转为为[]byte
 	for i := 0; i < 2*count; i++ {
@@ -484,16 +537,14 @@ func (d *DataWriteBenchmark) RunSimulator() {
 	}
 
 	wg.Wait()
-	d.itemsRead = d.simulator.SeenPoints()
 	d.valuesRead = d.simulator.SeenValues()
 	close(pointChan)
 	wg2.Wait()
 	close(d.pointByteChan)
-
 }
 
 // processBatches reads byte buffers from batchChan and writes them to the target server, while tracking stats on the write.
-func (d *DataWriteBenchmark) processBatches(w *HTTPWriter, buf *bytes.Buffer, backoffSrc chan bool, telemetryWorkerLabel string) error {
+func (d *DataWrite) processBatches(w *HTTPWriter, buf *bytes.Buffer, backoffSrc chan bool, telemetryWorkerLabel string) error {
 	// var batchesSeen int64
 	// 发送http write
 	var err error
@@ -541,7 +592,7 @@ func (d *DataWriteBenchmark) processBatches(w *HTTPWriter, buf *bytes.Buffer, ba
 	return nil
 }
 
-func (d *DataWriteBenchmark) createDb(daemonUrl, dbName string) (string, error) {
+func (d *DataWrite) createDb(daemonUrl, dbName string) (string, error) {
 	u, err := neturl.Parse(daemonUrl)
 	if err != nil {
 		return "", err
@@ -573,7 +624,7 @@ func (d *DataWriteBenchmark) createDb(daemonUrl, dbName string) (string, error) 
 }
 
 // listDatabases lists the existing databases in InfluxDB.
-func (d *DataWriteBenchmark) listDatabases(daemonUrl string) (map[string]string, error) {
+func (d *DataWrite) listDatabases(daemonUrl string) (map[string]string, error) {
 	u := fmt.Sprintf("%s/query?q=show%%20databases", daemonUrl)
 	resp, err := http.Get(u)
 	if err != nil {
@@ -612,4 +663,15 @@ func (d *DataWriteBenchmark) listDatabases(daemonUrl string) (map[string]string,
 		ret[nestedName[0]] = ""
 	}
 	return ret, nil
+}
+
+type CountWriter struct {
+	bytes []byte
+}
+
+func (c *CountWriter) Write(p []byte) (n int, err error) {
+	b := make([]byte, len(p))
+	copy(b, p)
+	c.bytes = b
+	return len(p), nil
 }

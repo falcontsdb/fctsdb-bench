@@ -19,7 +19,7 @@ go build -o fcbench cmd/bench-fctsdb/*.go
 ```
 fcbench write --use-case vehicle --scale-var 1000 --sampling-interval 10s --urls http://localhost:8086
 ```
-上述命令表示使用车载（vehicle）场景，模拟1000辆车，每个车采样时间间隔10s，在默认时间范围2018-01-01T00:00:00Z-2018-01-02T00:00:00Z的写入默认数据库benchmark_db中。
+上述命令表示使用车载（vehicle）场景，模拟1000辆车，每个车采样时间间隔10s，在默认时间范围2018-01-01T00:00:00Z~~~2018-01-02T00:00:00Z的写入默认数据库benchmark_db中。
 fcbench write这个命令集合了数据生成和数据写入两个过程，在这个过程中如果发现数据库不存在，会自动创建数据库。
 如果已有数据库，不想创建数据库，可以添加--do-db-create=false
 
