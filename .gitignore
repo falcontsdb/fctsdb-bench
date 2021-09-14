@@ -6,3 +6,4 @@ airq.test
 data.txt
 .vscode
 fcbench*
+*.cache

@@ -44,6 +44,7 @@ type DataLoad struct {
 	dbName          string
 	dataFile        string
 	timeLimit       time.Duration
+	doDBCreate      bool
 
 	//runtime vars
 	bufPool               sync.Pool
@@ -89,8 +90,9 @@ func RunLoad() int {
 
 	dataLoad.Validate()
 	exitCode := 0
-
-	dataLoad.CreateDb()
+	if dataLoad.doDBCreate {
+		dataLoad.CreateDb()
+	}
 
 	var once sync.Once
 	var workersGroup sync.WaitGroup
@@ -170,6 +172,7 @@ type Scanner interface {
 
 func (l *DataLoad) Init(cmd *cobra.Command) {
 	writeFlag := cmd.Flags()
+	writeFlag.BoolVar(&l.doDBCreate, "do-db-create", true, "是否创建数据库")
 	writeFlag.StringVar(&l.csvDaemonUrls, "urls", "http://localhost:8086", "InfluxDB URLs, comma-separated. Will be used in a round-robin fashion.")
 	writeFlag.DurationVar(&l.backoff, "backoff", time.Second, "Time to sleep between requests when server indicates backpressure is needed.")
 	writeFlag.DurationVar(&l.backoffTimeOut, "backoff-timeout", time.Minute*30, "Maximum time to spent when dealing with backoff messages in one shot")
