@@ -25,7 +25,6 @@ import (
 	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
 	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/devops"
 	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/vehicle"
-	"git.querycap.com/falcontsdb/fctsdb-bench/util/report"
 	"github.com/spf13/cobra"
 	"github.com/valyala/fasthttp"
 )
@@ -53,21 +52,19 @@ type DataWrite struct {
 	doDBCreate        bool
 
 	//runtime vars
-	timestampStart    time.Time
-	timestampEnd      time.Time
-	daemonUrls        []string
-	bufPool           sync.Pool
-	pointByteChan     chan *[]byte
-	pointPool         sync.Pool
-	inputDone         chan struct{}
-	totalBackOffSecs  float64
-	configs           []*loadWorkerConfig
-	valuesRead        int64
-	parallelSimulator int64
-	itemsRead         int64
-	bytesRead         int64
-	simulator         common.Simulator
-	respCollector     ResponseCollector
+	timestampStart   time.Time
+	timestampEnd     time.Time
+	daemonUrls       []string
+	bufPool          sync.Pool
+	pointPool        sync.Pool
+	inputDone        chan struct{}
+	totalBackOffSecs float64
+	configs          []*loadWorkerConfig
+	valuesRead       int64
+	itemsRead        int64
+	bytesRead        int64
+	simulator        common.Simulator
+	respCollector    ResponseCollector
 }
 
 var (
@@ -110,7 +107,6 @@ func (d *DataWrite) RunWrite() map[string]string {
 
 	for i := 0; i < d.workers; i++ {
 		d.PrepareProcess(i)
-		d.parallelSimulator++
 		workersGroup.Add(1)
 		go func(w int) {
 			err := d.RunProcess(w, &workersGroup)
@@ -266,7 +262,6 @@ func (d *DataWrite) PrepareWorkers() {
 			return bytes.NewBuffer(make([]byte, 0, 4*1024*1024))
 		},
 	}
-	d.pointByteChan = make(chan *[]byte, 10*d.workers)
 	d.pointPool = sync.Pool{
 		New: func() interface{} {
 			return common.MakeUsablePoint()
@@ -320,11 +315,6 @@ func (d *DataWrite) PrepareSimulator() {
 	log.Printf("We will write %d points", d.simulator.Total())
 }
 
-func (d *DataWrite) EmptyPointChanel() {
-	for range d.pointByteChan {
-	}
-}
-
 func (d *DataWrite) SyncShowStatistics() {
 	ticker := time.NewTicker(time.Second * 5)
 	go func() {
@@ -343,6 +333,7 @@ func (d *DataWrite) SyncShowStatistics() {
 
 func (d *DataWrite) SyncEnd() {
 	d.inputDone <- struct{}{}
+	close(d.inputDone)
 }
 
 func (d *DataWrite) CleanUp() {
@@ -386,6 +377,7 @@ func (d *DataWrite) RunProcess(i int, waitGroup *sync.WaitGroup) error {
 	point := common.MakeUsablePoint()
 	for !d.simulator.Finished() {
 		d.simulator.Next(point)
+		atomic.AddInt64(&d.valuesRead, int64(len(point.FieldValues)))
 		pointByte := SerializePoint(point)
 		buf.Write(pointByte)
 		batchItemCount++
@@ -420,36 +412,11 @@ func (d *DataWrite) AfterRunProcess(i int) {
 	d.configs[i].backingOffSecs = processBackoffMessages(i, d.configs[i].backingOffChan, d.configs[i].backingOffDone)
 }
 
-func (d *DataWrite) UpdateReport(params *report.LoadReportParams) (reportTags [][2]string, extraVals []report.ExtraVal) {
-
-	reportTags = [][2]string{{"back_off", strconv.Itoa(int(d.backoff.Seconds()))}}
-
-	extraVals = make([]report.ExtraVal, 0)
-
-	if d.totalBackOffSecs > 0 {
-		extraVals = append(extraVals, report.ExtraVal{Name: "total_backoff_secs", Value: d.totalBackOffSecs})
-	}
-
-	params.DBType = "InfluxDB"
-	params.DestinationUrl = d.csvDaemonUrls
-	params.IsGzip = d.useGzip
-
-	return
-}
-
 func (d *DataWrite) GetReadStatistics() (itemsRead, bytesRead, valuesRead int64) {
 	itemsRead = d.itemsRead
 	bytesRead = d.bytesRead
 	valuesRead = d.valuesRead
 	return
-}
-
-func (d *DataWrite) Write(p []byte) (n int, err error) {
-	b := make([]byte, len(p))
-	copy(b, p)
-	d.pointByteChan <- &b
-	// fmt.Println("write", len(p))
-	return len(p), nil
 }
 
 // processBatches reads byte buffers from batchChan and writes them to the target server, while tracking stats on the write.
@@ -573,17 +540,6 @@ func (d *DataWrite) listDatabases(daemonUrl string) (map[string]string, error) {
 		ret[nestedName[0].(string)] = ""
 	}
 	return ret, nil
-}
-
-type CountWriter struct {
-	bytes []byte
-}
-
-func (c *CountWriter) Write(p []byte) (n int, err error) {
-	b := make([]byte, len(p))
-	copy(b, p)
-	c.bytes = b
-	return len(p), nil
 }
 
 var scratchBufPool = &sync.Pool{
