@@ -54,10 +54,6 @@ func SendStopAllMonitorSignal(endpoint string) error {
 	return nil
 }
 
-func dealUrl(url string) {
-
-}
-
 //check monitor serve running or not
 func CheckMonitorServe(addr string) error {
 	conn, err := net.DialTimeout("tcp", addr, 5*time.Second)

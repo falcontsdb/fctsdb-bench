@@ -322,8 +322,8 @@ func (d *DataWrite) SyncShowStatistics() {
 		for {
 			select {
 			case <-ticker.C:
-				itemsRead, bytesRead, _ := d.GetReadStatistics()
-				log.Printf("Has writen %d point, %.2fMB", itemsRead, float64(bytesRead)/(1<<20))
+				itemsRead, bytesRead, valuesRead := d.GetReadStatistics()
+				log.Printf("Has writen %d point, %d values, %.2fMB", itemsRead, valuesRead, float64(bytesRead)/(1<<20))
 			case <-d.inputDone:
 				return
 			}
