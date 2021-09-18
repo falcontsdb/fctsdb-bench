@@ -1,9 +1,11 @@
 package devops
 
 import (
+	// "math/rand"
 	"time"
 
 	. "git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
+	rand "git.querycap.com/falcontsdb/fctsdb-bench/util/fastrand"
 )
 
 var (
@@ -29,8 +31,9 @@ var (
 )
 
 type PostgresqlMeasurement struct {
-	timestamp     time.Time
-	distributions []Distribution
+	timestamp time.Time
+	// distributions []Distribution
+	fieldValues []int64
 }
 
 func NewPostgresqlMeasurement(start time.Time) *PostgresqlMeasurement {
@@ -40,25 +43,42 @@ func NewPostgresqlMeasurement(start time.Time) *PostgresqlMeasurement {
 	}
 
 	return &PostgresqlMeasurement{
-		timestamp:     start,
-		distributions: distributions,
+		timestamp: start,
+		// distributions: distributions,
+		fieldValues: make([]int64, len(PostgresqlFields)),
 	}
 }
 
 func (m *PostgresqlMeasurement) Tick(d time.Duration) {
 	m.timestamp = m.timestamp.Add(d)
 
-	for i := range m.distributions {
-		m.distributions[i].Advance()
-	}
+	// for i := range m.distributions {
+	// 	m.distributions[i].Advance()
+	// }
 }
 
 func (m *PostgresqlMeasurement) ToPoint(p *Point) bool {
 	p.SetMeasurementName(PostgresqlByteString)
-	p.SetTimestamp(&m.timestamp)
+	// p.SetTimestamp(&m.timestamp)
 
-	for i := range m.distributions {
-		p.AppendField(PostgresqlFields[i].Label, int64(m.distributions[i].Get()))
+	letterIdxBits := 10                          // 6 bits to represent a letter index
+	letterIdxMask := int64(1<<letterIdxBits - 1) // All 1-bits, as many as letterIdxBits
+	letterIdxMax := 63 / letterIdxBits           // # of letter indices fitting in 63 bits
+
+	for i, cache, remain := len(m.fieldValues)-1, rand.Int63(), letterIdxMax; i >= 0; {
+		if remain == 0 {
+			cache, remain = rand.Int63(), letterIdxMax
+		}
+		idx := cache & letterIdxMask
+		// value := atomic.AddInt64(&m.fieldValues[i], idx)
+		p.AppendField(PostgresqlFields[i].Label, idx)
+		i--
+
+		cache >>= letterIdxBits
+		remain--
 	}
+	// for i := range m.distributions {
+	// 	p.AppendField(PostgresqlFields[i].Label, int64(m.distributions[i].Get()))
+	// }
 	return true
 }

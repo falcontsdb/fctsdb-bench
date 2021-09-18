@@ -2,10 +2,11 @@ package devops
 
 import (
 	"fmt"
-	"math/rand"
+	// "math/rand"
 	"time"
 
 	. "git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
+	rand "git.querycap.com/falcontsdb/fctsdb-bench/util/fastrand"
 )
 
 type LabeledDistributionMaker struct {
@@ -66,14 +67,15 @@ type RedisMeasurement struct {
 
 	port, serverName []byte
 	uptime           time.Duration
-	distributions    []Distribution
+	// distributions    []Distribution
+	fieldValues []int64
 }
 
 func NewRedisMeasurement(start time.Time) *RedisMeasurement {
-	distributions := make([]Distribution, len(RedisFields))
-	for i := range RedisFields {
-		distributions[i] = RedisFields[i].DistributionMaker()
-	}
+	// distributions := make([]Distribution, len(RedisFields))
+	// for i := range RedisFields {
+	// 	distributions[i] = RedisFields[i].DistributionMaker()
+	// }
 
 	serverName := []byte(fmt.Sprintf("redis_%d", rand.Intn(100000)))
 	port := []byte(fmt.Sprintf("%d", rand.Intn(20000)+1024))
@@ -85,9 +87,10 @@ func NewRedisMeasurement(start time.Time) *RedisMeasurement {
 		port:       port,
 		serverName: serverName,
 
-		timestamp:     start,
-		uptime:        time.Duration(0),
-		distributions: distributions,
+		timestamp: start,
+		uptime:    time.Duration(0),
+		// distributions: distributions,
+		fieldValues: make([]int64, len(RedisFields)),
 	}
 }
 
@@ -95,21 +98,38 @@ func (m *RedisMeasurement) Tick(d time.Duration) {
 	m.timestamp = m.timestamp.Add(d)
 	m.uptime += d
 
-	for i := range m.distributions {
-		m.distributions[i].Advance()
-	}
+	// for i := range m.distributions {
+	// 	m.distributions[i].Advance()
+	// }
 }
 
 func (m *RedisMeasurement) ToPoint(p *Point) bool {
 	p.SetMeasurementName(RedisByteString)
-	p.SetTimestamp(&m.timestamp)
+	// p.SetTimestamp(&m.timestamp)
 
 	p.AppendTag(RedisTags[0], m.port)
 	p.AppendTag(RedisTags[1], m.serverName)
-
+	m.uptime += EpochDuration
 	p.AppendField(RedisUptime, int64(m.uptime.Seconds()))
-	for i := range m.distributions {
-		p.AppendField(RedisFields[i].Label, int64(m.distributions[i].Get()))
+
+	letterIdxBits := 10                          // 6 bits to represent a letter index
+	letterIdxMask := int64(1<<letterIdxBits - 1) // All 1-bits, as many as letterIdxBits
+	letterIdxMax := 63 / letterIdxBits           // # of letter indices fitting in 63 bits
+
+	for i, cache, remain := len(m.fieldValues)-1, rand.Int63(), letterIdxMax; i >= 0; {
+		if remain == 0 {
+			cache, remain = rand.Int63(), letterIdxMax
+		}
+		idx := cache & letterIdxMask
+		// value := atomic.AddInt64(&m.fieldValues[i], idx)
+		p.AppendField(RedisFields[i].Label, idx)
+		i--
+
+		cache >>= letterIdxBits
+		remain--
 	}
+	// for i := range m.distributions {
+	// 	p.AppendField(RedisFields[i].Label, int64(m.distributions[i].Get()))
+	// }
 	return true
 }

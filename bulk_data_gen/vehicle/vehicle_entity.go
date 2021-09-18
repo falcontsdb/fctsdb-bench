@@ -1,11 +1,12 @@
 package vehicle
 
 import (
-	"math/rand"
-	"sync"
+	// "math/rand"
+
 	"time"
 
 	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
+	rand "git.querycap.com/falcontsdb/fctsdb-bench/util/fastrand"
 )
 
 var (
@@ -82,7 +83,6 @@ var (
 type EntityMeasurement struct {
 	timestamp time.Time
 	values    int
-	mutex     sync.Mutex
 }
 
 func NewEntityMeasurement(start time.Time) *EntityMeasurement {

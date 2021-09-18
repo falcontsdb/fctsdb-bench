@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"net/url"
 	"testing"
+	"time"
 )
 
 func TestQps(t *testing.T) {
@@ -19,17 +19,21 @@ func TestQps(t *testing.T) {
 		Fail:   600,
 		Total:  600,
 		RunSec: 29.046935901,
+		Start:  int(time.Now().Unix()),
+		End:    int(time.Now().Add(time.Minute).Unix()),
 	}
 	r.Show()
+	fmt.Println(r.ToMap())
 }
 
 func TestUrl(t *testing.T) {
-	u, err := url.Parse("www.baidu.com/")
-	if err != nil {
-		fmt.Print(err.Error())
-	}
-	u.Path = "/start"
-	if u.Scheme == "" {
-		fmt.Println(111)
-	}
+	// u, err := url.Parse("www.baidu.com/")
+	// if err != nil {
+	// 	fmt.Print(err.Error())
+	// }
+	// u.Path = "/start"
+	// if u.Scheme == "" {
+	// 	fmt.Println(111)
+	// }
+	SendStartMonitorSignal("http://124.71.230.36:3603", "adf*dfak")
 }

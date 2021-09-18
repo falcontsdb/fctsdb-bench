@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"encoding/csv"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"math/rand"
+	"net/http"
+	"net/url"
 	neturl "net/url"
 	"os"
 	"strconv"
@@ -38,6 +41,8 @@ type QueryWrite struct {
 	timeLimit        time.Duration
 	debug            bool
 	toCsv            bool
+	agentEndpoint    string
+	nmonEndpoint     string
 
 	//runtime vars
 	bufPool          sync.Pool
@@ -84,8 +89,9 @@ func init() {
 }
 
 func RunQueryWrite(arg string) {
-	csvFileName := time.Now().Format("Q-Jan2_15-04-05") + ".csv"
+	csvFileName := time.Now().Format("q-jan2_15-04-05") + ".csv"
 	queryWrite.Validate()
+
 	if arg == "all" {
 		for typeID := 1; typeID <= queryWrite.queryCase.Count; typeID++ {
 			queryWrite.RunOneQueryType(typeID)
@@ -93,6 +99,9 @@ func RunQueryWrite(arg string) {
 				queryWrite.WriteResultToCsv(csvFileName, true)
 			} else {
 				queryWrite.WriteResultToCsv(csvFileName, false)
+			}
+			if queryWrite.agentEndpoint != "" {
+				queryWrite.AfterRun()
 			}
 		}
 	} else {
@@ -106,6 +115,9 @@ func RunQueryWrite(arg string) {
 					queryWrite.WriteResultToCsv(csvFileName, true)
 				} else {
 					queryWrite.WriteResultToCsv(csvFileName, false)
+				}
+				if queryWrite.agentEndpoint != "" {
+					queryWrite.AfterRun()
 				}
 			}
 		}
@@ -129,6 +141,8 @@ func (q *QueryWrite) Init(cmd *cobra.Command) {
 	writeFlag.IntVar(&q.workers, "workers", 1, "并发的http个数")
 	writeFlag.DurationVar(&q.timeLimit, "time-limit", -1, "最大测试时间(-1表示无限制)，设置后会使query-count参数失效")
 	writeFlag.BoolVar(&q.debug, "debug", false, "是否需要打印debug日志")
+	writeFlag.StringVar(&q.agentEndpoint, "agent", "", "数据库代理服务地址，为空表示不使用 (默认不使用)")
+	writeFlag.StringVar(&q.nmonEndpoint, "easy-nmon", "", "easy-nmon地址，为空表示不使用监控 (默认不使用)")
 }
 
 func (q *QueryWrite) Validate() {
@@ -193,6 +207,10 @@ func (q *QueryWrite) Validate() {
 func (q *QueryWrite) RunOneQueryType(typeID int) {
 	log.Printf("*****************************************************************************************")
 	log.Printf("Run the case: %s, query type id: %d, name: %s\n", q.useCase, typeID, q.queryCase.Types[typeID].Name)
+	q.CheckDBIsRunning()
+	if q.nmonEndpoint != "" {
+		SendStartMonitorSignal(q.nmonEndpoint, fmt.Sprintf("%s_%d_", q.useCase, typeID))
+	}
 	var workersGroup sync.WaitGroup
 	q.queryTypeID = typeID
 	q.PrepareWorkers()
@@ -218,7 +236,36 @@ func (q *QueryWrite) RunOneQueryType(typeID int) {
 	log.Printf("Started load with %d workers\n", queryWrite.workers)
 	workersGroup.Wait()
 	queryWrite.respCollector.SetEnd(time.Now())
+	if q.nmonEndpoint != "" {
+		SendStopAllMonitorSignal(q.nmonEndpoint)
+	}
 	queryWrite.GetRespResult()
+}
+
+func (q *QueryWrite) AfterRun() {
+	if q.agentEndpoint != "" {
+		q.httpGet("/stop")
+		time.Sleep(time.Second * 5)
+		q.httpGet("/start")
+	}
+}
+
+func (q *QueryWrite) CheckDBIsRunning() {
+	u := fmt.Sprintf("%s/ping", q.daemonUrls[0])
+	cli := http.Client{Timeout: time.Second}
+	i := 0
+	for {
+		resp, err := cli.Get(u)
+		if err == nil {
+			defer resp.Body.Close()
+			return
+		}
+		time.Sleep(time.Second)
+		i++
+		if i%60 == 0 {
+			log.Println("Waiting the db start...")
+		}
+	}
 }
 
 func (q *QueryWrite) PrepareWorkers() {
@@ -376,7 +423,7 @@ func (q *QueryWrite) WriteResultToCsv(fileName string, writeHead bool) {
 	csvWriter := csv.NewWriter(csvFile)
 
 	heads := []string{"UseCase", "TypeID", "P50(ms)", "P90(ms)", "P95(ms)", "P99(ms)", "Min(ms)",
-		"Max(ms)", "Avg(ms)", "Fail", "Total", "RunSec(s)", "Qps", "TypeName"}
+		"Max(ms)", "Avg(ms)", "Fail", "Total", "RunSec(s)", "Qps", "TypeName", "Start", "End"}
 
 	r := q.respCollector.GetDetail().ToMap()
 	r["UseCase"] = q.useCase
@@ -430,4 +477,23 @@ func (q *QueryWrite) processBatches(w *HTTPWriter, backoffSrc chan bool, telemet
 	}
 
 	return nil
+}
+
+func (q *QueryWrite) httpGet(path string) ([]byte, error) {
+
+	u, err := url.Parse(q.agentEndpoint)
+	if err != nil {
+		log.Fatal("Invalid agent address:", q.agentEndpoint, ", error:", err.Error())
+	}
+	if u.Scheme == "" {
+		log.Fatal("Invalid agent address:", q.agentEndpoint)
+	}
+	u.Path = path
+
+	resp, err := http.Get(u.String())
+	if err != nil {
+		return nil, err
+	}
+	rData, err := ioutil.ReadAll(resp.Body)
+	return rData, err
 }

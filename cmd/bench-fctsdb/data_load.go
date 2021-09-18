@@ -182,7 +182,7 @@ func (l *DataLoad) Init(cmd *cobra.Command) {
 	writeFlag.IntVar(&l.batchSize, "batch-size", 100, "Batch size (1 line of input = 1 item).")
 	writeFlag.IntVar(&l.workers, "workers", 1, "Number of parallel requests to make.")
 	writeFlag.StringVar(&l.dataFile, "file", "", "Input file")
-	writeFlag.DurationVar(&l.timeLimit, "time-limit", -1, "Maximum duration to run (-1 is the default: no limit).")
+	// writeFlag.DurationVar(&l.timeLimit, "time-limit", -1, "Maximum duration to run (-1 is the default: no limit).")
 }
 
 func (l *DataLoad) Validate() {
@@ -211,9 +211,9 @@ func (l *DataLoad) Validate() {
 		log.Print("Ingestion rate control is off")
 	}
 
-	if l.timeLimit > 0 && l.backoffTimeOut > l.timeLimit {
-		l.backoffTimeOut = l.timeLimit
-	}
+	// if l.timeLimit > 0 && l.backoffTimeOut > l.timeLimit {
+	// 	l.backoffTimeOut = l.timeLimit
+	// }
 
 }
 
@@ -634,7 +634,7 @@ func (l *DataLoad) listDatabases(daemonUrl string) (map[string]string, error) {
 	type listingType struct {
 		Results []struct {
 			Series []struct {
-				Values [][]string
+				Values [][]interface{}
 			}
 		}
 	}
@@ -646,7 +646,7 @@ func (l *DataLoad) listDatabases(daemonUrl string) (map[string]string, error) {
 
 	ret := make(map[string]string)
 	for _, nestedName := range listing.Results[0].Series[0].Values {
-		ret[nestedName[0]] = ""
+		ret[nestedName[0].(string)] = ""
 	}
 	return ret, nil
 }

@@ -94,7 +94,7 @@ func (g *DataGenerator) Init(cmd *cobra.Command) {
 	dataGenFlag.Int64Var(&g.scaleVar, "scale-var", 1, "Scaling variable specific to the use case.")
 	dataGenFlag.Int64Var(&g.scaleVarOffset, "scale-var-offset", 0, "Scaling variable offset specific to the use case.")
 	dataGenFlag.DurationVar(&g.samplingInterval, "sampling-interval", time.Second, "Simulated sampling interval.")
-	dataGenFlag.StringVar(&g.configFile, "config-file", "", "Simulator config file in TOML format (experimental)")
+	// dataGenFlag.StringVar(&g.configFile, "config-file", "", "Simulator config file in TOML format (experimental)")
 	dataGenFlag.StringVar(&g.timestampStartStr, "timestamp-start", common.DefaultDateTimeStart, "Beginning timestamp (RFC3339).")
 	dataGenFlag.StringVar(&g.timestampEndStr, "timestamp-end", common.DefaultDateTimeEnd, "Ending timestamp (RFC3339).")
 	dataGenFlag.Int64Var(&g.seed, "seed", 12345678, "PRNG seed (default 12345678, or 0, uses the current timestamp).")
@@ -163,14 +163,14 @@ func (g *DataGenerator) RunProcess() {
 		defer pprof.StopCPUProfile()
 	}
 
-	if g.configFile != "" {
-		c, err := common.NewConfig(g.configFile)
-		if err != nil {
-			log.Fatalf("external config error: %v", err)
-		}
-		common.Config = c
-		log.Printf("Using config file %s\n", g.configFile)
-	}
+	// if g.configFile != "" {
+	// 	c, err := common.NewConfig(g.configFile)
+	// 	if err != nil {
+	// 		log.Fatalf("external config error: %v", err)
+	// 	}
+	// 	common.Config = c
+	// 	log.Printf("Using config file %s\n", g.configFile)
+	// }
 
 	//out := bufio.NewWriterSize(os.Stdout, 4<<20) //original buffer size
 	out := bufio.NewWriterSize(os.Stdout, 4<<24) // most potimized size based on inspection via test regression
@@ -205,9 +205,10 @@ func (g *DataGenerator) RunProcess() {
 			HostCount:  g.scaleVar,
 			HostOffset: g.scaleVarOffset,
 		}
+		devops.EpochDuration = g.samplingInterval
 		sim = cfg.ToSimulator()
 	default:
-		panic("unreachable")
+		log.Fatalln("the case is not supported")
 	}
 
 	var serializer common.Serializer

@@ -2,13 +2,15 @@ package devops
 
 import (
 	"fmt"
-	"math/rand"
+	// "math/rand"
+	"sync/atomic"
 	"time"
 
 	. "git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
+	rand "git.querycap.com/falcontsdb/fctsdb-bench/util/fastrand"
 )
 
-const OneTerabyte = 1 << 40
+const OneTerabyte int64 = 1 << 40
 
 var (
 	DiskByteString        = []byte("disk") // heap optimization
@@ -34,9 +36,10 @@ var (
 type DiskMeasurement struct {
 	timestamp time.Time
 
-	path, fsType  []byte
-	uptime        time.Duration
-	freeBytesDist Distribution
+	path, fsType []byte
+	// uptime       time.Duration
+	// freeBytesDist Distribution
+	free int64
 }
 
 func NewDiskMeasurement(start time.Time, sda int) *DiskMeasurement {
@@ -53,30 +56,35 @@ func NewDiskMeasurement(start time.Time, sda int) *DiskMeasurement {
 		path:   path,
 		fsType: fsType,
 
-		timestamp:     start,
-		freeBytesDist: CWD(ND(50, 1), 0, OneTerabyte, OneTerabyte/2),
+		timestamp: start,
+		// freeBytesDist: CWD(ND(50, 1), 0, OneTerabyte, OneTerabyte/2),
+		free: OneTerabyte / 2,
 	}
 }
 
 func (m *DiskMeasurement) Tick(d time.Duration) {
 	m.timestamp = m.timestamp.Add(d)
 
-	m.freeBytesDist.Advance()
+	// m.freeBytesDist.Advance()
 }
 
 func (m *DiskMeasurement) ToPoint(p *Point) bool {
 	p.SetMeasurementName(DiskByteString)
-	p.SetTimestamp(&m.timestamp)
+	// p.SetTimestamp(&m.timestamp)
 
 	p.AppendTag(DiskTags[0], m.path)
 	p.AppendTag(DiskTags[1], m.fsType)
 
 	// the only thing that actually changes is the free byte count:
-	free := int64(m.freeBytesDist.Get())
+	// free := int64(m.freeBytesDist.Get())
+	free := atomic.AddInt64(&m.free, rand.Int63n(50)+1)
+	if free > OneTerabyte {
+		free = OneTerabyte
+	}
 
-	total := int64(OneTerabyte)
+	total := OneTerabyte
 	used := total - free
-	usedPercent := int64(100.0 * (float64(used) / float64(total)))
+	usedPercent := 100 * used / total
 
 	// inodes are 4096b in size:
 	inodesTotal := total / 4096

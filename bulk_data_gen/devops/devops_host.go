@@ -169,7 +169,7 @@ func NewHost(i int, offset int, start time.Time) Host {
 	h := Host{
 		// Tag Values that are static throughout the life of a Host:
 		Name:               []byte(fmt.Sprintf("host_%d", i+offset)),
-		Region:             []byte(fmt.Sprintf("%s", region.Name)),
+		Region:             region.Name,
 		Datacenter:         RandChoice(region.Datacenters),
 		Rack:               []byte(fmt.Sprintf("%d", rackId)),
 		Arch:               RandChoice(MachineArchChoices),
