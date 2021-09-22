@@ -515,7 +515,7 @@ func BenchmarkNewPointAirq2Sim(b *testing.B) {
 	simCount := 1
 	scaleVar := 100000
 	now := time.Now()
-	simulators := make([]common.Simulator, simCount)
+	simulators := make([]*AirqSimulator, simCount)
 	var step = scaleVar / simCount
 	var offset = 0
 	for i := 0; i < simCount; i++ {
@@ -576,7 +576,7 @@ func BenchmarkNewPointAirq2SimWith(b *testing.B) {
 	simCount := 2
 	scaleVar := 100000
 	now := time.Now()
-	simulators := make([]common.Simulator, simCount)
+	simulators := make([]*AirqSimulator, simCount)
 	var step = scaleVar / simCount
 	var offset = 0
 	for i := 0; i < simCount; i++ {
@@ -841,4 +841,39 @@ func BenchmarkNewPointDevopsEasy(b *testing.B) {
 		// ser.SerializePoint(out, point)
 		point.Reset()
 	}
+}
+
+func TestSafe(t *testing.T) {
+	now := time.Now()
+
+	cfg := &AirqSimulatorConfig{
+		Start:            now.Add(time.Second * -100),
+		End:              now,
+		SamplingInterval: time.Second,
+		AirqDeviceCount:  100,
+		AirqDeviceOffset: 0,
+	}
+	sim := cfg.ToSimulator()
+	// ser := common.NewSerializerInflux()
+	// out := Printer{}
+	wg := sync.WaitGroup{}
+	var count int64 = 0
+	for i := 0; i < 1; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			point := common.MakeUsablePoint()
+			// for !sim.Finished() {
+			for sim.Next(point) {
+				// sim.Next(point)
+				// ser.SerializePoint(out, point)
+				point.Reset()
+				atomic.AddInt64(&count, 1)
+			}
+		}()
+		// host := sim.Hosts[i%len(sim.Hosts)]
+		// _ = string(host.SiteID)
+	}
+	wg.Wait()
+	fmt.Println(count)
 }

@@ -17,7 +17,7 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 			cmd.Help()
 		},
-		Version:           "0.0.1",
+		Version:           "v1.0.1",
 		CompletionOptions: cobra.CompletionOptions{DisableDefaultCmd: true},
 		// helpCommand:       helpCmd,
 	}

@@ -43,6 +43,7 @@ type QueryWrite struct {
 	toCsv            bool
 	agentEndpoint    string
 	nmonEndpoint     string
+	useGzip          bool
 
 	//runtime vars
 	bufPool          sync.Pool
@@ -78,8 +79,9 @@ var (
 		Example: fmt.Sprintf("%s list   获取场景（case）和查询类型（query-type）\n"+
 			"%s query 1 --use-case vehicle    测试单个查询类型的\n"+
 			"%s query 1,2,7,9 --use-case vehicle   按顺序执行1,2,7,9查询类型的测试\n"+
-			"%s query all --use-case vehicle   按顺序执行某个场景（case）的所有查询测试\n",
-			TOOL_NAME, TOOL_NAME, TOOL_NAME, TOOL_NAME),
+			"%s query all --use-case vehicle   按顺序执行某个场景（case）的所有查询测试\n"+
+			"注意: 带*的Flag必须和%s write中参数一致\n",
+			TOOL_NAME, TOOL_NAME, TOOL_NAME, TOOL_NAME, TOOL_NAME),
 	}
 )
 
@@ -126,23 +128,25 @@ func RunQueryWrite(arg string) {
 
 func (q *QueryWrite) Init(cmd *cobra.Command) {
 	writeFlag := cmd.Flags()
-	writeFlag.StringVar(&q.useCase, "use-case", CaseChoices[0], fmt.Sprintf("使用的测试场景(可选场景: %s)", strings.Join(CaseChoices, ", ")))
-	writeFlag.Int64Var(&q.scaleVar, "scale-var", 1, "场景的变量，一般情况下是场景中模拟机的数量")
-	writeFlag.Int64Var(&q.scaleVarOffset, "scale-var-offset", 0, "场景偏移量，一般情况下是模拟机的起始MN编号 (default 0)")
-	writeFlag.BoolVar(&q.toCsv, "to-csv", false, "是否记录结果到csv文件")
-	writeFlag.DurationVar(&q.samplingInterval, "sampling-interval", time.Second, "模拟机的采样时间")
-	writeFlag.Int64Var(&q.queryCount, "query-count", 1000, "生成的查询语句数量")
-	writeFlag.StringVar(&q.timestampStartStr, "timestamp-start", common.DefaultDateTimeStart, "模拟机开始采样的时间 (RFC3339)")
-	writeFlag.StringVar(&q.timestampEndStr, "timestamp-end", common.DefaultDateTimeEnd, "模拟机采样结束数据 (RFC3339)")
-	writeFlag.Int64Var(&q.seed, "seed", 12345678, "全局随机数种子(设置为0是使用当前时间作为随机数种子)")
-	writeFlag.StringVar(&q.csvDaemonUrls, "urls", "http://localhost:8086", "被测数据库的地址")
-	writeFlag.StringVar(&q.dbName, "db", "benchmark_db", "数据库的database名称")
+	writeFlag.SortFlags = false
+	writeFlag.StringVar(&q.csvDaemonUrls, "urls", "http://localhost:8086", "* 被测数据库的地址")
+	writeFlag.StringVar(&q.dbName, "db", "benchmark_db", "* 数据库的database名称")
+	writeFlag.StringVar(&q.useCase, "use-case", CaseChoices[0], fmt.Sprintf("* 使用的测试场景(可选场景: %s)", strings.Join(CaseChoices, ", ")))
+	writeFlag.Int64Var(&q.scaleVar, "scale-var", 1, "* 场景的变量，一般情况下是场景中模拟机的数量")
+	writeFlag.Int64Var(&q.scaleVarOffset, "scale-var-offset", 0, "* 场景偏移量，一般情况下是模拟机的起始MN编号 (default 0)")
+	writeFlag.DurationVar(&q.samplingInterval, "sampling-interval", time.Second, "* 模拟机的采样时间")
+	writeFlag.StringVar(&q.timestampStartStr, "timestamp-start", common.DefaultDateTimeStart, "* 模拟机开始采样的时间 (RFC3339)")
+	writeFlag.StringVar(&q.timestampEndStr, "timestamp-end", common.DefaultDateTimeEnd, "* 模拟机采样结束数据 (RFC3339)")
+	writeFlag.Int64Var(&q.seed, "seed", 12345678, "* 全局随机数种子(设置为0是使用当前时间作为随机数种子)")
 	writeFlag.IntVar(&q.batchSize, "batch-size", 1, "1个http请求中携带查询语句个数")
 	writeFlag.IntVar(&q.workers, "workers", 1, "并发的http个数")
+	writeFlag.Int64Var(&q.queryCount, "query-count", 1000, "生成的查询语句数量")
 	writeFlag.DurationVar(&q.timeLimit, "time-limit", -1, "最大测试时间(-1表示无限制)，设置后会使query-count参数失效")
 	writeFlag.BoolVar(&q.debug, "debug", false, "是否需要打印debug日志")
+	writeFlag.BoolVar(&q.toCsv, "to-csv", false, "是否记录结果到csv文件")
 	writeFlag.StringVar(&q.agentEndpoint, "agent", "", "数据库代理服务地址，为空表示不使用 (默认不使用)")
 	writeFlag.StringVar(&q.nmonEndpoint, "easy-nmon", "", "easy-nmon地址，为空表示不使用监控 (默认不使用)")
+	writeFlag.BoolVar(&q.useGzip, "gzip", false, "是否使用gzip (default false).")
 }
 
 func (q *QueryWrite) Validate() {
@@ -383,7 +387,6 @@ func (q *QueryWrite) RunQueryGenerate() {
 				n = 0
 			}
 		}
-
 		if n > 0 {
 			q.batchChan <- batch{buf, n, 0}
 		}

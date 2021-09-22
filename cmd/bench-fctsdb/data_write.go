@@ -169,7 +169,7 @@ func (d *DataWrite) Init(cmd *cobra.Command) {
 	writeFlag.StringVar(&d.csvDaemonUrls, "urls", "http://localhost:8086", "被测数据库的地址")
 	writeFlag.DurationVar(&d.backoff, "backoff", time.Second, "产生背压的情况下，两次请求时间的等待时间")
 	writeFlag.DurationVar(&d.backoffTimeOut, "backoff-timeout", time.Minute*30, "一次测试中，背压等待累积的最大时间")
-	writeFlag.BoolVar(&d.useGzip, "gzip", true, "是否使用gzip (default false).")
+	writeFlag.BoolVar(&d.useGzip, "gzip", true, "是否使用gzip")
 	writeFlag.StringVar(&d.dbName, "db", "benchmark_db", "数据库的database名称")
 	writeFlag.IntVar(&d.batchSize, "batch-size", 100, "1个http请求中携带Point个数")
 	writeFlag.IntVar(&d.workers, "workers", 1, "并发的http个数")
@@ -375,8 +375,7 @@ func (d *DataWrite) RunProcess(i int, waitGroup *sync.WaitGroup) error {
 
 	batchItemCount = 0
 	point := common.MakeUsablePoint()
-	for !d.simulator.Finished() {
-		d.simulator.Next(point)
+	for d.simulator.Next(point) {
 		atomic.AddInt64(&d.valuesRead, int64(len(point.FieldValues)))
 		pointByte := SerializePoint(point)
 		buf.Write(pointByte)

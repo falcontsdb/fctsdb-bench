@@ -36,7 +36,7 @@ type Simulator interface {
 	SeenPoints() int64
 	SeenValues() int64
 	Finished() bool
-	Next(*Point)
+	Next(*Point) bool
 }
 
 // SimulatedMeasurement simulates one measurement (e.g. Redis for DevOps).

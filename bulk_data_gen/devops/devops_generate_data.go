@@ -58,14 +58,13 @@ func (d *DevopsSimulatorConfig) ToSimulator() *DevopsSimulator {
 	epochs := d.End.Sub(d.Start).Nanoseconds() / EpochDuration.Nanoseconds()
 	maxPoints := epochs * (d.HostCount * NHostSims)
 	dg := &DevopsSimulator{
-		madePoints: -1, //由于atomic是先加后返回值，为了保证从0开始，需要先置为-1
+		madePoints: -1, //由于atomic是先加后返回值，为了保证next中方法从0开始，需要先置为-1
 		madeValues: 0,
 		maxPoints:  maxPoints,
 
 		simulatedMeasurementIndex: 0,
-
-		hostIndex: 0,
-		hosts:     hostInfos,
+		hostIndex:                 0,
+		hosts:                     hostInfos,
 
 		timestampNow:   d.Start,
 		timestampStart: d.Start,
@@ -76,7 +75,7 @@ func (d *DevopsSimulatorConfig) ToSimulator() *DevopsSimulator {
 }
 
 // Next advances a Point to the next state in the generator.
-func (d *DevopsSimulator) Next(p *Point) {
+func (d *DevopsSimulator) Next(p *Point) bool {
 	// // switch to the next host if needed
 	// if d.simulatedMeasurementIndex == NHostSims {
 	// 	d.simulatedMeasurementIndex = 0
@@ -122,4 +121,5 @@ func (d *DevopsSimulator) Next(p *Point) {
 
 	host.SimulatedMeasurements[madePoint%NHostSims].ToPoint(p)
 	atomic.AddInt64(&d.madeValues, int64(len(p.FieldValues)))
+	return madePoint < d.maxPoints //方便另一只线程安全的结束方式，for sim.next(point){...} 保证产生的总点数正确，注意最后一次{...}里面的代码不执行
 }

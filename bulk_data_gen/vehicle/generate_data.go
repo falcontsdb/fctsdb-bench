@@ -32,7 +32,7 @@ func (d *VehicleSimulatorConfig) ToSimulator() *VehicleSimulator {
 	epochs := d.End.Sub(d.Start).Nanoseconds() / d.SamplingInterval.Nanoseconds()
 	maxPoints := epochs * measNum
 	dg := &VehicleSimulator{
-		madePoints: 0,
+		madePoints: -1, //保证madePoint在next方法中被使用时的初始值是0
 		madeValues: 0,
 		maxPoints:  maxPoints,
 
@@ -74,11 +74,11 @@ func (g *VehicleSimulator) Total() int64 {
 }
 
 func (g *VehicleSimulator) Finished() bool {
-	return g.madePoints >= g.maxPoints
+	return g.madePoints >= g.maxPoints-1
 }
 
 // Next advances a Point to the next state in the generator.
-func (v *VehicleSimulator) Next(p *common.Point) {
+func (v *VehicleSimulator) Next(p *common.Point) bool {
 	// switch to the next metric if needed
 	madePoint := atomic.AddInt64(&v.madePoints, 1)
 	hostIndex := madePoint % int64(len(v.Hosts))
@@ -98,4 +98,5 @@ func (v *VehicleSimulator) Next(p *common.Point) {
 	// v.madePoints++
 	// v.madeValues += int64(len(p.FieldValues))
 	atomic.AddInt64(&v.madeValues, int64(len(p.FieldValues)))
+	return madePoint < v.maxPoints //方便另一只线程安全的结束方式，for sim.next(point){...} 保证产生的总点数正确，注意最后一次{...}里面的代码不执行
 }

@@ -29,7 +29,7 @@ func (d *AirqSimulatorConfig) ToSimulator() *AirqSimulator {
 	epochs := d.End.Sub(d.Start).Nanoseconds() / d.SamplingInterval.Nanoseconds()
 	maxPoints := epochs * measNum
 	dg := &AirqSimulator{
-		madePoints: 0,
+		madePoints: -1, //保证madePoint在next方法中被使用时的初始值是0
 		madeValues: 0,
 		maxPoints:  maxPoints,
 
@@ -73,11 +73,12 @@ func (s *AirqSimulator) Total() int64 {
 }
 
 func (s *AirqSimulator) Finished() bool {
-	return s.madePoints >= s.maxPoints
+	return s.madePoints >= s.maxPoints-1
 }
 
 // Next advances a Point to the next state in the generator.
-func (s *AirqSimulator) Next(p *common.Point) {
+func (s *AirqSimulator) Next(p *common.Point) bool {
+
 	// switch to the next metric if needed
 	madePoint := atomic.AddInt64(&s.madePoints, 1)
 	hostIndex := madePoint % int64(len(s.Hosts))
@@ -99,4 +100,5 @@ func (s *AirqSimulator) Next(p *common.Point) {
 	Airq.SimulatedMeasurements[0].ToPoint(p)
 
 	atomic.AddInt64(&s.madeValues, int64(len(p.FieldValues)))
+	return madePoint < s.maxPoints //方便另一只线程安全的结束方式，for sim.next(point){...} 保证产生的总点数正确，注意最后一次{...}里面的代码不执行
 }

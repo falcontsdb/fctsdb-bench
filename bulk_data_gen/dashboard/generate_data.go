@@ -76,7 +76,7 @@ func (d *DashboardSimulatorConfig) ToSimulator() *DashboardSimulator {
 }
 
 // Next advances a Point to the next state in the generator.
-func (d *DashboardSimulator) Next(p *Point) {
+func (d *DashboardSimulator) Next(p *Point) bool {
 	// switch to the next host if needed
 	if d.simulatedMeasurementIndex == NHostSims {
 		d.simulatedMeasurementIndex = 0
@@ -111,5 +111,5 @@ func (d *DashboardSimulator) Next(p *Point) {
 	d.simulatedMeasurementIndex++
 	d.madeValues += int64(len(p.FieldValues))
 
-	return
+	return true
 }

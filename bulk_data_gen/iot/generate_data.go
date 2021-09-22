@@ -76,7 +76,7 @@ func (g *IotSimulator) Finished() bool {
 }
 
 // Next advances a Point to the next state in the generator.
-func (g *IotSimulator) Next(p *Point) {
+func (g *IotSimulator) Next(p *Point) bool {
 	for {
 		//find home which has not send measurement
 		homeFound := false
@@ -115,4 +115,5 @@ func (g *IotSimulator) Next(p *Point) {
 		g.madeValues += int64(len(p.FieldValues))
 		break
 	}
+	return true
 }

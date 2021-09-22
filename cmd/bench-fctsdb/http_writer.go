@@ -116,6 +116,7 @@ func (w *HTTPWriter) QueryLineProtocol(queryUrl []byte, debug bool) (int64, erro
 	req.Header.SetContentTypeBytes(textPlain)
 	req.Header.SetMethodBytes(get)
 	req.Header.SetRequestURIBytes(queryUrl)
+	req.Header.Add("Accept-Encoding", "gzip")
 	if w.c.AuthToken != "" {
 		req.Header.Add("Authorization", fmt.Sprintf("Token %s", w.c.AuthToken))
 	}

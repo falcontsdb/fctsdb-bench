@@ -37,7 +37,7 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 			RunGenerateQueries()
 		},
-		Hidden: true,
+		// Hidden: true,
 	}
 
 	listQueryCmd = &cobra.Command{
