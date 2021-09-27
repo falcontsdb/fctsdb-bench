@@ -37,7 +37,7 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 			RunGenerateQueries()
 		},
-		Hidden: true,
+		// Hidden: true,
 	}
 
 	listQueryCmd = &cobra.Command{
@@ -174,6 +174,8 @@ func ShowQueryTypes(qtype *fctsdb.QueryType, ID int, caseName string) {
 		fmt.Println("sql示例: ", qtype.RawSql)
 		fmt.Println(qtype.Comment)
 		fmt.Println("")
+		// file, _ := os.OpenFile("case.csv", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+		// file.WriteString(fmt.Sprintf("%s,%d,%s,%s\n", caseName, ID, qtype.Name, qtype.RawSql))
 	} else {
 		fmt.Printf("%s %d %s\n", caseName, ID, qtype.Name)
 	}

@@ -87,7 +87,7 @@ func (g *MetaquerySimulator) Finished() bool {
 }
 
 // Next advances a Point to the next state in the generator.
-func (g *MetaquerySimulator) Next(p *common.Point) {
+func (g *MetaquerySimulator) Next(p *common.Point) bool {
 	p.SetMeasurementName(measKey)
 	p.SetTimestamp(&g.timestampNow)
 
@@ -105,4 +105,5 @@ func (g *MetaquerySimulator) Next(p *common.Point) {
 	g.madePoints++
 	g.madeValues++
 	g.timestampNow = g.timestampNow.Add(g.stepTime)
+	return true
 }

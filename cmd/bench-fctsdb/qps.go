@@ -29,6 +29,8 @@ type RespTimeResult struct {
 	Total  int
 	RunSec float64
 	Qps    float64
+	Start  int
+	End    int
 }
 
 type ResponseCollector struct {
@@ -88,6 +90,8 @@ func (c *ResponseCollector) GetDetail() RespTimeResult {
 			Total:  len(c.stats),
 			Qps:    Round(qps, 3),
 			RunSec: Round(runSec, 3),
+			Start:  int(c.startTime.Unix()),
+			End:    int(c.endTime.Unix()),
 		}
 	}
 	return RespTimeResult{}
@@ -123,7 +127,7 @@ func (r RespTimeResult) Show() {
 	for k := 0; k < t.NumField(); k++ {
 		var key string
 		// 合入单位
-		if t.Field(k).Name == "Qps" || t.Field(k).Name == "Fail" || t.Field(k).Name == "Total" {
+		if t.Field(k).Name == "Qps" || t.Field(k).Name == "Fail" || t.Field(k).Name == "Total" || t.Field(k).Name == "Start" || t.Field(k).Name == "End" {
 			key = fmt.Sprintf("%v ", t.Field(k).Name)
 		} else if t.Field(k).Name == "RunSec" {
 			key = fmt.Sprintf("%v(s) ", t.Field(k).Name)
@@ -164,7 +168,7 @@ func (r RespTimeResult) ToMap() map[string]string {
 	for k := 0; k < t.NumField(); k++ {
 		var key string
 		// 合入单位
-		if t.Field(k).Name == "Qps" || t.Field(k).Name == "Fail" || t.Field(k).Name == "Total" {
+		if t.Field(k).Name == "Qps" || t.Field(k).Name == "Fail" || t.Field(k).Name == "Total" || t.Field(k).Name == "Start" || t.Field(k).Name == "End" {
 			key = fmt.Sprintf("%v", t.Field(k).Name)
 		} else if t.Field(k).Name == "RunSec" {
 			key = fmt.Sprintf("%v(s)", t.Field(k).Name)

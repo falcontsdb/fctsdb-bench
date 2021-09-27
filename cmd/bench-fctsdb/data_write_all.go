@@ -26,6 +26,7 @@ import (
 type DataWriteAll struct {
 	configsPath   string
 	agentEndpoint string
+	nmonEndpoint  string
 }
 
 // 一个简化版的配置，用来指定连续运行的
@@ -41,13 +42,13 @@ type DataWriteConfig struct {
 
 var (
 	buildinConfig_1 = DataWriteConfig{Workers: 64, BatchSize: 5000, UseCase: "vehicle", ScaleVar: 1, SamplingInterval: "10s", DataDuration: "3650d", UseGzip: true}
-	buildinConfig_2 = DataWriteConfig{Workers: 64, BatchSize: 5000, UseCase: "vehicle", ScaleVar: 1000, SamplingInterval: "10s", DataDuration: "30d", UseGzip: true}
-	buildinConfig_3 = DataWriteConfig{Workers: 64, BatchSize: 5000, UseCase: "vehicle", ScaleVar: 10000, SamplingInterval: "10s", DataDuration: "1d", UseGzip: true}
-	buildinConfig_4 = DataWriteConfig{Workers: 64, BatchSize: 5000, UseCase: "vehicle", ScaleVar: 100000, SamplingInterval: "10s", DataDuration: "1h", UseGzip: true}
+	buildinConfig_2 = DataWriteConfig{Workers: 64, BatchSize: 5000, UseCase: "vehicle", ScaleVar: 1000, SamplingInterval: "100s", DataDuration: "30d", UseGzip: true}
+	buildinConfig_3 = DataWriteConfig{Workers: 64, BatchSize: 5000, UseCase: "vehicle", ScaleVar: 10000, SamplingInterval: "30s", DataDuration: "1d", UseGzip: true}
+	buildinConfig_4 = DataWriteConfig{Workers: 64, BatchSize: 5000, UseCase: "vehicle", ScaleVar: 100000, SamplingInterval: "60s", DataDuration: "1h", UseGzip: true}
 	buildinConfig_5 = DataWriteConfig{Workers: 64, BatchSize: 5000, UseCase: "air-quality", ScaleVar: 1, SamplingInterval: "10s", DataDuration: "3650d", UseGzip: true}
-	buildinConfig_6 = DataWriteConfig{Workers: 64, BatchSize: 5000, UseCase: "air-quality", ScaleVar: 1000, SamplingInterval: "10s", DataDuration: "30d", UseGzip: true}
+	buildinConfig_6 = DataWriteConfig{Workers: 64, BatchSize: 5000, UseCase: "air-quality", ScaleVar: 1000, SamplingInterval: "30s", DataDuration: "30d", UseGzip: true}
 	buildinConfig_7 = DataWriteConfig{Workers: 64, BatchSize: 5000, UseCase: "air-quality", ScaleVar: 10000, SamplingInterval: "10s", DataDuration: "1d", UseGzip: true}
-	buildinConfig_8 = DataWriteConfig{Workers: 64, BatchSize: 5000, UseCase: "air-quality", ScaleVar: 100000, SamplingInterval: "10s", DataDuration: "1h", UseGzip: true}
+	buildinConfig_8 = DataWriteConfig{Workers: 64, BatchSize: 5000, UseCase: "air-quality", ScaleVar: 100000, SamplingInterval: "5s", DataDuration: "1h", UseGzip: true}
 	buildinConfigs  = []DataWriteConfig{buildinConfig_1, buildinConfig_2, buildinConfig_3, buildinConfig_4, buildinConfig_5, buildinConfig_6, buildinConfig_7, buildinConfig_8}
 
 	dataWriteAll    = DataWriteAll{}
@@ -134,14 +135,15 @@ func (d *DataWriteConfig) CopyToDataWrite(dw *DataWrite) error {
 func (d *DataWriteAll) Init(cmd *cobra.Command) {
 	flags := cmd.Flags()
 	flags.StringVar(&d.configsPath, "config-file", "", "config路径")
-	flags.StringVar(&d.agentEndpoint, "agent", "http://localhost:8966", "数据库代理服务地址")
+	flags.StringVar(&d.agentEndpoint, "agent", "", "数据库代理服务地址，为空表示不使用")
+	flags.StringVar(&d.nmonEndpoint, "easy-nmon", "", "easy-nmon地址，为空表示不使用监控 (默认不使用)")
 }
 
 func (d *DataWriteAll) Validate() {
 }
 
 func (d *DataWriteAll) Run() {
-	fileName := time.Now().Format("W-Jan2(15-04-05)") + ".csv"
+	fileName := time.Now().Format("w-jan2_15-04-05") + ".csv"
 	if d.configsPath != "" {
 		configsFile, err := os.Open(d.configsPath)
 		if err != nil {
@@ -162,27 +164,36 @@ func (d *DataWriteAll) Run() {
 				log.Println(err.Error())
 				continue
 			}
-			result := RunWrite()
+			if d.nmonEndpoint != "" {
+				SendStartMonitorSignal(d.nmonEndpoint, fmt.Sprintf("case_%d_", lindID))
+			}
+			result := dataWrite.RunWrite()
+			if d.nmonEndpoint != "" {
+				SendStopAllMonitorSignal(d.nmonEndpoint)
+			}
 			var writeHead bool = true
 			if lindID > 1 {
 				writeHead = false
 			}
 			d.WriteResult(fileName, result, config, writeHead)
 			d.AfterRun()
-
 		}
 	} else {
-		i := 0
-		for _, config := range buildinConfigs {
-			i++
+		for lindID, config := range buildinConfigs {
 			err := config.CopyToDataWrite(dataWrite)
 			if err != nil {
 				log.Println(err.Error())
 				continue
 			}
-			result := RunWrite()
+			if d.nmonEndpoint != "" {
+				SendStartMonitorSignal(d.nmonEndpoint, fmt.Sprintf("case_%d", lindID+1))
+			}
+			result := dataWrite.RunWrite()
+			if d.nmonEndpoint != "" {
+				SendStopAllMonitorSignal(d.nmonEndpoint)
+			}
 			var writeHead bool = true
-			if i > 1 {
+			if lindID > 0 {
 				writeHead = false
 			}
 			d.WriteResult(fileName, result, config, writeHead)
@@ -204,8 +215,8 @@ func (d *DataWriteAll) WriteResult(fileName string, r map[string]string, c DataW
 		r[tag.Field(k).Name] = fmt.Sprintf("%v", value.Field(k).Interface())
 	}
 
-	heads := []string{"UseCase", "Workers", "BatchSize", "ScaleVar", "SamplingInterval", "TimestampEndStr",
-		"UseGzip", "Points", "PointRate(p/s)", "ValueRate(v/s)", "BytesRate(MB/s)", "RunSec(s)"}
+	heads := []string{"UseCase", "Workers", "BatchSize", "ScaleVar", "SamplingInterval", "DataDuration",
+		"UseGzip", "Points", "PointRate(p/s)", "ValueRate(v/s)", "BytesRate(MB/s)", "RunSec(s)", "Start", "End"}
 
 	if writeHead {
 		err := csvWriter.Write(heads)
@@ -226,10 +237,12 @@ func (d *DataWriteAll) WriteResult(fileName string, r map[string]string, c DataW
 }
 
 func (d *DataWriteAll) AfterRun() {
-	d.HttpGet("/clean")
-	time.Sleep(time.Second * 2)
-	d.HttpGet("/start")
-	time.Sleep(time.Second * 10)
+	if d.agentEndpoint != "" {
+		d.HttpGet("/clean")
+		time.Sleep(time.Second * 5)
+		d.HttpGet("/start")
+		time.Sleep(time.Second * 10)
+	}
 }
 
 func (d *DataWriteAll) HttpGet(path string) ([]byte, error) {
@@ -291,6 +304,7 @@ func (f *FctsdbAgent) ListenAndServe() {
 
 	http.HandleFunc("/clean", f.CleanHandler)
 	http.HandleFunc("/start", f.StartDBHandler)
+	http.HandleFunc("/stop", f.StopDBHandler)
 	log.Println("Start service 0.0.0.0:" + f.port)
 	err := http.ListenAndServe("0.0.0.0:"+f.port, nil)
 	if err != nil {
@@ -316,7 +330,7 @@ func (f *FctsdbAgent) StartDBHandler(w http.ResponseWriter, r *http.Request) {
 
 func (f *FctsdbAgent) CleanHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
-		err := f.CleanFalconTSDB()
+		err := f.CleanFalconTSDB(true)
 		if err != nil {
 			log.Println("HTTP: " + err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
@@ -329,7 +343,22 @@ func (f *FctsdbAgent) CleanHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (f *FctsdbAgent) CleanFalconTSDB() error {
+func (f *FctsdbAgent) StopDBHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "GET" {
+		err := f.CleanFalconTSDB(false)
+		if err != nil {
+			log.Println("HTTP: " + err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(err.Error()))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+		log.Println("HTTP: clean falconTSDB successful")
+	}
+}
+
+func (f *FctsdbAgent) CleanFalconTSDB(deleteData bool) error {
 	pid, err := GetPidOnLinux("fctsdb")
 	if err != nil {
 		log.Println("Clean fctsdb failed, error: " + err.Error())
@@ -346,11 +375,13 @@ func (f *FctsdbAgent) CleanFalconTSDB() error {
 		pid, _ = GetPidOnLinux("fctsdb")
 		if pid == "" {
 			log.Println("Stop falconTSDB succeed")
-			//clear data directory of database
-			for _, dir := range []string{f.dbConfig.Meta.Dir, f.dbConfig.Data.Dir, f.dbConfig.Data.SnapshotDir, f.dbConfig.Data.WalDir} {
-				err := os.RemoveAll(dir)
-				if err != nil {
-					return err
+			if deleteData {
+				//clear data directory of database
+				for _, dir := range []string{f.dbConfig.Meta.Dir, f.dbConfig.Data.Dir, f.dbConfig.Data.SnapshotDir, f.dbConfig.Data.WalDir} {
+					err := os.RemoveAll(dir)
+					if err != nil {
+						return err
+					}
 				}
 			}
 			return nil

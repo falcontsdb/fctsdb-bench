@@ -1,7 +1,6 @@
 package common
 
 import (
-	"encoding/gob"
 	"sync"
 	"time"
 )
@@ -18,13 +17,11 @@ type Point struct {
 	FieldKeys       [][]byte
 	FieldValues     []interface{}
 	Timestamp       *time.Time
-
-	encoder *gob.Encoder
 }
 
 // Using these literals prevents the slices from escaping to the heap, saving
 // a few micros per call:
-var ()
+// var ()
 
 // scratchBufPool helps reuse serialization scratch buffers.
 var scratchBufPool = &sync.Pool{

@@ -4,7 +4,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -18,7 +17,7 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 			cmd.Help()
 		},
-		Version:           "0.0.1",
+		Version:           "v1.0.1",
 		CompletionOptions: cobra.CompletionOptions{DisableDefaultCmd: true},
 		// helpCommand:       helpCmd,
 	}
@@ -36,24 +35,37 @@ var (
 
 func mockFctsdb() {
 
-	server := &http.Server{
-		Addr:              "",
-		Handler:           nil,
-		ReadTimeout:       time.Second * 10,
-		ReadHeaderTimeout: time.Second * 10}
+	// server := &http.Server{
+	// 	Addr:              "0.0.0.0:9086",
+	// 	Handler:           nil,
+	// 	ReadTimeout:       time.Second * 10,
+	// 	ReadHeaderTimeout: time.Second * 10}
 
 	http.HandleFunc("/write", func(w http.ResponseWriter, r *http.Request) {
+		b := make([]byte, 32*1024)
+		for {
+			_, err := r.Body.Read(b)
+			if err == io.EOF {
+				break
+			}
+		}
 		w.WriteHeader(204)
 		io.WriteString(w, "")
 	})
 	http.HandleFunc("/query", func(w http.ResponseWriter, r *http.Request) {
+		b := make([]byte, 4*1024)
+		for {
+			_, err := r.Body.Read(b)
+			if err == io.EOF {
+				break
+			}
+		}
 		w.WriteHeader(200)
 		io.WriteString(w, "ok")
 	})
-	log.Println("Start service 0.0.0.0:9060")
-	server.ListenAndServe()
-	// http.
-	// http.ListenAndServe("0.0.0.0:9060", nil) //outprint hello world！
+	log.Println("Start service 0.0.0.0:9086")
+	// server.ListenAndServe()
+	log.Println(http.ListenAndServe("0.0.0.0:9086", nil))
 }
 
 func main() {

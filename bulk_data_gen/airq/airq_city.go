@@ -1,11 +1,11 @@
 package airq
 
 import (
-	"math/rand"
+	// "math/rand"
 	"time"
-	"unsafe"
 
 	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
+	rand "git.querycap.com/falcontsdb/fctsdb-bench/util/fastrand"
 )
 
 var (
@@ -28,6 +28,7 @@ var (
 
 type CityAirQualityMeasurement struct {
 	timestamp time.Time
+	// rand      rand.RNG
 }
 
 func NewCityAirQualityMeasurement(start time.Time) *CityAirQualityMeasurement {
@@ -43,20 +44,27 @@ func (m *CityAirQualityMeasurement) Tick(d time.Duration) {
 func (m *CityAirQualityMeasurement) ToPoint(p *common.Point) bool {
 	p.SetMeasurementName(CityAirQualityByteString)
 	// p.SetTimestamp(&m.timestamp)
-
-	p.AppendField(CityAirQualityFieldKeys[0], rand.Intn(490)+10)
-	p.AppendField(CityAirQualityFieldKeys[1], rand.Intn(490)+10)
-	p.AppendField(CityAirQualityFieldKeys[2], rand.Intn(490)+10)
-	p.AppendField(CityAirQualityFieldKeys[3], rand.Intn(90)+10)
-	p.AppendField(CityAirQualityFieldKeys[4], rand.Intn(30)+2)
-	p.AppendField(CityAirQualityFieldKeys[5], rand.Intn(200)+10)
-	p.AppendField(CityAirQualityFieldKeys[6], rand.Float64()+0.5)
-	p.AppendField(CityAirQualityFieldKeys[7], RandomString(20))
+	randNum := rand.Int63() //一个64位随机数可以通过掩码的形式，9+9+9+7+6+8+10 = 58
+	p.AppendField(CityAirQualityFieldKeys[0], randNum&int64(1<<9-1)+10)
+	randNum >>= 9
+	p.AppendField(CityAirQualityFieldKeys[1], randNum&int64(1<<9-1)+10)
+	randNum >>= 9
+	p.AppendField(CityAirQualityFieldKeys[2], randNum&int64(1<<9-1)+10)
+	randNum >>= 9
+	p.AppendField(CityAirQualityFieldKeys[3], randNum&int64(1<<7-1)+10)
+	randNum >>= 7
+	p.AppendField(CityAirQualityFieldKeys[4], randNum&int64(1<<6-1)+2)
+	randNum >>= 6
+	p.AppendField(CityAirQualityFieldKeys[5], randNum&int64(1<<8-1)+10)
+	randNum >>= 8
+	p.AppendField(CityAirQualityFieldKeys[6], float32(randNum&int64(1<<10-1))/1000.0+0.5)
+	// p.AppendField(CityAirQualityFieldKeys[6], rand.Float32()+0.5)
+	p.AppendField(CityAirQualityFieldKeys[7], m.RandomString(20))
 
 	return true
 }
 
-func RandomString(n int) string {
+func (m *CityAirQualityMeasurement) RandomString(n int) []byte {
 	letterBytes := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	letterIdxBits := 6                           // 6 bits to represent a letter index
 	letterIdxMask := int64(1<<letterIdxBits - 1) // All 1-bits, as many as letterIdxBits
@@ -80,5 +88,6 @@ func RandomString(n int) string {
 	}
 
 	// return sb.String()
-	return *(*string)(unsafe.Pointer(&buf))
+	// return *(*string)(unsafe.Pointer(&buf))
+	return buf
 }

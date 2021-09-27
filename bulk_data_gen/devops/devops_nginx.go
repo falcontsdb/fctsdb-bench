@@ -2,10 +2,11 @@ package devops
 
 import (
 	"fmt"
-	"math/rand"
+	// "math/rand"
 	"time"
 
 	. "git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
+	rand "git.querycap.com/falcontsdb/fctsdb-bench/util/fastrand"
 )
 
 var (
@@ -31,7 +32,8 @@ type NginxMeasurement struct {
 	timestamp time.Time
 
 	port, serverName []byte
-	distributions    []Distribution
+	// distributions    []Distribution
+	fieldValues []int64
 }
 
 func NewNginxMeasurement(start time.Time) *NginxMeasurement {
@@ -50,28 +52,45 @@ func NewNginxMeasurement(start time.Time) *NginxMeasurement {
 		port:       port,
 		serverName: serverName,
 
-		timestamp:     start,
-		distributions: distributions,
+		timestamp: start,
+		// distributions: distributions,
+		fieldValues: make([]int64, len(NginxFields)),
 	}
 }
 
 func (m *NginxMeasurement) Tick(d time.Duration) {
 	m.timestamp = m.timestamp.Add(d)
 
-	for i := range m.distributions {
-		m.distributions[i].Advance()
-	}
+	// for i := range m.distributions {
+	// 	m.distributions[i].Advance()
+	// }
 }
 
 func (m *NginxMeasurement) ToPoint(p *Point) bool {
 	p.SetMeasurementName(NginxByteString)
-	p.SetTimestamp(&m.timestamp)
+	// p.SetTimestamp(&m.timestamp)
 
 	p.AppendTag(NginxTags[0], m.port)
 	p.AppendTag(NginxTags[1], m.serverName)
 
-	for i := range m.distributions {
-		p.AppendField(NginxFields[i].Label, int64(m.distributions[i].Get()))
+	letterIdxBits := 7                           // 6 bits to represent a letter index
+	letterIdxMask := int64(1<<letterIdxBits - 1) // All 1-bits, as many as letterIdxBits
+	letterIdxMax := 63 / letterIdxBits           // # of letter indices fitting in 63 bits
+
+	for i, cache, remain := len(m.fieldValues)-1, rand.Int63(), letterIdxMax; i >= 0; {
+		if remain == 0 {
+			cache, remain = rand.Int63(), letterIdxMax
+		}
+		idx := cache & letterIdxMask
+		// value := atomic.AddInt64(&m.fieldValues[i], idx)
+		p.AppendField(NginxFields[i].Label, idx)
+		i--
+
+		cache >>= letterIdxBits
+		remain--
 	}
+	// for i := range m.distributions {
+	// 	p.AppendField(NginxFields[i].Label, int64(m.distributions[i].Get()))
+	// }
 	return true
 }

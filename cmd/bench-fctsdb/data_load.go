@@ -44,6 +44,7 @@ type DataLoad struct {
 	dbName          string
 	dataFile        string
 	timeLimit       time.Duration
+	doDBCreate      bool
 
 	//runtime vars
 	bufPool               sync.Pool
@@ -76,7 +77,7 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 			RunLoad()
 		},
-		Hidden: true,
+		// Hidden: true,
 	}
 )
 
@@ -89,8 +90,9 @@ func RunLoad() int {
 
 	dataLoad.Validate()
 	exitCode := 0
-
-	dataLoad.CreateDb()
+	if dataLoad.doDBCreate {
+		dataLoad.CreateDb()
+	}
 
 	var once sync.Once
 	var workersGroup sync.WaitGroup
@@ -170,6 +172,7 @@ type Scanner interface {
 
 func (l *DataLoad) Init(cmd *cobra.Command) {
 	writeFlag := cmd.Flags()
+	writeFlag.BoolVar(&l.doDBCreate, "do-db-create", true, "是否创建数据库")
 	writeFlag.StringVar(&l.csvDaemonUrls, "urls", "http://localhost:8086", "InfluxDB URLs, comma-separated. Will be used in a round-robin fashion.")
 	writeFlag.DurationVar(&l.backoff, "backoff", time.Second, "Time to sleep between requests when server indicates backpressure is needed.")
 	writeFlag.DurationVar(&l.backoffTimeOut, "backoff-timeout", time.Minute*30, "Maximum time to spent when dealing with backoff messages in one shot")
@@ -179,7 +182,7 @@ func (l *DataLoad) Init(cmd *cobra.Command) {
 	writeFlag.IntVar(&l.batchSize, "batch-size", 100, "Batch size (1 line of input = 1 item).")
 	writeFlag.IntVar(&l.workers, "workers", 1, "Number of parallel requests to make.")
 	writeFlag.StringVar(&l.dataFile, "file", "", "Input file")
-	writeFlag.DurationVar(&l.timeLimit, "time-limit", -1, "Maximum duration to run (-1 is the default: no limit).")
+	// writeFlag.DurationVar(&l.timeLimit, "time-limit", -1, "Maximum duration to run (-1 is the default: no limit).")
 }
 
 func (l *DataLoad) Validate() {
@@ -208,9 +211,9 @@ func (l *DataLoad) Validate() {
 		log.Print("Ingestion rate control is off")
 	}
 
-	if l.timeLimit > 0 && l.backoffTimeOut > l.timeLimit {
-		l.backoffTimeOut = l.timeLimit
-	}
+	// if l.timeLimit > 0 && l.backoffTimeOut > l.timeLimit {
+	// 	l.backoffTimeOut = l.timeLimit
+	// }
 
 }
 
@@ -631,7 +634,7 @@ func (l *DataLoad) listDatabases(daemonUrl string) (map[string]string, error) {
 	type listingType struct {
 		Results []struct {
 			Series []struct {
-				Values [][]string
+				Values [][]interface{}
 			}
 		}
 	}
@@ -643,7 +646,7 @@ func (l *DataLoad) listDatabases(daemonUrl string) (map[string]string, error) {
 
 	ret := make(map[string]string)
 	for _, nestedName := range listing.Results[0].Series[0].Values {
-		ret[nestedName[0]] = ""
+		ret[nestedName[0].(string)] = ""
 	}
 	return ret, nil
 }
