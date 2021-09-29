@@ -48,11 +48,10 @@ func (d *AirqSimulatorConfig) ToSimulator() *AirqSimulator {
 // A IotSimulator generates data similar to telemetry from Telegraf.
 // It fulfills the Simulator interface.
 type AirqSimulator struct {
-	madePoints                int64
-	maxPoints                 int64
-	madeValues                int64
-	simulatedMeasurementIndex int
-	currentHostIndex          int
+	madePoints       int64
+	maxPoints        int64
+	madeValues       int64
+	currentHostIndex int
 
 	Hosts            []AirqDevice
 	SamplingInterval time.Duration

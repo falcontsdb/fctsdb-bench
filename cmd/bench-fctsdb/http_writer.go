@@ -111,11 +111,14 @@ func (w *HTTPWriter) WriteLineProtocol(body []byte, isGzip bool) (int64, error) 
 	return lat, err
 }
 
-func (w *HTTPWriter) QueryLineProtocol(queryUrl []byte, debug bool) (int64, error) {
+func (w *HTTPWriter) QueryLineProtocol(lines []byte, debug bool) (int64, error) {
+	furl := fasthttp.AcquireURI()
+	furl.Parse(nil, w.url)
+	furl.QueryArgs().AddBytesKV([]byte("q"), lines)
 	req := fasthttp.AcquireRequest()
 	req.Header.SetContentTypeBytes(textPlain)
 	req.Header.SetMethodBytes(get)
-	req.Header.SetRequestURIBytes(queryUrl)
+	req.Header.SetRequestURIBytes(furl.FullURI())
 	req.Header.Add("Accept-Encoding", "gzip")
 	if w.c.AuthToken != "" {
 		req.Header.Add("Authorization", fmt.Sprintf("Token %s", w.c.AuthToken))
@@ -134,11 +137,11 @@ func (w *HTTPWriter) QueryLineProtocol(queryUrl []byte, debug bool) (int64, erro
 			err = fmt.Errorf("[DebugInfo: %s] Invalid write response (status %d): %s", w.c.DebugInfo, sc, resp.Body())
 		}
 		if debug {
-			fmt.Println(string(queryUrl))
+			fmt.Println(furl.String())
 			fmt.Fprintln(os.Stdout, string(resp.Body()))
 		}
 	}
-
+	fasthttp.ReleaseURI(furl)
 	fasthttp.ReleaseResponse(resp)
 	fasthttp.ReleaseRequest(req)
 

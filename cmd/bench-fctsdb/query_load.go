@@ -269,10 +269,10 @@ outer:
 		sql := scanner.Text()
 
 		if sql[len(sql)-1] == ';' {
-			buf.Write([]byte(neturl.QueryEscape(sql)))
+			buf.Write([]byte(sql))
 		} else {
-			buf.Write([]byte(neturl.QueryEscape(sql)))
-			buf.Write([]byte(neturl.QueryEscape(";")))
+			buf.Write([]byte(sql))
+			buf.Write([]byte(";"))
 		}
 
 		n++
@@ -316,14 +316,9 @@ func (q *QueryLoad) processBatches(w *HTTPWriter, backoffSrc chan bool, telemetr
 	// var batchesSeen int64
 
 	defer workersGroup.Done()
-
 	for batch := range q.batchChan {
-
 		buf := q.bufPool.Get().(*bytes.Buffer)
-		buf.Write(w.url)
-		buf.Write([]byte("&q="))
 		buf.Write(batch.Buffer.Bytes())
-
 		lat, err := w.QueryLineProtocol(buf.Bytes(), q.debug)
 		if err != nil {
 			q.respCollector.AddOne(w.c.Database, lat, false)

@@ -377,7 +377,7 @@ func (d *DataWrite) RunProcess(i int, waitGroup *sync.WaitGroup) error {
 	point := common.MakeUsablePoint()
 	for d.simulator.Next(point) {
 		atomic.AddInt64(&d.valuesRead, int64(len(point.FieldValues)))
-		pointByte := SerializePoint(point)
+		pointByte := SerializePointToFctsdb(point)
 		buf.Write(pointByte)
 		batchItemCount++
 		pointByte = pointByte[:0]
@@ -547,7 +547,7 @@ var scratchBufPool = &sync.Pool{
 	},
 }
 
-func SerializePoint(p *common.Point) []byte {
+func SerializePointToFctsdb(p *common.Point) []byte {
 	buf := scratchBufPool.Get().([]byte)
 	buf = append(buf, p.MeasurementName...)
 
