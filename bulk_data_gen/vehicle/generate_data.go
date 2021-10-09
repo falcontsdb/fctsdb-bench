@@ -97,6 +97,6 @@ func (v *VehicleSimulator) Next(p *common.Point) bool {
 
 	// v.madePoints++
 	// v.madeValues += int64(len(p.FieldValues))
-	atomic.AddInt64(&v.madeValues, int64(len(p.FieldValues)))
+	atomic.AddInt64(&v.madeValues, int64(len(p.FieldValues)+len(p.Int64FiledValues)))
 	return madePoint < v.maxPoints //方便另一只线程安全的结束方式，for sim.next(point){...} 保证产生的总点数正确，注意最后一次{...}里面的代码不执行
 }

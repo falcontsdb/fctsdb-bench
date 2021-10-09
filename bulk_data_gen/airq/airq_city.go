@@ -43,7 +43,6 @@ func (m *CityAirQualityMeasurement) Tick(d time.Duration) {
 
 func (m *CityAirQualityMeasurement) ToPoint(p *common.Point) bool {
 	p.SetMeasurementName(CityAirQualityByteString)
-	// p.SetTimestamp(&m.timestamp)
 	randNum := rand.Int63() //一个64位随机数可以通过掩码的形式，9+9+9+7+6+8+10 = 58
 	p.AppendField(CityAirQualityFieldKeys[0], randNum&int64(1<<9-1)+10)
 	randNum >>= 9
@@ -58,7 +57,6 @@ func (m *CityAirQualityMeasurement) ToPoint(p *common.Point) bool {
 	p.AppendField(CityAirQualityFieldKeys[5], randNum&int64(1<<8-1)+10)
 	randNum >>= 8
 	p.AppendField(CityAirQualityFieldKeys[6], float32(randNum&int64(1<<10-1))/1000.0+0.5)
-	// p.AppendField(CityAirQualityFieldKeys[6], rand.Float32()+0.5)
 	p.AppendField(CityAirQualityFieldKeys[7], m.RandomString(20))
 
 	return true
@@ -87,7 +85,6 @@ func (m *CityAirQualityMeasurement) RandomString(n int) []byte {
 		remain--
 	}
 
-	// return sb.String()
 	// return *(*string)(unsafe.Pointer(&buf))
 	return buf
 }

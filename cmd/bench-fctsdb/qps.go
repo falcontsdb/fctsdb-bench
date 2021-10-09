@@ -125,35 +125,35 @@ func (r RespTimeResult) Show() {
 	//
 	// 第1步：先遍历一变，按照key的长度，格式化value并记录下来
 	for k := 0; k < t.NumField(); k++ {
-		var key string
 		// 合入单位
-		if t.Field(k).Name == "Qps" || t.Field(k).Name == "Fail" || t.Field(k).Name == "Total" || t.Field(k).Name == "Start" || t.Field(k).Name == "End" {
-			key = fmt.Sprintf("%v ", t.Field(k).Name)
-		} else if t.Field(k).Name == "RunSec" {
-			key = fmt.Sprintf("%v(s) ", t.Field(k).Name)
-		} else {
-			key = fmt.Sprintf("%v(ms) ", t.Field(k).Name)
+		switch t.Field(k).Name {
+		case "Qps", "Fail", "Total":
+			keys[k] = fmt.Sprintf("%v ", t.Field(k).Name)
+		case "RunSec":
+			keys[k] = fmt.Sprintf("%v(s) ", t.Field(k).Name)
+		case "Start", "End":
+			continue
+		default:
+			keys[k] = fmt.Sprintf("%v(ms) ", t.Field(k).Name)
 		}
-
-		keys[k] = key
 
 		// key长度大于value，将value补位；key长度小于value，则保持value
 		value := fmt.Sprintf("%v", v.Field(k).Interface())
-		if len(key) > len(value) {
-			values[k] = stringComplement(fmt.Sprintf("%v", value), len(key)-len(value), " ")
+		if len(keys[k]) > len(value) {
+			values[k] = stringComplement(fmt.Sprintf("%v", value), len(keys[k])-len(value), " ")
 		} else {
 			values[k] = value + " "
 		}
 	}
 
 	// 第2步：按value长度打印key，不足补位空字符串
-	for k := 0; k < t.NumField(); k++ {
+	for k := 0; k < len(keys); k++ {
 		fmt.Print(stringComplement(keys[k], len(values[k])-len(keys[k]), " "))
 	}
 	fmt.Print("\n")
 
 	// 第3步：输出value
-	for k := 0; k < t.NumField(); k++ {
+	for k := 0; k < len(keys); k++ {
 		fmt.Print(values[k], "")
 	}
 	fmt.Print("\n")
@@ -168,11 +168,12 @@ func (r RespTimeResult) ToMap() map[string]string {
 	for k := 0; k < t.NumField(); k++ {
 		var key string
 		// 合入单位
-		if t.Field(k).Name == "Qps" || t.Field(k).Name == "Fail" || t.Field(k).Name == "Total" || t.Field(k).Name == "Start" || t.Field(k).Name == "End" {
+		switch t.Field(k).Name {
+		case "Qps", "Fail", "Total", "Start", "End":
 			key = fmt.Sprintf("%v", t.Field(k).Name)
-		} else if t.Field(k).Name == "RunSec" {
+		case "RunSec":
 			key = fmt.Sprintf("%v(s)", t.Field(k).Name)
-		} else {
+		default:
 			key = fmt.Sprintf("%v(ms)", t.Field(k).Name)
 		}
 		value := fmt.Sprintf("%v", v.Field(k).Interface())

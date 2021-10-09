@@ -46,13 +46,3 @@ type SimulatedMeasurement interface {
 }
 
 // MakeUsablePoint allocates a new Point ready for use by a Simulator.
-func MakeUsablePoint() *Point {
-	return &Point{
-		MeasurementName: nil,
-		TagKeys:         make([][]byte, 0),
-		TagValues:       make([][]byte, 0),
-		FieldKeys:       make([][]byte, 0),
-		FieldValues:     make([]interface{}, 0),
-		Timestamp:       &time.Time{},
-	}
-}

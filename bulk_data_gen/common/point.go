@@ -11,12 +11,14 @@ import (
 // Internally, Point uses byte slices instead of strings to try to minimize
 // overhead.
 type Point struct {
-	MeasurementName []byte
-	TagKeys         [][]byte
-	TagValues       [][]byte
-	FieldKeys       [][]byte
-	FieldValues     []interface{}
-	Timestamp       *time.Time
+	MeasurementName  []byte
+	TagKeys          [][]byte
+	TagValues        [][]byte
+	FieldKeys        [][]byte
+	FieldValues      []interface{}
+	Int64FiledKeys   [][]byte
+	Int64FiledValues []int64
+	Timestamp        *time.Time
 }
 
 // Using these literals prevents the slices from escaping to the heap, saving
@@ -36,6 +38,8 @@ func (p *Point) Reset() {
 	p.TagValues = p.TagValues[:0]
 	p.FieldKeys = p.FieldKeys[:0]
 	p.FieldValues = p.FieldValues[:0]
+	p.Int64FiledKeys = p.Int64FiledKeys[:0]
+	p.Int64FiledValues = p.Int64FiledValues[:0]
 	p.Timestamp = nil
 }
 
@@ -57,7 +61,20 @@ func (p *Point) AppendField(key []byte, value interface{}) {
 	p.FieldValues = append(p.FieldValues, value)
 }
 
-func (p *Point) AddFeild(key [][]byte, value []interface{}) {
-	p.FieldKeys = key
-	p.FieldValues = value
+func (p *Point) AppendInt64Field(key []byte, value int64) {
+	p.Int64FiledKeys = append(p.Int64FiledKeys, key)
+	p.Int64FiledValues = append(p.Int64FiledValues, value)
+}
+
+func MakeUsablePoint() *Point {
+	return &Point{
+		MeasurementName:  nil,
+		TagKeys:          make([][]byte, 0),
+		TagValues:        make([][]byte, 0),
+		FieldKeys:        make([][]byte, 0),
+		FieldValues:      make([]interface{}, 0),
+		Int64FiledKeys:   make([][]byte, 0),
+		Int64FiledValues: make([]int64, 0),
+		Timestamp:        &time.Time{},
+	}
 }

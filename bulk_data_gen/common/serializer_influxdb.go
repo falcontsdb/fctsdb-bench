@@ -2,6 +2,7 @@ package common
 
 import (
 	"io"
+	"strconv"
 )
 
 type serializerInflux struct {
@@ -23,6 +24,7 @@ func NewSerializerInflux() *serializerInflux {
 // TODO(rw): Speed up this function. The bulk of time is spent in strconv.
 func (s *serializerInflux) SerializePoint(w io.Writer, p *Point) (err error) {
 	buf := scratchBufPool.Get().([]byte)
+	// buf := make([]byte, 0, 4*1024)
 	buf = append(buf, p.MeasurementName...)
 
 	for i := 0; i < len(p.TagKeys); i++ {
@@ -32,11 +34,12 @@ func (s *serializerInflux) SerializePoint(w io.Writer, p *Point) (err error) {
 		buf = append(buf, p.TagValues[i]...)
 	}
 
-	if len(p.FieldKeys) > 0 {
+	if len(p.FieldKeys)+len(p.Int64FiledKeys) > 0 {
 		buf = append(buf, ' ')
 	}
 
-	for i := 0; i < len(p.FieldKeys); i++ {
+	var i int
+	for i = 0; i < len(p.FieldKeys); i++ {
 		buf = append(buf, p.FieldKeys[i]...)
 		buf = append(buf, '=')
 
@@ -50,6 +53,23 @@ func (s *serializerInflux) SerializePoint(w io.Writer, p *Point) (err error) {
 		}
 
 		if i+1 < len(p.FieldKeys) {
+			buf = append(buf, ',')
+		}
+	}
+
+	if i > 0 && len(p.Int64FiledKeys) > 0 {
+		buf = append(buf, ',')
+	}
+
+	for i = 0; i < len(p.Int64FiledKeys); i++ {
+		buf = append(buf, p.Int64FiledKeys[i]...)
+		buf = append(buf, '=')
+
+		v := p.Int64FiledValues[i]
+		buf = strconv.AppendInt(buf, v, 10)
+		// Influx uses 'i' to indicate integers:
+		buf = append(buf, 'i')
+		if i+1 < len(p.Int64FiledKeys) {
 			buf = append(buf, ',')
 		}
 	}

@@ -15,7 +15,6 @@ import (
 	neturl "net/url"
 	"os"
 	"runtime/pprof"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -34,7 +33,7 @@ type DataWrite struct {
 	csvDaemonUrls     string
 	backoff           time.Duration
 	backoffTimeOut    time.Duration
-	useGzip           bool
+	useGzip           int
 	workers           int
 	batchSize         int
 	dbName            string
@@ -142,7 +141,8 @@ func (d *DataWrite) RunWrite() map[string]string {
 
 	loadTime := took.Seconds()
 	convertedBytesRate := bytesRate / (1 << 20)
-	log.Printf("loaded %d items in %fsec with %d workers (mean point rate %.2f/sec, mean value rate %.2f/s, %.2fMB/sec)\n", itemsRead, loadTime, d.workers, itemsRate, valuesRate, convertedBytesRate)
+	log.Printf("Total write %d points, %0.2fMB in %.2fsec (mean point rate %.2f/sec, mean value rate %.2f/s, %.2fMB/sec)\n",
+		itemsRead, float64(bytesRead)/(1<<20), loadTime, itemsRate, valuesRate, convertedBytesRate)
 	d.respCollector.GetDetail().Show()
 
 	result := d.respCollector.GetDetail().ToMap()
@@ -169,7 +169,7 @@ func (d *DataWrite) Init(cmd *cobra.Command) {
 	writeFlag.StringVar(&d.csvDaemonUrls, "urls", "http://localhost:8086", "被测数据库的地址")
 	writeFlag.DurationVar(&d.backoff, "backoff", time.Second, "产生背压的情况下，两次请求时间的等待时间")
 	writeFlag.DurationVar(&d.backoffTimeOut, "backoff-timeout", time.Minute*30, "一次测试中，背压等待累积的最大时间")
-	writeFlag.BoolVar(&d.useGzip, "gzip", true, "是否使用gzip")
+	writeFlag.IntVar(&d.useGzip, "gzip", 1, "是否使用gzip,level[0-9],小于0表示不使用")
 	writeFlag.StringVar(&d.dbName, "db", "benchmark_db", "数据库的database名称")
 	writeFlag.IntVar(&d.batchSize, "batch-size", 100, "1个http请求中携带Point个数")
 	writeFlag.IntVar(&d.workers, "workers", 1, "并发的http个数")
@@ -194,7 +194,6 @@ func (d *DataWrite) Validate() {
 		d.seed = int64(time.Now().Nanosecond())
 	}
 	log.Printf("using random seed %d\n", d.seed)
-
 	rand.Seed(d.seed)
 
 	// Parse timestamps:
@@ -213,8 +212,15 @@ func (d *DataWrite) Validate() {
 	if d.samplingInterval <= 0 {
 		log.Fatal("Invalid sampling interval")
 	}
-
 	log.Printf("Using sampling interval %v\n", d.samplingInterval)
+	if d.useGzip < 0 || d.useGzip > 9 {
+		log.Fatal("Invalid gzip level, must bu in 0-9")
+	}
+	if d.useGzip == 0 {
+		log.Println("Close the gzip")
+	} else {
+		log.Println("Using gzip: level", d.useGzip)
+	}
 
 }
 
@@ -226,7 +232,7 @@ func (d *DataWrite) CreateDb() {
 	existingDatabases, err := listDatabasesFn(d.daemonUrls[0])
 	if err != nil {
 		log.Println(err)
-		log.Fatal("如果被测数据库是mock的，请使用--do-db-create=false跳过此步骤")
+		// log.Fatal("如果被测数据库是mock的，请使用--do-db-create=false跳过此步骤")
 	}
 
 	delete(existingDatabases, "_internal")
@@ -236,9 +242,7 @@ func (d *DataWrite) CreateDb() {
 			dbs = append(dbs, key)
 		}
 		dbs_string := strings.Join(dbs, ", ")
-
 		log.Printf("The following databases already exist in the data store: %s", dbs_string)
-
 	}
 
 	var id string
@@ -316,14 +320,26 @@ func (d *DataWrite) PrepareSimulator() {
 }
 
 func (d *DataWrite) SyncShowStatistics() {
+
 	ticker := time.NewTicker(time.Second * 5)
 	go func() {
 		defer ticker.Stop()
+		lastTime := time.Now()
+		lastItems, lastValues, lastBytes := d.itemsRead, d.valuesRead, d.bytesRead
 		for {
 			select {
 			case <-ticker.C:
-				itemsRead, bytesRead, valuesRead := d.GetReadStatistics()
-				log.Printf("Has writen %d point, %d values, %.2fMB", itemsRead, valuesRead, float64(bytesRead)/(1<<20))
+				now := time.Now()
+				took := now.Sub(lastTime)
+				lastTime = now
+				itemsRate := float64(d.itemsRead-lastItems) / took.Seconds()
+				lastItems = d.itemsRead
+				bytesRate := float64(d.bytesRead-lastBytes) / took.Seconds()
+				lastBytes = d.bytesRead
+				valuesRate := float64(d.valuesRead-lastValues) / took.Seconds()
+				lastValues = d.valuesRead
+				log.Printf("Has writen %d point, %.2fMB (mean point rate %.2f/sec, value rate %.2f/s, %.2fMB/sec in this %0.2f sec)",
+					d.itemsRead, float64(d.bytesRead)/(1<<20), itemsRate, valuesRate, bytesRate/(1<<20), took.Seconds())
 			case <-d.inputDone:
 				return
 			}
@@ -371,17 +387,14 @@ func (d *DataWrite) RunProcess(i int, waitGroup *sync.WaitGroup) error {
 	var batchItemCount int
 	var err error
 	// newline := []byte("\n")
+	fctsdb := common.NewSerializerInflux()
 	buf := d.bufPool.Get().(*bytes.Buffer)
-
 	batchItemCount = 0
 	point := common.MakeUsablePoint()
 	for d.simulator.Next(point) {
-		atomic.AddInt64(&d.valuesRead, int64(len(point.FieldValues)))
-		pointByte := SerializePointToFctsdb(point)
-		buf.Write(pointByte)
+		atomic.AddInt64(&d.valuesRead, int64(len(point.FieldValues)+len(point.Int64FiledValues)))
+		fctsdb.SerializePoint(buf, point)
 		batchItemCount++
-		pointByte = pointByte[:0]
-		scratchBufPool.Put(pointByte)
 		point.Reset()
 
 		// 达到batchSize
@@ -389,7 +402,6 @@ func (d *DataWrite) RunProcess(i int, waitGroup *sync.WaitGroup) error {
 			err = d.processBatches(d.configs[i].writer, buf, d.configs[i].backingOffChan, fmt.Sprintf("%d", i))
 			atomic.AddInt64(&d.bytesRead, int64(buf.Len()))
 			atomic.AddInt64(&d.itemsRead, int64(batchItemCount))
-			// Return the point buffer to the pool.
 			batchItemCount = 0
 			buf.Reset()
 			d.bufPool.Put(buf)
@@ -427,9 +439,9 @@ func (d *DataWrite) processBatches(w *HTTPWriter, buf *bytes.Buffer, backoffSrc 
 	timeStart := time.Now()
 	var lat int64
 	for {
-		if d.useGzip {
+		if d.useGzip > 0 {
 			compressedBatch := d.bufPool.Get().(*bytes.Buffer)
-			fasthttp.WriteGzip(compressedBatch, buf.Bytes())
+			fasthttp.WriteGzipLevel(compressedBatch, buf.Bytes(), d.useGzip)
 			//bodySize = len(compressedBatch.Bytes())
 			lat, err = w.WriteLineProtocol(compressedBatch.Bytes(), true)
 			// Return the compressed batch buffer to the pool.
@@ -461,7 +473,6 @@ func (d *DataWrite) processBatches(w *HTTPWriter, buf *bytes.Buffer, backoffSrc 
 	}
 	if err != nil {
 		d.respCollector.AddOne(w.c.Database, lat, false)
-		// log.Println(err.Error())
 		return fmt.Errorf("error writing: %s", err.Error())
 	}
 	d.respCollector.AddOne(w.c.Database, lat, true)
@@ -539,84 +550,4 @@ func (d *DataWrite) listDatabases(daemonUrl string) (map[string]string, error) {
 		ret[nestedName[0].(string)] = ""
 	}
 	return ret, nil
-}
-
-var scratchBufPool = &sync.Pool{
-	New: func() interface{} {
-		return make([]byte, 0, 1024)
-	},
-}
-
-func SerializePointToFctsdb(p *common.Point) []byte {
-	buf := scratchBufPool.Get().([]byte)
-	buf = append(buf, p.MeasurementName...)
-
-	for i := 0; i < len(p.TagKeys); i++ {
-		buf = append(buf, ',')
-		buf = append(buf, p.TagKeys[i]...)
-		buf = append(buf, '=')
-		buf = append(buf, p.TagValues[i]...)
-	}
-
-	if len(p.FieldKeys) > 0 {
-		buf = append(buf, ' ')
-	}
-
-	for i := 0; i < len(p.FieldKeys); i++ {
-		buf = append(buf, p.FieldKeys[i]...)
-		buf = append(buf, '=')
-
-		v := p.FieldValues[i]
-		buf = fastFormatAppend(v, buf, false)
-
-		// Influx uses 'i' to indicate integers:
-		switch v.(type) {
-		case int, int64:
-			buf = append(buf, 'i')
-		}
-
-		if i+1 < len(p.FieldKeys) {
-			buf = append(buf, ',')
-		}
-	}
-
-	buf = append(buf, ' ')
-	buf = fastFormatAppend(p.Timestamp.UTC().UnixNano(), buf, true)
-	buf = append(buf, '\n')
-
-	// buf = buf[:0]
-	// scratchBufPool.Put(buf)
-
-	return buf
-}
-
-func fastFormatAppend(v interface{}, buf []byte, singleQuotesForString bool) []byte {
-	var quotationChar = "\""
-	if singleQuotesForString {
-		quotationChar = "'"
-	}
-	switch v.(type) {
-	case int:
-		return strconv.AppendInt(buf, int64(v.(int)), 10)
-	case int64:
-		return strconv.AppendInt(buf, v.(int64), 10)
-	case float64:
-		return strconv.AppendFloat(buf, v.(float64), 'f', 16, 64)
-	case float32:
-		return strconv.AppendFloat(buf, float64(v.(float32)), 'f', 16, 32)
-	case bool:
-		return strconv.AppendBool(buf, v.(bool))
-	case []byte:
-		buf = append(buf, quotationChar...)
-		buf = append(buf, v.([]byte)...)
-		buf = append(buf, quotationChar...)
-		return buf
-	case string:
-		buf = append(buf, quotationChar...)
-		buf = append(buf, v.(string)...)
-		buf = append(buf, quotationChar...)
-		return buf
-	default:
-		panic(fmt.Sprintf("unknown field type for %#v", v))
-	}
 }

@@ -101,3 +101,8 @@ func (s *AirqSimulator) Next(p *common.Point) bool {
 	atomic.AddInt64(&s.madeValues, int64(len(p.FieldValues)))
 	return madePoint < s.maxPoints //方便另一只线程安全的结束方式，for sim.next(point){...} 保证产生的总点数正确，注意最后一次{...}里面的代码不执行
 }
+
+func (s *AirqSimulator) NextSql(tql string) []byte {
+	bql := make([]byte, 0, 1024)
+	return bql
+}

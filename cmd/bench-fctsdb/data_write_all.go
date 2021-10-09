@@ -37,18 +37,18 @@ type DataWriteConfig struct {
 	ScaleVar         int64
 	SamplingInterval string
 	DataDuration     string
-	UseGzip          bool
+	UseGzip          int
 }
 
 var (
-	buildinConfig_1 = DataWriteConfig{Workers: 64, BatchSize: 5000, UseCase: "vehicle", ScaleVar: 1, SamplingInterval: "10s", DataDuration: "3650d", UseGzip: true}
-	buildinConfig_2 = DataWriteConfig{Workers: 64, BatchSize: 5000, UseCase: "vehicle", ScaleVar: 1000, SamplingInterval: "100s", DataDuration: "30d", UseGzip: true}
-	buildinConfig_3 = DataWriteConfig{Workers: 64, BatchSize: 5000, UseCase: "vehicle", ScaleVar: 10000, SamplingInterval: "30s", DataDuration: "1d", UseGzip: true}
-	buildinConfig_4 = DataWriteConfig{Workers: 64, BatchSize: 5000, UseCase: "vehicle", ScaleVar: 100000, SamplingInterval: "60s", DataDuration: "1h", UseGzip: true}
-	buildinConfig_5 = DataWriteConfig{Workers: 64, BatchSize: 5000, UseCase: "air-quality", ScaleVar: 1, SamplingInterval: "10s", DataDuration: "3650d", UseGzip: true}
-	buildinConfig_6 = DataWriteConfig{Workers: 64, BatchSize: 5000, UseCase: "air-quality", ScaleVar: 1000, SamplingInterval: "30s", DataDuration: "30d", UseGzip: true}
-	buildinConfig_7 = DataWriteConfig{Workers: 64, BatchSize: 5000, UseCase: "air-quality", ScaleVar: 10000, SamplingInterval: "10s", DataDuration: "1d", UseGzip: true}
-	buildinConfig_8 = DataWriteConfig{Workers: 64, BatchSize: 5000, UseCase: "air-quality", ScaleVar: 100000, SamplingInterval: "5s", DataDuration: "1h", UseGzip: true}
+	buildinConfig_1 = DataWriteConfig{Workers: 64, BatchSize: 5000, UseCase: "vehicle", ScaleVar: 1, SamplingInterval: "10s", DataDuration: "3650d", UseGzip: 1}
+	buildinConfig_2 = DataWriteConfig{Workers: 64, BatchSize: 5000, UseCase: "vehicle", ScaleVar: 1000, SamplingInterval: "100s", DataDuration: "30d", UseGzip: 1}
+	buildinConfig_3 = DataWriteConfig{Workers: 64, BatchSize: 5000, UseCase: "vehicle", ScaleVar: 10000, SamplingInterval: "30s", DataDuration: "1d", UseGzip: 1}
+	buildinConfig_4 = DataWriteConfig{Workers: 64, BatchSize: 5000, UseCase: "vehicle", ScaleVar: 100000, SamplingInterval: "60s", DataDuration: "1h", UseGzip: 1}
+	buildinConfig_5 = DataWriteConfig{Workers: 64, BatchSize: 5000, UseCase: "air-quality", ScaleVar: 1, SamplingInterval: "10s", DataDuration: "3650d", UseGzip: 1}
+	buildinConfig_6 = DataWriteConfig{Workers: 64, BatchSize: 5000, UseCase: "air-quality", ScaleVar: 1000, SamplingInterval: "30s", DataDuration: "30d", UseGzip: 1}
+	buildinConfig_7 = DataWriteConfig{Workers: 64, BatchSize: 5000, UseCase: "air-quality", ScaleVar: 10000, SamplingInterval: "10s", DataDuration: "1d", UseGzip: 1}
+	buildinConfig_8 = DataWriteConfig{Workers: 64, BatchSize: 5000, UseCase: "air-quality", ScaleVar: 100000, SamplingInterval: "5s", DataDuration: "1h", UseGzip: 1}
 	buildinConfigs  = []DataWriteConfig{buildinConfig_1, buildinConfig_2, buildinConfig_3, buildinConfig_4, buildinConfig_5, buildinConfig_6, buildinConfig_7, buildinConfig_8}
 
 	dataWriteAll    = DataWriteAll{}

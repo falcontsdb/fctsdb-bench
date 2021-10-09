@@ -1,8 +1,10 @@
 package airq
 
 import (
+	"bytes"
 	"fmt"
 	"runtime"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -640,9 +642,7 @@ func TestNewPointVehicle(t *testing.T) {
 	}
 	outchan := make(chan []byte, 10000)
 	sim := cfg.ToSimulator()
-	out := mockWriter{
-		outchan: outchan,
-	}
+	out := bytes.NewBuffer(make([]byte, 0, 1024))
 	serializer := common.NewSerializerInflux()
 	// str := []byte("aaa")
 	var num int32 = 4
@@ -702,7 +702,7 @@ func BenchmarkNewPointVehicleEasy(b *testing.B) {
 		Start:            now.Add(time.Hour * -24000),
 		End:              now,
 		SamplingInterval: time.Second,
-		VehicleCount:     100000,
+		VehicleCount:     10000,
 		VehicleOffset:    1,
 	}
 	sim := cfg.ToSimulator()
@@ -727,11 +727,13 @@ func TestNewPointVehicleEasy(t *testing.T) {
 	sim := cfg.ToSimulator()
 
 	point := common.MakeUsablePoint()
-	out := Printer{}
+	out := bytes.NewBuffer(make([]byte, 0, 1024))
 	ser := common.NewSerializerInflux()
 	for i := 0; i < 10; i++ {
 		sim.Next(point)
 		ser.SerializePoint(out, point)
+		fmt.Println(out.String())
+		out.Reset()
 		point.Reset()
 	}
 }
@@ -876,4 +878,88 @@ func TestSafe(t *testing.T) {
 	}
 	wg.Wait()
 	fmt.Println(count)
+}
+
+var (
+	num    = int64(987654321)
+	numstr = "987654321"
+)
+
+// strconv.ParseInt
+func BenchmarkStrconvParseInt(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		strconv.Itoa(int(num))
+		// if x != num || err != nil {
+		// 	b.Error(err)
+		// }
+	}
+}
+
+// strconv.Atoi
+func BenchmarkStrconvAtoi(b *testing.B) {
+	buf := make([]byte, 0, 1024*1024)
+	for i := 0; i < b.N; i++ {
+		strconv.AppendInt(buf, num, 10)
+		// if x != num || err != nil {
+		// 	b.Error(err)
+		// }
+	}
+}
+
+// fmt.Sscan
+func BenchmarkStrconvFmtSscan(b *testing.B) {
+	buf := make([]byte, 0, 1024*1024)
+	for i := 0; i < b.N; i++ {
+		strconv.AppendInt(buf, 77, 10)
+	}
+}
+
+func BenchmarkStrconvFmtSscan2(b *testing.B) {
+	buf := make([]byte, 0, 1024*1024)
+	for i := 0; i < b.N; i++ {
+		AppendInt(buf, 77)
+	}
+}
+
+const digits = "0123456789"
+const smallsString = "00010203040506070809" +
+	"10111213141516171819" +
+	"20212223242526272829" +
+	"30313233343536373839" +
+	"40414243444546474849" +
+	"50515253545556575859" +
+	"60616263646566676869" +
+	"70717273747576777879" +
+	"80818283848586878889" +
+	"90919293949596979899"
+
+func TestStrconvFmtSscan(b *testing.T) {
+	buf := make([]byte, 0, 1024*1024)
+	buf = AppendInt(buf, 85447)
+	fmt.Println(string(buf))
+}
+
+func AppendInt(dst []byte, u int64) (d []byte) {
+	var a [64 + 1]byte // +1 for sign of 64bit value in base 2
+	i := len(a)
+	var neg bool = false
+	if u < 0 {
+		u = -u
+		neg = true
+	}
+	us := uint(u)
+	for us > 0 {
+		is := us % 10
+		us /= 10
+		i--
+		a[i] = digits[is]
+	}
+
+	if neg {
+		i--
+		a[i] = '-'
+	}
+
+	d = append(dst, a[i:]...)
+	return
 }
