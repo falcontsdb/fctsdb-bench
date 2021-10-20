@@ -63,7 +63,8 @@ func mockFctsdb() {
 			}
 		}
 		w.WriteHeader(200)
-		io.WriteString(w, "ok")
+		// io.WriteString(w, "ok")
+		io.WriteString(w, `{"results":[{"statement_id":0,"series":[{"name":"city_air_quality","tags":{"site_id":"DEV000008449"},"columns":["time","aqi"],"values":[["2018-01-15T23:59:00Z",222]]}]}]}`)
 	})
 	http.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
 		// log.Println("ping")

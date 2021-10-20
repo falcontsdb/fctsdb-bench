@@ -145,12 +145,12 @@ type FctsdbAgent struct {
 var (
 	dataWriteAgentCmd = &cobra.Command{
 		Use:   "agent",
-		Short: "隐藏命令，远程控制",
+		Short: "代理程序，和数据库运行在一起，支持被远程调用开启关闭数据库（开发团队内部使用）",
 		Run: func(cmd *cobra.Command, args []string) {
 			RunAsAgent()
 			// GetPidOnLinux("fctsdb")
 		},
-		Hidden: true, // 隐藏此命令，不对外使用，内部测试使用
+		// Hidden: true, // 隐藏此命令，不对外使用，内部测试使用
 	}
 
 	fctsdbWriteAgent = FctsdbAgent{}

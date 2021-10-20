@@ -47,11 +47,7 @@ type DataLoad struct {
 	batchChan             chan batch
 	inputDone             chan struct{}
 	progressIntervalItems uint64
-	ingestionRateGran     float64
-	maxBatchSize          int
-	speedUpRequest        int32
 	scanFinished          bool
-	totalBackOffSecs      float64
 	writers               []*HTTPWriter
 	valuesRead            int64
 	itemsRead             int64

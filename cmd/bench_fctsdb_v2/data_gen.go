@@ -38,7 +38,6 @@ var formatChoices = []string{"influx-bulk", "es-bulk", "es-bulk6x", "es-bulk7x",
 type DataGenerator struct {
 	format           string
 	useCase          string
-	configFile       string
 	scaleVar         int64
 	scaleVarOffset   int64
 	samplingInterval time.Duration

@@ -110,32 +110,33 @@ func (c *ResponseCollector) GetGroupDetail() (gr GroupResult) {
 			groupRespTime[state.Label] = make([]int64, 0)
 			groupCount[state.Label] = 0
 		}
-		groupRespTime[state.Label] = append(groupRespTime[state.Label], state.Lat)
+		if state.IsPass {
+			groupRespTime[state.Label] = append(groupRespTime[state.Label], state.Lat)
+		}
 		groupCount[state.Label] += 1
 	}
 
 	for label, respTimes := range groupRespTime {
 		var r RespTimeResult
+		runSec := c.endTime.Sub(c.startTime).Seconds()
+		r.Label = label
+		r.Fail = groupCount[label] - len(respTimes)
+		r.Total = groupCount[label]
+		r.RunSec = Round(runSec, 3)
+		r.Start = int(c.startTime.Unix())
+		r.End = int(c.endTime.Unix())
 		if len(respTimes) > 0 {
 			sort.Slice(respTimes, func(i, j int) bool { return respTimes[i] < respTimes[j] })
 			qps := float64(len(respTimes)) / c.endTime.Sub(c.startTime).Seconds()
-			runSec := c.endTime.Sub(c.startTime).Seconds()
-			r = RespTimeResult{
-				Label:  label,
-				P50:    Round(float64(respTimes[int(0.5*float64(len(respTimes)))])/1e6, 1),  //50%
-				P90:    Round(float64(respTimes[int(0.9*float64(len(respTimes)))])/1e6, 1),  //90%
-				P95:    Round(float64(respTimes[int(0.95*float64(len(respTimes)))])/1e6, 1), //95%
-				P99:    Round(float64(respTimes[int(0.99*float64(len(respTimes)))])/1e6, 1), //99%
-				Min:    Round(float64(respTimes[0])/1e6, 1),                                 //MIN
-				Max:    Round(float64(respTimes[len(respTimes)-1])/1e6, 1),                  //MAX
-				Avg:    Round(float64(AvgInt64(respTimes))/1e6, 1),
-				Fail:   groupCount[label] - len(respTimes),
-				Total:  groupCount[label],
-				Qps:    Round(qps, 3),
-				RunSec: Round(runSec, 3),
-				Start:  int(c.startTime.Unix()),
-				End:    int(c.endTime.Unix()),
-			}
+
+			r.P50 = Round(float64(respTimes[int(0.5*float64(len(respTimes)))])/1e6, 1)  //50%
+			r.P90 = Round(float64(respTimes[int(0.9*float64(len(respTimes)))])/1e6, 1)  //90%
+			r.P95 = Round(float64(respTimes[int(0.95*float64(len(respTimes)))])/1e6, 1) //95%
+			r.P99 = Round(float64(respTimes[int(0.99*float64(len(respTimes)))])/1e6, 1) //99%
+			r.Min = Round(float64(respTimes[0])/1e6, 1)                                 //MIN
+			r.Max = Round(float64(respTimes[len(respTimes)-1])/1e6, 1)                  //MAX
+			r.Avg = Round(float64(AvgInt64(respTimes))/1e6, 1)
+			r.Qps = Round(qps, 3)
 		}
 		gr = append(gr, r)
 	}

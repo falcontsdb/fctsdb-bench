@@ -24,45 +24,44 @@ import (
 
 type BasicBenchTask struct {
 	// Program option vars:
-	csvDaemonUrls       string
-	useGzip             int
-	workers             int
-	batchSize           int
-	dbName              string
-	timeLimit           time.Duration
-	format              string
-	useCase             string
-	scaleVar            int64
-	scaleVarOffset      int64
-	samplingInterval    time.Duration
-	timestampStartStr   string
-	timestampEndStr     string
-	timestampPrepareStr string
-	seed                int64
-	debug               bool
-	cpuProfile          string
-	doDBCreate          bool
-	mixMode             string
-	queryPercent        int
-	queryType           int
-	queryCount          int64
+	csvDaemonUrls     string
+	useGzip           int
+	workers           int
+	batchSize         int
+	dbName            string
+	timeLimit         time.Duration
+	format            string
+	useCase           string
+	scaleVar          int64
+	scaleVarOffset    int64
+	samplingInterval  time.Duration
+	timestampStartStr string
+	timestampEndStr   string
+	seed              int64
+	debug             bool
+	cpuProfile        string
+	doDBCreate        bool
+	mixMode           string
+	queryPercent      int
+	queryType         int
+	queryCount        int64
+	needPrePare       bool
 
 	//runtime vars
-	timestampStart   time.Time
-	timestampEnd     time.Time
-	timestampPrepare time.Time
-	daemonUrls       []string
-	bufPool          sync.Pool
-	inputDone        chan struct{}
-	writers          []DBWriter
-	valuesRead       int64
-	itemsRead        int64
-	bytesRead        int64
-	qureyRead        int64
-	simulator        common.Simulator
-	respCollector    ResponseCollector
-	sqlTemplate      []string
-	serializer       common.Serializer
+	timestampStart time.Time
+	timestampEnd   time.Time
+	daemonUrls     []string
+	bufPool        sync.Pool
+	inputDone      chan struct{}
+	writers        []DBWriter
+	valuesRead     int64
+	itemsRead      int64
+	bytesRead      int64
+	qureyRead      int64
+	simulator      common.Simulator
+	respCollector  ResponseCollector
+	sqlTemplate    []string
+	serializer     common.Serializer
 }
 
 func (d *BasicBenchTask) Validate() {
@@ -91,14 +90,6 @@ func (d *BasicBenchTask) Validate() {
 		log.Fatalln("parse end error: ", err)
 	}
 	d.timestampEnd = d.timestampEnd.UTC()
-	// d.timestampPrepare, err = time.Parse(time.RFC3339, d.timestampPrepareStr)
-	// if err != nil {
-	// 	log.Fatalln("parse prepare error: ", err)
-	// }
-	// d.timestampPrepare = d.timestampPrepare.UTC()
-	// if d.timestampPrepare.Before(d.timestampStart) || d.timestampPrepare.After(d.timestampEnd) {
-	// 	log.Fatalln("the prepare time > ")
-	// }
 
 	if d.samplingInterval <= 0 {
 		log.Fatal("Invalid sampling interval")
@@ -147,7 +138,6 @@ func (d *BasicBenchTask) Validate() {
 			log.Fatalln("the sql template is empty")
 		}
 	}
-
 }
 
 func (d *BasicBenchTask) PrepareWorkers() int {
@@ -159,9 +149,7 @@ func (d *BasicBenchTask) PrepareWorkers() int {
 	}
 	d.inputDone = make(chan struct{})
 	d.writers = make([]DBWriter, d.workers)
-	d.itemsRead = 0
-	d.valuesRead = 0
-	d.bytesRead = 0
+
 	d.respCollector = ResponseCollector{}
 
 	switch d.useCase {
@@ -200,17 +188,13 @@ func (d *BasicBenchTask) PrepareWorkers() int {
 	}
 
 	if d.timeLimit > 0 {
-		log.Printf("We will write %s", d.timeLimit)
+		log.Printf("We will run about %s", d.timeLimit)
 	} else {
 		if d.mixMode != "read_only" {
 			log.Printf("We will write %d points", d.simulator.Total())
 		} else {
 			log.Printf("We will query %d sql", d.queryCount)
 		}
-	}
-
-	if d.mixMode == "read_only" {
-		d.simulator.SetWrittenPoints(d.simulator.Total())
 	}
 
 	c := &HTTPWriterConfig{
@@ -227,6 +211,20 @@ func (d *BasicBenchTask) PrepareWorkers() int {
 		d.createDb(writer)
 	}
 	d.serializer = common.NewSerializerInflux()
+
+	if d.needPrePare {
+		d.runPrepareData()
+	} else {
+		if d.mixMode == "read_only" {
+			d.simulator.SetWrittenPoints(d.simulator.Total())
+		}
+	}
+
+	// 在数据准备完后，再次初始化值
+	d.itemsRead = 0
+	d.valuesRead = 0
+	d.bytesRead = 0
+	d.qureyRead = 0
 	return d.workers
 }
 
@@ -239,7 +237,6 @@ func (d *BasicBenchTask) PrepareProcess(i int) {
 		Debug:     d.debug,
 		DebugInfo: fmt.Sprintf("worker #%d", i),
 	}
-
 	d.writers[i] = NewHTTPWriter(*c)
 }
 
@@ -249,71 +246,36 @@ func (d *BasicBenchTask) RunProcess(i int, waitGroup *sync.WaitGroup) {
 	switch d.mixMode {
 	case "parallel":
 		point := common.MakeUsablePoint()
-		if d.timeLimit > 0 {
-			endTime := time.Now().Add(d.timeLimit)
-			if i >= d.queryPercent*d.workers/100 {
-				for time.Now().Before(endTime) {
-					err := d.processWrite(d.writers[i], d.batchSize, false, point)
-					if err != nil {
-						log.Println(err.Error())
-					}
-				}
-			} else {
-				for time.Now().Before(endTime) {
-					err := d.processQuery(d.writers[i], 1, false)
-					if err != nil {
-						log.Println(err.Error())
-					}
+		endTime := time.Now().Add(d.timeLimit)
+		if i >= d.queryPercent*d.workers/100 {
+			for time.Now().Before(endTime) {
+				err := d.processWrite(d.writers[i], d.batchSize, false, point)
+				if err != nil && d.debug {
+					log.Println(err.Error())
 				}
 			}
 		} else {
-			if i >= d.queryPercent*d.workers/100 {
-				for !d.simulator.Finished() {
-					err := d.processWrite(d.writers[i], d.batchSize, true, point)
-					if err != nil {
-						log.Println(err.Error())
-					}
-				}
-			} else {
-				for !d.simulator.Finished() {
-					err := d.processQuery(d.writers[i], 1, false)
-					if err != nil {
-						log.Println(err.Error())
-					}
+			for time.Now().Before(endTime) {
+				err := d.processQuery(d.writers[i], 1, false)
+				if err != nil && d.debug {
+					log.Println(err.Error())
 				}
 			}
 		}
 	case "request":
 		point := common.MakeUsablePoint()
-		if d.timeLimit > 0 {
-			endTime := time.Now().Add(d.timeLimit)
-			for time.Now().Before(endTime) {
-				num := fastrand.Uint32n(100)
-				if num >= uint32(d.queryPercent) {
-					err := d.processWrite(d.writers[i], d.batchSize, false, point)
-					if err != nil {
-						log.Println(err.Error())
-					}
-				} else {
-					err := d.processQuery(d.writers[i], 1, false)
-					if err != nil {
-						log.Println(err.Error())
-					}
+		endTime := time.Now().Add(d.timeLimit)
+		for time.Now().Before(endTime) {
+			num := fastrand.Uint32n(100)
+			if num >= uint32(d.queryPercent) {
+				err := d.processWrite(d.writers[i], d.batchSize, false, point)
+				if err != nil {
+					log.Println(err.Error())
 				}
-			}
-		} else {
-			for !d.simulator.Finished() {
-				num := fastrand.Uint32n(100)
-				if num >= uint32(d.queryPercent) {
-					err := d.processWrite(d.writers[i], d.batchSize, true, point)
-					if err != nil {
-						log.Println(err.Error())
-					}
-				} else {
-					err := d.processQuery(d.writers[i], 1, false)
-					if err != nil {
-						log.Println(err.Error())
-					}
+			} else {
+				err := d.processQuery(d.writers[i], 1, false)
+				if err != nil && d.debug {
+					log.Println(err.Error())
 				}
 			}
 		}
@@ -347,10 +309,10 @@ func (d *BasicBenchTask) RunSyncTask() {
 					log.Printf("Has writen %d point, %.2fMB (mean point rate %.2f/sec, value rate %.2f/s, %.2fMB/sec in this %0.2f sec)",
 						lastItems, float64(lastBytes)/(1<<20), itemsRate, valuesRate, bytesRate/(1<<20), took.Seconds())
 				case "read_only":
-					log.Printf("Has writen %d queries,  (mean %.2f q/sec in this %0.2f sec)\n",
+					log.Printf("Has writen %d queries(mean %.2f q/sec in this %0.2f sec)\n",
 						lastQuery, queryRate, took.Seconds())
 				default:
-					log.Printf("Has writen %d point, %.2fMB, %d queries (mean point rate %.2f/sec, value rate %.2f/s, %.2fMB/sec, %.2f q/sec in this %0.2f sec)\n",
+					log.Printf("Has writen %d point, %.2fMB, %d queries (mean point rate %.2f/sec, value rate %.2f/s, %.2fMB/sec, %.2f q/sec in this %0.2f sec)",
 						lastItems, float64(lastBytes)/(1<<20), lastQuery, itemsRate, valuesRate, bytesRate/(1<<20), queryRate, took.Seconds())
 				}
 			case <-d.inputDone:
@@ -471,8 +433,9 @@ func (d *BasicBenchTask) processQuery(w DBWriter, batchSize int, useCountLimit b
 		lat, err = w.QueryLineProtocol(buf.Bytes())
 		if err != nil {
 			d.respCollector.AddOne("query", lat, false)
+		} else {
+			d.respCollector.AddOne("query", lat, true)
 		}
-		d.respCollector.AddOne("query", lat, true)
 	}
 	buf.Reset()
 	d.bufPool.Put(buf)
@@ -485,14 +448,14 @@ func (d *BasicBenchTask) processWriteOnly(i int) {
 		endTime := time.Now().Add(d.timeLimit)
 		for time.Now().Before(endTime) {
 			err := d.processWrite(d.writers[i], d.batchSize, false, point)
-			if err != nil {
+			if err != nil && d.debug {
 				log.Println(err.Error())
 			}
 		}
 	} else {
 		for !d.simulator.Finished() {
 			err := d.processWrite(d.writers[i], d.batchSize, true, point)
-			if err != nil {
+			if err != nil && d.debug {
 				log.Println(err.Error())
 			}
 		}
@@ -504,14 +467,14 @@ func (d *BasicBenchTask) processQueryOnly(i int) {
 		endTime := time.Now().Add(d.timeLimit)
 		for time.Now().Before(endTime) {
 			err := d.processQuery(d.writers[i], d.batchSize, false)
-			if err != nil {
+			if err != nil && d.debug {
 				log.Println(err.Error())
 			}
 		}
 	} else {
 		for d.qureyRead < d.queryCount {
 			err := d.processQuery(d.writers[i], d.batchSize, true)
-			if err != nil {
+			if err != nil && d.debug {
 				log.Println(err.Error())
 			}
 		}
@@ -582,4 +545,48 @@ func (d *BasicBenchTask) checkDbConnection(w DBWriter) error {
 		time.Sleep(5 * time.Second)
 	}
 	return errors.New("can not connect DB in 60s")
+}
+
+func (d *BasicBenchTask) runPrepareData() error {
+	log.Printf("We will prepare %d points", d.simulator.Total())
+	var workersGroup sync.WaitGroup
+	prePrareChan := make(chan struct{})
+	for i := 0; i < d.workers; i++ {
+		workersGroup.Add(1)
+		d.PrepareProcess(i)
+		go func(w int) {
+			defer workersGroup.Done()
+			point := common.MakeUsablePoint()
+			for !d.simulator.Finished() {
+				err := d.processWrite(d.writers[w], 5000, true, point)
+				if err != nil && d.debug {
+					log.Println(err.Error())
+				}
+			}
+		}(i)
+	}
+	ticker := time.NewTicker(time.Second * 5)
+	go func() {
+		defer ticker.Stop()
+		lastTime := time.Now()
+		lastItems, lastBytes := d.itemsRead, d.bytesRead
+		for {
+			select {
+			case <-ticker.C:
+				now := time.Now()
+				took := now.Sub(lastTime)
+				lastTime = now
+				itemsRate := float64(d.itemsRead-lastItems) / took.Seconds()
+				bytesRate := float64(d.bytesRead-lastBytes) / took.Seconds()
+				lastItems, lastBytes = d.itemsRead, d.bytesRead
+				log.Printf("Has prepare %d point, %.2fMB (mean point rate %.2f/sec, %.2fMB/sec in this %0.2f sec)",
+					lastItems, float64(lastBytes)/(1<<20), itemsRate, bytesRate/(1<<20), took.Seconds())
+			case <-prePrareChan:
+				return
+			}
+		}
+	}()
+	workersGroup.Wait()
+	close(prePrareChan)
+	return nil
 }

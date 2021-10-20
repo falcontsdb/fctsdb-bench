@@ -130,7 +130,6 @@ func (s *AirqSimulator) Next(p *common.Point) int64 {
 }
 
 func (s *AirqSimulator) NextSql(wr io.Writer) int64 {
-
 	madeSql := atomic.AddInt64(&s.madeSql, 1)
 	tmp := s.sqlTemplates[madeSql%int64(len(s.sqlTemplates))]
 	randomHostsIndex := int(fastrand.Uint32n(uint32(len(s.Hosts))))

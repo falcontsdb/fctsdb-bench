@@ -33,7 +33,6 @@ type QueryLoad struct {
 	inputDone             chan struct{}
 	progressIntervalItems uint64
 	scanFinished          bool
-	totalBackOffSecs      float64
 	writers               []*HTTPWriter
 	itemsRead             int64
 	sourceReader          *os.File

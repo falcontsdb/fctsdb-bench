@@ -84,7 +84,7 @@ var (
 	post                = []byte("POST")
 	get                 = []byte("GET")
 	textPlain           = []byte("text/plain")
-	responseMustContain = []byte(`"time"`)
+	responseMustContain = []byte(`"statement_id"`)
 )
 
 // WriteLineProtocol writes the given byte slice to the HTTP server described in the Writer's HTTPWriterConfig.
@@ -113,9 +113,6 @@ func (w *HTTPWriter) WriteLineProtocol(body []byte) (int64, error) {
 			log.Printf("backoff suggested, reason: %s", resp.Body())
 		} else if sc != fasthttp.StatusNoContent {
 			err = fmt.Errorf("[DebugInfo: %s] Invalid write response (status %d): %s", w.c.DebugInfo, sc, resp.Body())
-		}
-		if w.c.Debug {
-			fmt.Println(string(w.writeUrl))
 		}
 	}
 	fasthttp.ReleaseResponse(resp)
