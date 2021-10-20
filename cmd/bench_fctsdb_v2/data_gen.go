@@ -57,12 +57,6 @@ type DataGenerator struct {
 
 // Program option vars:
 var (
-	CaseChoices = []string{
-		common.UseCaseVehicle,
-		common.UseCaseAirQuality,
-		common.UseCaseDevOps,
-	}
-
 	dataGenCmd = &cobra.Command{
 		Use:   "data-gen",
 		Short: "生成不同场景（case）的数据，输出到stdout，搭配data-load使用",

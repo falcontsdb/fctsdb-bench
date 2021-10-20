@@ -1,4 +1,4 @@
-package bulk_query_fctsdb
+package fctsdb_query_gen
 
 import (
 	"fmt"
@@ -13,8 +13,8 @@ var (
 		Start:            now.Add(time.Hour * -1000),
 		End:              now,
 		SamplingInterval: time.Second,
-		AirqDeviceCount:  100000,
-		AirqDeviceOffset: 0,
+		DeviceCount:      100000,
+		DeviceOffset:     0,
 	}
 	simA = cfgA.ToSimulator()
 )
@@ -25,8 +25,8 @@ func TestAllTypes(t *testing.T) {
 		Start:            now.Add(time.Hour * -1000),
 		End:              now,
 		SamplingInterval: time.Second,
-		AirqDeviceCount:  100000,
-		AirqDeviceOffset: 0,
+		DeviceCount:      100000,
+		DeviceOffset:     0,
 	}
 	sim := cfg.ToSimulator()
 	for i := 1; i <= AirQuality.Count; i++ {
@@ -51,8 +51,8 @@ func TestAirqFromSitesNewest(t *testing.T) {
 		Start:            now.Add(time.Hour * -1000),
 		End:              now,
 		SamplingInterval: time.Second,
-		AirqDeviceCount:  100000,
-		AirqDeviceOffset: 0,
+		DeviceCount:      100000,
+		DeviceOffset:     0,
 	}
 	sim := cfg.ToSimulator()
 	aiq := airqFromSitesNewest{count: 1000}

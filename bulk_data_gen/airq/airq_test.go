@@ -3,6 +3,7 @@ package airq
 import (
 	"bytes"
 	"fmt"
+	"log"
 	"runtime"
 	"strconv"
 	"sync"
@@ -68,8 +69,8 @@ func BenchmarkNewPointVehicle(b *testing.B) {
 		Start:            now.Add(time.Hour * -24000),
 		End:              now,
 		SamplingInterval: time.Second,
-		VehicleCount:     100,
-		VehicleOffset:    1,
+		DeviceCount:      100,
+		DeviceOffset:     1,
 	}
 	outchan := make(chan []byte, 10000)
 	sim := cfg.ToSimulator()
@@ -111,8 +112,8 @@ func BenchmarkNewPointAirq1_1(b *testing.B) {
 		Start:            now.Add(time.Hour * -24000),
 		End:              now,
 		SamplingInterval: time.Second,
-		AirqDeviceCount:  100000,
-		AirqDeviceOffset: 1,
+		DeviceCount:      100000,
+		DeviceOffset:     1,
 	}
 	// out := bufio.NewWriterSize(os.Stdout, 4<<24)
 	outPointChan := make(chan *common.Point, 10000)
@@ -171,8 +172,8 @@ func BenchmarkNewPointAirq1_2(b *testing.B) {
 		Start:            now.Add(time.Hour * -24000),
 		End:              now,
 		SamplingInterval: time.Second,
-		AirqDeviceCount:  100000,
-		AirqDeviceOffset: 1,
+		DeviceCount:      100000,
+		DeviceOffset:     1,
 	}
 	// out := bufio.NewWriterSize(os.Stdout, 4<<24)
 	outPointChan := make(chan *common.Point, 10000)
@@ -230,8 +231,8 @@ func BenchmarkNewPointAirq2_2(b *testing.B) {
 		Start:            now.Add(time.Hour * -24000),
 		End:              now,
 		SamplingInterval: time.Second,
-		AirqDeviceCount:  100000,
-		AirqDeviceOffset: 1,
+		DeviceCount:      100000,
+		DeviceOffset:     1,
 	}
 	// out := bufio.NewWriterSize(os.Stdout, 4<<24)
 	outPointChan := make(chan *common.Point, 10000)
@@ -286,8 +287,8 @@ func BenchmarkNewPointAirq2_4(b *testing.B) {
 		Start:            now.Add(time.Hour * -24000),
 		End:              now,
 		SamplingInterval: time.Second,
-		AirqDeviceCount:  100000,
-		AirqDeviceOffset: 1,
+		DeviceCount:      100000,
+		DeviceOffset:     1,
 	}
 	// out := bufio.NewWriterSize(os.Stdout, 4<<24)
 	outPointChan := make(chan *common.Point, 1000)
@@ -343,8 +344,8 @@ func BenchmarkNewPointAirq2_4_New(b *testing.B) {
 		Start:            now.Add(time.Hour * -24000),
 		End:              now,
 		SamplingInterval: time.Second,
-		AirqDeviceCount:  100000,
-		AirqDeviceOffset: 1,
+		DeviceCount:      100000,
+		DeviceOffset:     1,
 	}
 	// out := bufio.NewWriterSize(os.Stdout, 4<<24)
 	outPointChan1 := make(chan *common.Point, 1000)
@@ -406,8 +407,8 @@ func BenchmarkNewPointAirqHand(b *testing.B) {
 		Start:            now.Add(time.Hour * -24000),
 		End:              now,
 		SamplingInterval: time.Second,
-		AirqDeviceCount:  100000,
-		AirqDeviceOffset: 1,
+		DeviceCount:      100000,
+		DeviceOffset:     1,
 	}
 	// out := bufio.NewWriterSize(os.Stdout, 4<<24)
 	// outPointChan := make(chan *common.Point, 10000)
@@ -462,8 +463,8 @@ func BenchmarkNewPointAirq(b *testing.B) {
 		Start:            now.Add(time.Hour * -24000),
 		End:              now,
 		SamplingInterval: time.Second,
-		AirqDeviceCount:  100000,
-		AirqDeviceOffset: 1,
+		DeviceCount:      100000,
+		DeviceOffset:     1,
 	}
 	// out := bufio.NewWriterSize(os.Stdout, 4<<24)
 	// outPointChan := make(chan *common.Point, 10000)
@@ -529,8 +530,8 @@ func BenchmarkNewPointAirq2Sim(b *testing.B) {
 			Start:            now.Add(time.Hour * -24000),
 			End:              now,
 			SamplingInterval: time.Second,
-			AirqDeviceCount:  int64(step),
-			AirqDeviceOffset: int64(offset),
+			DeviceCount:      int64(step),
+			DeviceOffset:     int64(offset),
 		}
 		simulators[i] = cfg.ToSimulator()
 	}
@@ -590,8 +591,8 @@ func BenchmarkNewPointAirq2SimWith(b *testing.B) {
 			Start:            now.Add(time.Hour * -24000),
 			End:              now,
 			SamplingInterval: time.Second,
-			AirqDeviceCount:  int64(step),
-			AirqDeviceOffset: int64(offset),
+			DeviceCount:      int64(step),
+			DeviceOffset:     int64(offset),
 		}
 		simulators[i] = cfg.ToSimulator()
 	}
@@ -637,8 +638,8 @@ func TestNewPointVehicle(t *testing.T) {
 		Start:            now.Add(time.Hour * -24),
 		End:              now,
 		SamplingInterval: time.Second,
-		VehicleCount:     100,
-		VehicleOffset:    0,
+		DeviceCount:      100,
+		DeviceOffset:     0,
 	}
 	outchan := make(chan []byte, 10000)
 	sim := cfg.ToSimulator()
@@ -702,8 +703,8 @@ func BenchmarkNewPointVehicleEasy(b *testing.B) {
 		Start:            now.Add(time.Hour * -24000),
 		End:              now,
 		SamplingInterval: time.Second,
-		VehicleCount:     10000,
-		VehicleOffset:    1,
+		DeviceCount:      10000,
+		DeviceOffset:     1,
 	}
 	sim := cfg.ToSimulator()
 
@@ -721,8 +722,8 @@ func TestNewPointVehicleEasy(t *testing.T) {
 		Start:            now.Add(time.Hour * -24000),
 		End:              now,
 		SamplingInterval: time.Second,
-		VehicleCount:     100000,
-		VehicleOffset:    1,
+		DeviceCount:      100000,
+		DeviceOffset:     1,
 	}
 	sim := cfg.ToSimulator()
 
@@ -746,8 +747,8 @@ func BenchmarkNewPointAirqEasy(b *testing.B) {
 		Start:            now.Add(time.Hour * -24000),
 		End:              now,
 		SamplingInterval: time.Second,
-		AirqDeviceCount:  100000,
-		AirqDeviceOffset: 1,
+		DeviceCount:      100000,
+		DeviceOffset:     1,
 	}
 	sim := cfg.ToSimulator()
 
@@ -769,23 +770,30 @@ func TestNewPointAirqEasy(t *testing.T) {
 	now := time.Now()
 
 	cfg := &AirqSimulatorConfig{
-		Start:            now.Add(time.Hour * -24000),
+		Start:            now.Add(time.Second * -10),
 		End:              now,
 		SamplingInterval: time.Second,
-		AirqDeviceCount:  100000,
-		AirqDeviceOffset: 1,
+		DeviceCount:      10,
+		DeviceOffset:     0,
 	}
 	sim := cfg.ToSimulator()
 	ser := common.NewSerializerInflux()
 	point := common.MakeUsablePoint()
 	out := Printer{}
-	for i := 0; i < 10; i++ {
+	// for i := 0; i < 10; i++ {
+	i := 0
+
+	// for sim.Next(point) {
+	for !sim.Finished() {
 		// host := sim.Hosts[i%len(sim.Hosts)]
 		// _ = string(host.SiteID)
 		sim.Next(point)
 		ser.SerializePoint(out, point)
 		point.Reset()
+		i += 1
 	}
+	fmt.Println(i)
+	fmt.Println(sim.SeenPoints())
 }
 
 type Printer struct {
@@ -849,28 +857,30 @@ func TestSafe(t *testing.T) {
 	now := time.Now()
 
 	cfg := &AirqSimulatorConfig{
-		Start:            now.Add(time.Second * -100),
+		Start:            now.Add(time.Second * -1000),
 		End:              now,
 		SamplingInterval: time.Second,
-		AirqDeviceCount:  100,
-		AirqDeviceOffset: 0,
+		DeviceCount:      100,
+		DeviceOffset:     0,
 	}
 	sim := cfg.ToSimulator()
 	// ser := common.NewSerializerInflux()
-	// out := Printer{}
 	wg := sync.WaitGroup{}
 	var count int64 = 0
-	for i := 0; i < 1; i++ {
+	for i := 0; i < 100; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			// out := bytes.NewBuffer(make([]byte, 0, 8*1024))
 			point := common.MakeUsablePoint()
 			// for !sim.Finished() {
-			for sim.Next(point) {
+			for sim.Next(point) <= sim.Total() {
+				time.Sleep(time.Microsecond)
 				// sim.Next(point)
 				// ser.SerializePoint(out, point)
 				point.Reset()
 				atomic.AddInt64(&count, 1)
+				// out.Reset()
 			}
 		}()
 		// host := sim.Hosts[i%len(sim.Hosts)]
@@ -962,4 +972,54 @@ func AppendInt(dst []byte, u int64) (d []byte) {
 
 	d = append(dst, a[i:]...)
 	return
+}
+
+func TestAirqNextSql(t *testing.T) {
+	start, err := time.Parse(time.RFC3339, "2021-01-01T00:00:00+08:00")
+	if err != nil {
+		log.Fatal(err)
+	}
+	end, err := time.Parse(time.RFC3339, "2021-02-01T00:00:00+08:00")
+	if err != nil {
+		log.Fatal(err)
+	}
+	cfg := &AirqSimulatorConfig{
+		Start:            start,
+		End:              end,
+		SamplingInterval: time.Second,
+		DeviceCount:      100,
+		DeviceOffset:     0,
+		SqlTemplates:     []string{"select mean(aqi) as aqi from city_air_quality where city in '{city*6}' and time >= '{now}'-30d and time < '{now}' group by time(1d)"},
+	}
+	sim := cfg.ToSimulator()
+	point := common.MakeUsablePoint()
+	sim.Next(point)
+	point.Reset()
+	buf := bytes.NewBuffer(make([]byte, 0, 1024))
+	sim.SetWrittenPoints(10000)
+	sim.NextSql(buf)
+	fmt.Println(buf.String())
+}
+
+func BenchmarkAirqNextSql(b *testing.B) {
+	now := time.Now()
+	cfg := &AirqSimulatorConfig{
+		Start:            now.Add(time.Second * -100),
+		End:              now,
+		SamplingInterval: time.Second,
+		DeviceCount:      100,
+		DeviceOffset:     0,
+		SqlTemplates:     []string{"select mean(aqi) as aqi from city_air_quality where city in '{city*1000}' and time >= '{now}'-30d and time < '{now}' group by time(1d)"},
+	}
+	sim := cfg.ToSimulator()
+	point := common.MakeUsablePoint()
+	sim.Next(point)
+	point.Reset()
+	buf := bytes.NewBuffer(make([]byte, 0, 8*1024))
+	for i := 0; i < b.N; i++ {
+		sim.NextSql(buf)
+		buf.Reset()
+	}
+
+	// fmt.Println(buf.String())
 }

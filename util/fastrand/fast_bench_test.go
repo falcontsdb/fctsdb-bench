@@ -6,6 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 	"unsafe"
 )
 
@@ -19,6 +20,16 @@ func BenchmarkUint64n(b *testing.B) {
 			s += Uint64n(1e6)
 		}
 		atomic.AddUint64(&BenchSink, s)
+	})
+}
+
+func BenchmarkUint32n(b *testing.B) {
+	b.RunParallel(func(pb *testing.PB) {
+		s := uint32(0)
+		for pb.Next() {
+			s += Uint32n(1e6)
+		}
+		atomic.AddUint64(&BenchSink, uint64(s))
 	})
 }
 
@@ -140,9 +151,36 @@ func BenchmarkMathRandRNGInt63nArray(b *testing.B) {
 	})
 }
 
+func Int64_2() int64 {
+	var num int64
+	num |= int64(Uint32()) << 31
+	num |= int64(Uint32())
+	return num
+}
+
+func BenchmarkFastRandInt64(b *testing.B) {
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			Int64_2()
+		}
+	})
+}
+
+func BenchmarkRandInt64(b *testing.B) {
+	rng := &RNG64{}
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			rng.Int63()
+		}
+	})
+}
+
 func TestRand(t *testing.T) {
+	// rng := &RNG64{}
 	for i := 0; i < 100; i++ {
 		// fmt.Println(Uint64n(10))
-		fmt.Println(Int63n(3))
+		fmt.Println(Int64_2())
+		// runtime.FuncForPC()
 	}
+	time.Sleep(time.Second)
 }

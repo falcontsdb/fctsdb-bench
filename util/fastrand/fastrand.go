@@ -8,12 +8,21 @@ package fastrand
 import (
 	"sync"
 	"time"
+	_ "unsafe"
 )
 
 const (
 	rngMax  = 1 << 63
 	rngMask = rngMax - 1
 )
+
+// Uint32 returns a lock free uint32 value.
+//go:linkname Uint32 runtime.fastrand
+func Uint32() uint32
+
+// Uint32n returns a lock free uint32 value in the interval [0, n).
+//go:linkname Uint32n runtime.fastrandn
+func Uint32n(n uint32) uint32
 
 // Uint32 returns pseudorandom uint32.
 //

@@ -1,6 +1,7 @@
 package devops
 
 import (
+	"io"
 	"sync/atomic"
 	"time"
 
@@ -37,7 +38,7 @@ func (g *DevopsSimulator) Total() int64 {
 }
 
 func (g *DevopsSimulator) Finished() bool {
-	return g.madePoints >= g.maxPoints-1 //对应g.madePoints从0开始
+	return g.madePoints >= g.maxPoints
 }
 
 // Type DevopsSimulatorConfig is used to create a DevopsSimulator.
@@ -58,7 +59,7 @@ func (d *DevopsSimulatorConfig) ToSimulator() *DevopsSimulator {
 	epochs := d.End.Sub(d.Start).Nanoseconds() / EpochDuration.Nanoseconds()
 	maxPoints := epochs * (d.HostCount * NHostSims)
 	dg := &DevopsSimulator{
-		madePoints: -1, //由于atomic是先加后返回值，为了保证next中方法从0开始，需要先置为-1
+		madePoints: 0,
 		madeValues: 0,
 		maxPoints:  maxPoints,
 
@@ -75,7 +76,7 @@ func (d *DevopsSimulatorConfig) ToSimulator() *DevopsSimulator {
 }
 
 // Next advances a Point to the next state in the generator.
-func (d *DevopsSimulator) Next(p *Point) bool {
+func (d *DevopsSimulator) Next(p *Point) int64 {
 	// // switch to the next host if needed
 	// if d.simulatedMeasurementIndex == NHostSims {
 	// 	d.simulatedMeasurementIndex = 0
@@ -90,10 +91,12 @@ func (d *DevopsSimulator) Next(p *Point) bool {
 	// host := &d.hosts[d.hostIndex]
 
 	madePoint := atomic.AddInt64(&d.madePoints, 1)
-	hostIndex := (madePoint / NHostSims) % int64(len(d.hosts))
+	poindIndex := madePoint - 1 //由于atomic是先加后返回值，为了保证next中方法从0开始，需要先置为-1
+	hostIndex := (poindIndex / NHostSims) % int64(len(d.hosts))
 	host := &d.hosts[hostIndex]
-	// 为了协程安全, 这里不使用TickAll方法
-	timestamp := d.timestampStart.Add(EpochDuration * time.Duration(madePoint/int64(len(d.hosts))/NHostSims))
+	// 为了多协程timestamp不混乱, 这里不使用TickAll方法
+	// madePoint 增加int64(len(d.hosts))*NHostSims次，timestamp增加一次，保证每张表里面两条数据之间的间隔为 EpochDuration
+	timestamp := d.timestampStart.Add(EpochDuration * time.Duration(poindIndex/int64(len(d.hosts))/NHostSims))
 	p.SetTimestamp(&timestamp)
 	if hostIndex == int64(len(d.hosts)-1) {
 		for i := 0; i < len(d.hosts); i++ {
@@ -121,5 +124,14 @@ func (d *DevopsSimulator) Next(p *Point) bool {
 
 	host.SimulatedMeasurements[madePoint%NHostSims].ToPoint(p)
 	atomic.AddInt64(&d.madeValues, int64(len(p.FieldValues)))
-	return madePoint < d.maxPoints //方便另一只线程安全的结束方式，for sim.next(point){...} 保证产生的总点数正确，注意最后一次{...}里面的代码不执行
+	return madePoint //方便另一种线程安全的结束方式，for sim.next(point) <= sim.total(){...} 保证产生的总点数正确，注意最后一次{...}里面的代码不执行
+}
+
+func (d *DevopsSimulator) NextSql(wr io.Writer) int64 {
+	return 0
+}
+func (g *DevopsSimulator) SetWrittenPoints(num int64) {
+}
+func (g *DevopsSimulator) SetSqlTemplate(sqlTemplates []string) error {
+	return nil
 }

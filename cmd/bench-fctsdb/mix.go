@@ -6,6 +6,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -15,6 +16,7 @@ import (
 	neturl "net/url"
 	"os"
 	"runtime/pprof"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -24,29 +26,36 @@ import (
 	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
 	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/devops"
 	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/vehicle"
+	fctsdb "git.querycap.com/falcontsdb/fctsdb-bench/fctsdb_query_gen"
+	"git.querycap.com/falcontsdb/fctsdb-bench/util/fastrand"
 	"github.com/spf13/cobra"
 	"github.com/valyala/fasthttp"
 )
 
-type DataWrite struct {
+type MixReadWrite struct {
 	// Program option vars:
-	csvDaemonUrls     string
-	useGzip           int
-	workers           int
-	batchSize         int
-	dbName            string
-	format            string
-	useCase           string
-	scaleVar          int64
-	scaleVarOffset    int64
-	samplingInterval  time.Duration
-	timeLimit         time.Duration
-	timestampStartStr string
-	timestampEndStr   string
-	seed              int64
-	debug             bool
-	cpuProfile        string
-	doDBCreate        bool
+	csvDaemonUrls       string
+	useGzip             int
+	workers             int
+	batchSize           int
+	dbName              string
+	timeLimit           time.Duration
+	format              string
+	useCase             string
+	scaleVar            int64
+	scaleVarOffset      int64
+	samplingInterval    time.Duration
+	timestampStartStr   string
+	timestampEndStr     string
+	timestampPrepareStr string
+	seed                int64
+	debug               bool
+	cpuProfile          string
+	doDBCreate          bool
+	agentEndpoint       string
+	nmonEndpoint        string
+	mixMode             string
+	queryPercent        int
 
 	//runtime vars
 	timestampStart time.Time
@@ -61,16 +70,26 @@ type DataWrite struct {
 	bytesRead      int64
 	simulator      common.Simulator
 	respCollector  ResponseCollector
+	queryTypeID    int
+	queryCase      *fctsdb.QueryCase
+	serializer     common.Serializer
 }
 
 var (
-	dataWrite    = &DataWrite{}
-	dataWriteCmd = &cobra.Command{
-		Use:   "write",
-		Short: "生成数据并直接发送至数据库",
+	mixReadWrite = &MixReadWrite{}
+	MixCmd       = &cobra.Command{
+		Use:   "mixed",
+		Short: "混合读写测试",
 		Run: func(cmd *cobra.Command, args []string) {
-			if dataWrite.cpuProfile != "" {
-				f, err := os.Create(dataWrite.cpuProfile)
+			if len(args) < 1 {
+				fmt.Println("缺少参数 query-type")
+				fmt.Printf("使用命令\"%s query --help\"查看帮助信息\n", TOOL_NAME)
+				// cmd.Help()
+			} else if len(args) == 1 {
+				RunMixWrite(args[0])
+			}
+			if mixReadWrite.cpuProfile != "" {
+				f, err := os.Create(mixReadWrite.cpuProfile)
 				if err != nil {
 					log.Fatal("could not create CPU profile: ", err)
 				}
@@ -79,54 +98,83 @@ var (
 				}
 				defer pprof.StopCPUProfile()
 			}
-			dataWrite.RunWrite()
 		},
 	}
 )
 
 func init() {
-	dataWrite.Init(dataWriteCmd)
-	rootCmd.AddCommand(dataWriteCmd)
+	mixReadWrite.Init(MixCmd)
+	rootCmd.AddCommand(MixCmd)
 }
 
-func (d *DataWrite) RunWrite() map[string]string {
+func RunMixWrite(arg string) {
+	csvFileName := time.Now().Format("q-jan2_15-04-05") + ".csv"
+	mixReadWrite.Validate()
+
+	if arg == "all" {
+		for typeID := 1; typeID <= mixReadWrite.queryCase.Count; typeID++ {
+			mixReadWrite.RunWriteOne(typeID)
+			if typeID == 1 {
+				mixReadWrite.WriteResultToCsv(csvFileName, true)
+			} else {
+				mixReadWrite.WriteResultToCsv(csvFileName, false)
+			}
+			if mixReadWrite.agentEndpoint != "" {
+				mixReadWrite.AfterRun()
+			}
+		}
+	} else {
+		for i, ids := range strings.Split(arg, ",") {
+			typeID, err := strconv.Atoi(ids)
+			if err != nil {
+				fmt.Println("the query-type is unsupported: ", ids)
+			} else {
+				mixReadWrite.RunWriteOne(typeID)
+				if i < 1 {
+					mixReadWrite.WriteResultToCsv(csvFileName, true)
+				} else {
+					mixReadWrite.WriteResultToCsv(csvFileName, false)
+				}
+				if mixReadWrite.agentEndpoint != "" {
+					mixReadWrite.AfterRun()
+				}
+			}
+		}
+	}
+}
+
+func (d *MixReadWrite) RunWriteOne(typeID int) map[string]string {
 
 	d.format = "fctsdb"
-	d.Validate()
 	if d.doDBCreate {
 		d.CreateDb()
 	}
-
+	d.queryTypeID = typeID
 	var workersGroup sync.WaitGroup
 	d.PrepareWorkers()
-
 	for i := 0; i < d.workers; i++ {
 		d.PrepareProcess(i)
 		workersGroup.Add(1)
 		go func(w int) {
-			err := d.RunProcess(w, &workersGroup)
-			if err != nil {
-				log.Println(err.Error())
-			}
+			d.RunProcess(w, &workersGroup)
 		}(i)
 		go func(w int) {
 			d.AfterRunProcess(w)
 		}(i)
 	}
 	log.Printf("Started load with %d workers\n", d.workers)
+
 	// 定时运行状态日志
 	d.SyncShowStatistics()
 	start := time.Now()
 	d.respCollector.SetStart(start)
 	workersGroup.Wait()
 	d.SyncEnd()
-	d.CleanUp() // 目前cleanup主要处理背压相关的channel问题
 	end := time.Now()
 	d.respCollector.SetEnd(end)
 	took := end.Sub(start)
 
 	// 总结果输出
-
 	itemsRead, bytesRead, valuesRead := d.GetReadStatistics()
 	itemsRate := float64(itemsRead) / took.Seconds()
 	bytesRate := float64(bytesRead) / took.Seconds()
@@ -136,7 +184,8 @@ func (d *DataWrite) RunWrite() map[string]string {
 	convertedBytesRate := bytesRate / (1 << 20)
 	log.Printf("Total write %d points, %0.2fMB in %.2fsec (mean point rate %.2f/sec, mean value rate %.2f/s, %.2fMB/sec)\n",
 		itemsRead, float64(bytesRead)/(1<<20), loadTime, itemsRate, valuesRate, convertedBytesRate)
-	d.respCollector.GetDetail().Show()
+	// d.respCollector.GetDetail().Show()
+	d.respCollector.GetGroupDetail().Show()
 
 	result := d.respCollector.GetDetail().ToMap()
 	result["PointRate(p/s)"] = fmt.Sprintf("%.2f", itemsRate)
@@ -146,7 +195,7 @@ func (d *DataWrite) RunWrite() map[string]string {
 	return result
 }
 
-func (d *DataWrite) Init(cmd *cobra.Command) {
+func (d *MixReadWrite) Init(cmd *cobra.Command) {
 	writeFlag := cmd.PersistentFlags()
 	// writeFlag.StringVar(&d.format, "format", formatChoices[0], fmt.Sprintf("Format to emit. (choices: %s)", strings.Join(formatChoices, ", ")))
 	writeFlag.StringVar(&d.useCase, "use-case", CaseChoices[0], fmt.Sprintf("使用的测试场景(可选场景: %s)", strings.Join(CaseChoices, ", ")))
@@ -164,11 +213,13 @@ func (d *DataWrite) Init(cmd *cobra.Command) {
 	writeFlag.StringVar(&d.dbName, "db", "benchmark_db", "数据库的database名称")
 	writeFlag.IntVar(&d.batchSize, "batch-size", 100, "1个http请求中携带Point个数")
 	writeFlag.IntVar(&d.workers, "workers", 1, "并发的http个数")
-	writeFlag.DurationVar(&d.timeLimit, "time-limit", -1, "最大测试时间(-1表示不生效)，>0会使timestampEndStr参数失效")
+	writeFlag.StringVar(&d.agentEndpoint, "agent", "", "数据库代理服务地址，为空表示不使用 (默认不使用)")
+	writeFlag.StringVar(&d.nmonEndpoint, "easy-nmon", "", "easy-nmon地址，为空表示不使用监控 (默认不使用)")
+	writeFlag.StringVar(&d.mixMode, "mix-mode", "parallel", "混合模式，支持parallel(按线程比例混合)、request(按请求比例混合)")
+	writeFlag.IntVar(&d.queryPercent, "query-percent", 0, "查询请求所占百分比 (default 0)")
 }
 
-func (d *DataWrite) Validate() {
-
+func (d *MixReadWrite) Validate() {
 	d.daemonUrls = strings.Split(d.csvDaemonUrls, ",")
 	if len(d.daemonUrls) == 0 {
 		log.Fatal("missing 'urls' flag")
@@ -208,9 +259,19 @@ func (d *DataWrite) Validate() {
 		log.Println("Using gzip: level", d.useGzip)
 	}
 
+	switch d.useCase {
+	case fctsdb.AirQuality.CaseName:
+		d.queryCase = fctsdb.AirQuality
+	case fctsdb.Vehicle.CaseName:
+		d.queryCase = fctsdb.Vehicle
+	default:
+		log.Fatal("the use-case is unsupported")
+	}
+
+	d.serializer = common.NewSerializerInflux()
 }
 
-func (d *DataWrite) CreateDb() {
+func (d *MixReadWrite) CreateDb() {
 	listDatabasesFn := d.listDatabases
 	createDbFn := d.createDb
 
@@ -243,9 +304,10 @@ func (d *DataWrite) CreateDb() {
 		time.Sleep(1000 * time.Millisecond)
 		log.Printf("Database %s [%s] created", d.dbName, id)
 	}
+
 }
 
-func (d *DataWrite) PrepareWorkers() {
+func (d *MixReadWrite) PrepareWorkers() {
 
 	d.bufPool = sync.Pool{
 		New: func() interface{} {
@@ -272,6 +334,7 @@ func (d *DataWrite) PrepareWorkers() {
 			SamplingInterval: d.samplingInterval,
 			DeviceCount:      d.scaleVar,
 			DeviceOffset:     d.scaleVarOffset,
+			SqlTemplates:     []string{d.queryCase.Types[d.queryTypeID].RawSql},
 		}
 		d.simulator = cfg.ToSimulator()
 	case common.UseCaseAirQuality:
@@ -281,6 +344,7 @@ func (d *DataWrite) PrepareWorkers() {
 			SamplingInterval: d.samplingInterval,
 			DeviceCount:      d.scaleVar,
 			DeviceOffset:     d.scaleVarOffset,
+			SqlTemplates:     []string{d.queryCase.Types[d.queryTypeID].RawSql},
 		}
 		d.simulator = cfg.ToSimulator()
 	case common.UseCaseDevOps:
@@ -298,15 +362,11 @@ func (d *DataWrite) PrepareWorkers() {
 		log.Fatalln("the case is not supported")
 	}
 
-	if d.timeLimit > 0 {
-		log.Printf("We will write %s", d.timeLimit)
-	} else {
-		log.Printf("We will write %d points", d.simulator.Total())
-	}
+	log.Printf("We will write %d points", d.simulator.Total())
 
 }
 
-func (d *DataWrite) SyncShowStatistics() {
+func (d *MixReadWrite) SyncShowStatistics() {
 
 	ticker := time.NewTicker(time.Second * 5)
 	go func() {
@@ -334,123 +394,183 @@ func (d *DataWrite) SyncShowStatistics() {
 	}()
 }
 
-func (d *DataWrite) SyncEnd() {
+func (d *MixReadWrite) SyncEnd() {
 	d.inputDone <- struct{}{}
 	close(d.inputDone)
 }
 
-func (d *DataWrite) CleanUp() {
-}
-
-func (d *DataWrite) PrepareProcess(i int) {
+func (d *MixReadWrite) PrepareProcess(i int) {
 
 	c := &HTTPWriterConfig{
 		Host:      d.daemonUrls[i%len(d.daemonUrls)],
 		Database:  d.dbName,
 		DebugInfo: fmt.Sprintf("worker #%d", i),
 	}
+
 	d.writers[i] = NewHTTPWriter(*c)
 }
 
-func (d *DataWrite) RunProcess(i int, waitGroup *sync.WaitGroup) error {
+func (d *MixReadWrite) RunProcess(i int, waitGroup *sync.WaitGroup) {
 	defer waitGroup.Done()
-
-	var batchItemCount int
-	var err error
-	// newline := []byte("\n")
-	fctsdb := common.NewSerializerInflux()
-	buf := d.bufPool.Get().(*bytes.Buffer)
-	batchItemCount = 0
 	point := common.MakeUsablePoint()
-	if d.timeLimit > 0 {
-		endTime := time.Now().Add(d.timeLimit)
-		for time.Now().Before(endTime) {
-			d.simulator.Next(point)
-			atomic.AddInt64(&d.valuesRead, int64(len(point.FieldValues)+len(point.Int64FiledValues)))
-			fctsdb.SerializePoint(buf, point)
-			batchItemCount++
-			point.Reset()
-
-			// 达到batchSize
-			if batchItemCount >= d.batchSize {
-				err = d.processBatches(d.writers[i], buf, fmt.Sprintf("%d", i))
-				atomic.AddInt64(&d.bytesRead, int64(buf.Len()))
-				atomic.AddInt64(&d.itemsRead, int64(batchItemCount))
-				batchItemCount = 0
-				buf.Reset()
-				d.bufPool.Put(buf)
-				buf = d.bufPool.Get().(*bytes.Buffer)
+	switch d.mixMode {
+	case "parallel":
+		if i >= d.queryPercent*d.workers/100 {
+			for !d.simulator.Finished() {
+				err := d.processWrite(d.writers[i], point)
+				if err != nil {
+					log.Println(err.Error())
+				}
+			}
+		} else {
+			for !d.simulator.Finished() {
+				err := d.processQuery(d.writers[i])
+				if err != nil {
+					log.Println(err.Error())
+				}
 			}
 		}
-	} else {
-		for d.simulator.Next(point) <= d.simulator.Total() {
-			atomic.AddInt64(&d.valuesRead, int64(len(point.FieldValues)+len(point.Int64FiledValues)))
-			fctsdb.SerializePoint(buf, point)
-			batchItemCount++
-			point.Reset()
-
-			// 达到batchSize
-			if batchItemCount >= d.batchSize {
-				err = d.processBatches(d.writers[i], buf, fmt.Sprintf("%d", i))
-				atomic.AddInt64(&d.bytesRead, int64(buf.Len()))
-				atomic.AddInt64(&d.itemsRead, int64(batchItemCount))
-				batchItemCount = 0
-				buf.Reset()
-				d.bufPool.Put(buf)
-				buf = d.bufPool.Get().(*bytes.Buffer)
+	case "request":
+		for !d.simulator.Finished() {
+			num := fastrand.Uint32n(100)
+			if num >= uint32(d.queryPercent) {
+				err := d.processWrite(d.writers[i], point)
+				if err != nil {
+					log.Println(err.Error())
+				}
+			} else {
+				err := d.processQuery(d.writers[i])
+				if err != nil {
+					log.Println(err.Error())
+				}
 			}
-
-		}
-		if batchItemCount > 0 {
-			err = d.processBatches(d.writers[i], buf, fmt.Sprintf("%d", i))
-			atomic.AddInt64(&d.bytesRead, int64(buf.Len()))
-			atomic.AddInt64(&d.itemsRead, int64(batchItemCount))
-			buf.Reset()
-			d.bufPool.Put(buf)
 		}
 	}
-	return err
 }
 
-func (d *DataWrite) AfterRunProcess(i int) {
+func (d *MixReadWrite) AfterRunProcess(i int) {
 }
 
-func (d *DataWrite) GetReadStatistics() (itemsRead, bytesRead, valuesRead int64) {
+func (d *MixReadWrite) GetReadStatistics() (itemsRead, bytesRead, valuesRead int64) {
 	itemsRead = d.itemsRead
 	bytesRead = d.bytesRead
 	valuesRead = d.valuesRead
 	return
 }
 
-// processBatches reads byte buffers from batchChan and writes them to the target server, while tracking stats on the write.
-func (d *DataWrite) processBatches(w *HTTPWriter, buf *bytes.Buffer, telemetryWorkerLabel string) error {
-	// var batchesSeen int64
-	// 发送http write
-	var err error
-	var lat int64
-	if d.useGzip > 0 {
-		compressedBatch := d.bufPool.Get().(*bytes.Buffer)
-		fasthttp.WriteGzipLevel(compressedBatch, buf.Bytes(), d.useGzip)
-		//bodySize = len(compressedBatch.Bytes())
-		lat, err = w.WriteLineProtocol(compressedBatch.Bytes(), true, d.debug)
-		// Return the compressed batch buffer to the pool.
-		compressedBatch.Reset()
-		d.bufPool.Put(compressedBatch)
-	} else {
-		//bodySize = len(batch.Bytes())
-		// fmt.Println(string(buf.Bytes()))
-		lat, err = w.WriteLineProtocol(buf.Bytes(), false, d.debug)
+func (d *MixReadWrite) WriteResultToCsv(fileName string, writeHead bool) {
+	csvFile, err := os.OpenFile(fileName, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0666)
+	if err != nil {
+		log.Println("open result csv failed, error:", err.Error())
+	}
+	defer csvFile.Close()
+	csvWriter := csv.NewWriter(csvFile)
+
+	heads := []string{"UseCase", "TypeID", "P50(ms)", "P90(ms)", "P95(ms)", "P99(ms)", "Min(ms)",
+		"Max(ms)", "Avg(ms)", "Fail", "Total", "RunSec(s)", "Qps", "TypeName", "Start", "End"}
+
+	r := d.respCollector.GetDetail().ToMap()
+	r["UseCase"] = d.useCase
+	r["TypeID"] = fmt.Sprintf("%d", d.queryTypeID)
+	r["TypeName"] = d.queryCase.Types[d.queryTypeID].Name
+
+	if writeHead {
+		err := csvWriter.Write(heads)
+		if err != nil {
+			log.Println("write result csv failed, error:", err.Error())
+		}
 	}
 
-	if err != nil {
-		d.respCollector.AddOne(d.dbName, lat, false)
-		return fmt.Errorf("error writing: %s", err.Error())
+	oneLine := make([]string, len(heads))
+	for i := 0; i < len(heads); i++ {
+		oneLine[i] = r[heads[i]]
 	}
-	d.respCollector.AddOne(d.dbName, lat, true)
+	err = csvWriter.Write(oneLine)
+	if err != nil {
+		log.Println("write result csv failed, error:", err.Error())
+	}
+	csvWriter.Flush()
+}
+
+func (d *MixReadWrite) AfterRun() {
+	if d.agentEndpoint != "" {
+		d.httpGet("/stop")
+		time.Sleep(time.Second * 5)
+		d.httpGet("/start")
+	}
+}
+
+// processWrite reads byte buffers from batchChan and writes them to the target server, while tracking stats on the write.
+func (d *MixReadWrite) processWrite(w *HTTPWriter, point *common.Point) error {
+	// var batchesSeen int64
+	// 发送http write
+
+	buf := d.bufPool.Get().(*bytes.Buffer)
+	var err error
+	var lat int64
+	var batchItemCount int = 0
+	var pointMadeIndex int64
+	for batchItemCount < d.batchSize {
+		pointMadeIndex = d.simulator.Next(point)
+		if pointMadeIndex > d.simulator.Total() { // 以point结束为结束
+			break
+		}
+		d.serializer.SerializePoint(buf, point)
+		batchItemCount++
+		atomic.AddInt64(&d.valuesRead, int64(len(point.FieldValues)+len(point.Int64FiledValues)))
+		point.Reset()
+	}
+
+	if batchItemCount > 0 {
+		atomic.AddInt64(&d.bytesRead, int64(buf.Len()))
+		atomic.AddInt64(&d.itemsRead, int64(batchItemCount))
+
+		if d.useGzip > 0 {
+			compressedBatch := d.bufPool.Get().(*bytes.Buffer)
+			fasthttp.WriteGzipLevel(compressedBatch, buf.Bytes(), d.useGzip)
+			//bodySize = len(compressedBatch.Bytes())
+			lat, err = w.WriteLineProtocol(compressedBatch.Bytes(), true, d.debug)
+			// Return the compressed batch buffer to the pool.
+			compressedBatch.Reset()
+			d.bufPool.Put(compressedBatch)
+		} else {
+			//bodySize = len(batch.Bytes())
+			// fmt.Println(string(buf.Bytes()))
+			lat, err = w.WriteLineProtocol(buf.Bytes(), false, d.debug)
+		}
+		if err != nil {
+			d.respCollector.AddOne("write", lat, false)
+		} else {
+			d.respCollector.AddOne("write", lat, true)
+			d.simulator.SetWrittenPoints(pointMadeIndex)
+		}
+	}
+	buf.Reset()
+	d.bufPool.Put(buf)
+	return err
+}
+
+func (d *MixReadWrite) processQuery(w *HTTPWriter) error {
+	var err error
+	var lat int64
+	buf := d.bufPool.Get().(*bytes.Buffer)
+	d.simulator.NextSql(buf)
+	if d.useGzip > 0 {
+		lat, err = w.QueryLineProtocol(buf.Bytes(), true, d.debug)
+	} else {
+		lat, err = w.QueryLineProtocol(buf.Bytes(), false, d.debug)
+	}
+	buf.Reset()
+	d.bufPool.Put(buf)
+	if err != nil {
+		d.respCollector.AddOne("query", lat, false)
+		return fmt.Errorf("error query: %s", err.Error())
+	}
+	d.respCollector.AddOne("query", lat, true)
 	return nil
 }
 
-func (d *DataWrite) createDb(daemonUrl, dbName string) (string, error) {
+func (d *MixReadWrite) createDb(daemonUrl, dbName string) (string, error) {
 	u, err := neturl.Parse(daemonUrl)
 	if err != nil {
 		return "", err
@@ -482,7 +602,7 @@ func (d *DataWrite) createDb(daemonUrl, dbName string) (string, error) {
 }
 
 // listDatabases lists the existing databases in InfluxDB.
-func (d *DataWrite) listDatabases(daemonUrl string) (map[string]string, error) {
+func (d *MixReadWrite) listDatabases(daemonUrl string) (map[string]string, error) {
 	u := fmt.Sprintf("%s/query?q=show%%20databases", daemonUrl)
 	resp, err := http.Get(u)
 	if err != nil {
@@ -521,4 +641,23 @@ func (d *DataWrite) listDatabases(daemonUrl string) (map[string]string, error) {
 		ret[nestedName[0].(string)] = ""
 	}
 	return ret, nil
+}
+
+func (d *MixReadWrite) httpGet(path string) ([]byte, error) {
+
+	u, err := neturl.Parse(d.agentEndpoint)
+	if err != nil {
+		log.Fatal("Invalid agent address:", d.agentEndpoint, ", error:", err.Error())
+	}
+	if u.Scheme == "" {
+		log.Fatal("Invalid agent address:", d.agentEndpoint)
+	}
+	u.Path = path
+
+	resp, err := http.Get(u.String())
+	if err != nil {
+		return nil, err
+	}
+	rData, err := ioutil.ReadAll(resp.Body)
+	return rData, err
 }

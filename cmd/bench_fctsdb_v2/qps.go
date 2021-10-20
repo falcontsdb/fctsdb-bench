@@ -302,6 +302,36 @@ func (g GroupResult) Show() {
 	}
 }
 
+func (g GroupResult) ToMap() map[string]string {
+	// 利用反射
+	m := make(map[string]string)
+	for _, r := range g {
+		t := reflect.TypeOf(r)
+		v := reflect.ValueOf(r)
+		label := r.Label
+		if label == "query" {
+			label = "r"
+		}
+		if label == "write" {
+			label = "w"
+		}
+		for k := 0; k < t.NumField(); k++ {
+			switch t.Field(k).Name {
+			case "RunSec", "Start", "End":
+				key := fmt.Sprintf("%v", t.Field(k).Name)
+				value := fmt.Sprintf("%v", v.Field(k).Interface())
+				m[key] = value
+			case "Label":
+			default:
+				key := fmt.Sprintf("%v(%v)", t.Field(k).Name, label)
+				value := fmt.Sprintf("%v", v.Field(k).Interface())
+				m[key] = value
+			}
+		}
+	}
+	return m
+}
+
 func AvgInt64(list []int64) int64 {
 	var total int64 = 0
 	var highWord int64 = 0 //超出int64范围的计数

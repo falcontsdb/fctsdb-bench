@@ -8,7 +8,6 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
-	"net/url"
 	neturl "net/url"
 	"os"
 	"strconv"
@@ -46,19 +45,18 @@ type QueryWrite struct {
 	useGzip          bool
 
 	//runtime vars
-	bufPool          sync.Pool
-	batchChan        chan batch
-	inputDone        chan struct{}
-	scanFinished     bool
-	totalBackOffSecs float64
-	configs          []*loadWorkerConfig
-	itemsRead        int64
-	respCollector    ResponseCollector
-	timestampStart   time.Time
-	timestampEnd     time.Time
-	queryCase        *fctsdb.QueryCase
-	simulatorInfo    common.Simulator
-	queryTypeID      int
+	bufPool        sync.Pool
+	batchChan      chan batch
+	inputDone      chan struct{}
+	scanFinished   bool
+	writers        []*HTTPWriter
+	itemsRead      int64
+	respCollector  ResponseCollector
+	timestampStart time.Time
+	timestampEnd   time.Time
+	queryCase      *fctsdb.QueryCase
+	simulator      common.Simulator
+	queryTypeID    int
 }
 
 var (
@@ -141,7 +139,7 @@ func (q *QueryWrite) Init(cmd *cobra.Command) {
 	writeFlag.IntVar(&q.batchSize, "batch-size", 1, "1个http请求中携带查询语句个数")
 	writeFlag.IntVar(&q.workers, "workers", 1, "并发的http个数")
 	writeFlag.Int64Var(&q.queryCount, "query-count", 1000, "生成的查询语句数量")
-	writeFlag.DurationVar(&q.timeLimit, "time-limit", -1, "最大测试时间(-1表示无限制)，设置后会使query-count参数失效")
+	writeFlag.DurationVar(&q.timeLimit, "time-limit", -1, "最大测试时间(-1表示不生效)，>0会使query-count参数失效")
 	writeFlag.BoolVar(&q.debug, "debug", false, "是否需要打印debug日志")
 	writeFlag.BoolVar(&q.toCsv, "to-csv", false, "是否记录结果到csv文件")
 	writeFlag.StringVar(&q.agentEndpoint, "agent", "", "数据库代理服务地址，为空表示不使用 (默认不使用)")
@@ -189,23 +187,26 @@ func (q *QueryWrite) Validate() {
 			Start:            q.timestampStart,
 			End:              q.timestampEnd,
 			SamplingInterval: q.samplingInterval,
-			AirqDeviceCount:  q.scaleVar,
-			AirqDeviceOffset: q.scaleVarOffset,
+			DeviceCount:      q.scaleVar,
+			DeviceOffset:     q.scaleVarOffset,
 		}
-		q.simulatorInfo = cfg.ToSimulator()
+		q.simulator = cfg.ToSimulator()
+
 	case fctsdb.Vehicle.CaseName:
 		q.queryCase = fctsdb.Vehicle
 		cfg := &vehicle.VehicleSimulatorConfig{
 			Start:            q.timestampStart,
 			End:              q.timestampEnd,
 			SamplingInterval: q.samplingInterval,
-			VehicleCount:     q.scaleVar,
-			VehicleOffset:    q.scaleVarOffset,
+			DeviceCount:      q.scaleVar,
+			DeviceOffset:     q.scaleVarOffset,
 		}
-		q.simulatorInfo = cfg.ToSimulator()
+		q.simulator = cfg.ToSimulator()
 	default:
 		log.Fatal("the use-case is unsupported")
 	}
+	// 非混合测试时，数据已经写好，因此将written points设置为最大值，保证sql模板中{now}的正确性
+	q.simulator.SetWrittenPoints(q.simulator.Total())
 }
 
 func (q *QueryWrite) RunOneQueryType(typeID int) {
@@ -283,26 +284,16 @@ func (q *QueryWrite) PrepareWorkers() {
 	q.batchChan = make(chan batch, 5*q.workers)
 	q.inputDone = make(chan struct{})
 	q.respCollector = ResponseCollector{}
-	q.configs = make([]*loadWorkerConfig, q.workers)
+	q.writers = make([]*HTTPWriter, q.workers)
 }
 
 func (q *QueryWrite) PrepareProcess(i int) {
-	q.configs[i] = &loadWorkerConfig{
-		url: q.daemonUrls[i%len(q.daemonUrls)],
-		// backingOffChan: make(chan bool, 100),
-		// backingOffDone: make(chan struct{}),
-	}
-	var url string
 	c := &HTTPWriterConfig{
-		DebugInfo: fmt.Sprintf("worker #%d, dest url: %s", i, q.configs[i].url),
-		Host:      q.configs[i].url,
+		Host:      q.daemonUrls[i%len(q.daemonUrls)],
 		Database:  q.dbName,
-		// BackingOffChan: q.configs[i].backingOffChan,
-		// BackingOffDone: q.configs[i].backingOffDone,
+		DebugInfo: fmt.Sprintf("worker #%d", i),
 	}
-	url = c.Host + "/query?db=" + neturl.QueryEscape(c.Database)
-
-	q.configs[i].writer = NewHTTPWriter(*c, url)
+	q.writers[i] = NewHTTPWriter(*c)
 }
 
 func (q *QueryWrite) EmptyBatchChanel() {
@@ -317,14 +308,6 @@ func (q *QueryWrite) SyncEnd() {
 }
 
 func (q *QueryWrite) CleanUp() {
-	for _, c := range q.configs {
-		close(c.backingOffChan)
-		<-c.backingOffDone
-	}
-	q.totalBackOffSecs = float64(0)
-	for i := 0; i < q.workers; i++ {
-		q.totalBackOffSecs += q.configs[i].backingOffSecs
-	}
 }
 
 func (q *QueryWrite) RunQueryGenerate() {
@@ -337,7 +320,7 @@ func (q *QueryWrite) RunQueryGenerate() {
 		log.Fatal("the query-type out of range")
 	}
 
-	err := queryType.Generator.Init(q.simulatorInfo)
+	err := q.simulator.SetSqlTemplate([]string{queryType.RawSql})
 	if err != nil {
 		log.Println(err.Error())
 		close(q.batchChan)
@@ -345,17 +328,13 @@ func (q *QueryWrite) RunQueryGenerate() {
 	}
 
 	buf := q.bufPool.Get().(*bytes.Buffer)
-
 	// 采用时间控制
 	if q.timeLimit > 0 {
 		endTime := time.Now().Add(q.timeLimit)
 		n := 0
 		for time.Now().Before(endTime) {
-			sql := queryType.Generator.Next()
-			if sql[len(sql)-1] == ';' {
-				buf.Write([]byte(sql))
-			} else {
-				buf.Write([]byte(sql))
+			q.simulator.NextSql(buf)
+			if buf.Bytes()[buf.Len()-1] != ';' {
 				buf.Write([]byte(";"))
 			}
 			n++
@@ -373,11 +352,8 @@ func (q *QueryWrite) RunQueryGenerate() {
 	} else {
 		n := 0
 		for i := 0; i < int(q.queryCount); i++ {
-			sql := queryType.Generator.Next()
-			if sql[len(sql)-1] == ';' {
-				buf.Write([]byte(sql))
-			} else {
-				buf.Write([]byte(sql))
+			q.simulator.NextSql(buf)
+			if buf.Bytes()[buf.Len()-1] != ';' {
 				buf.Write([]byte(";"))
 			}
 			n++
@@ -395,7 +371,7 @@ func (q *QueryWrite) RunQueryGenerate() {
 }
 
 func (q *QueryWrite) RunProcess(i int, waitGroup *sync.WaitGroup) error {
-	return q.processBatches(q.configs[i].writer, q.configs[i].backingOffChan, fmt.Sprintf("%d", i), waitGroup)
+	return q.processBatches(q.writers[i], fmt.Sprintf("%d", i), waitGroup)
 }
 
 func (q *QueryWrite) AfterRunProcess(i int) {
@@ -455,19 +431,19 @@ func (q *QueryWrite) WriteResultToCsv(fileName string, writeHead bool) {
 // When the requested number of items per batch is met, send a batch over batchChan for the workers to write.
 
 // processBatches reads byte buffers from batchChan and writes them to the target server, while tracking stats on the write.
-func (q *QueryWrite) processBatches(w *HTTPWriter, backoffSrc chan bool, telemetryWorkerLabel string, workersGroup *sync.WaitGroup) error {
+func (q *QueryWrite) processBatches(w *HTTPWriter, telemetryWorkerLabel string, workersGroup *sync.WaitGroup) error {
 	// var batchesSeen int64
 
 	defer workersGroup.Done()
 	for batch := range q.batchChan {
 		buf := q.bufPool.Get().(*bytes.Buffer)
 		buf.Write(batch.Buffer.Bytes())
-		lat, err := w.QueryLineProtocol(buf.Bytes(), q.debug)
+		lat, err := w.QueryLineProtocol(buf.Bytes(), q.useGzip, q.debug)
 		if err != nil {
-			q.respCollector.AddOne(w.c.Database, lat, false)
+			q.respCollector.AddOne(q.dbName, lat, false)
 			return fmt.Errorf("error writing: %s", err.Error())
 		}
-		q.respCollector.AddOne(w.c.Database, lat, true)
+		q.respCollector.AddOne(q.dbName, lat, true)
 		batch.Buffer.Reset()
 		q.bufPool.Put(batch.Buffer)
 		buf.Reset()
@@ -479,7 +455,7 @@ func (q *QueryWrite) processBatches(w *HTTPWriter, backoffSrc chan bool, telemet
 
 func (q *QueryWrite) httpGet(path string) ([]byte, error) {
 
-	u, err := url.Parse(q.agentEndpoint)
+	u, err := neturl.Parse(q.agentEndpoint)
 	if err != nil {
 		log.Fatal("Invalid agent address:", q.agentEndpoint, ", error:", err.Error())
 	}

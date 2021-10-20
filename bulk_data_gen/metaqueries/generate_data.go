@@ -2,6 +2,7 @@ package metaqueries
 
 import (
 	"fmt"
+	"io"
 	"time"
 
 	"math/rand"
@@ -87,7 +88,7 @@ func (g *MetaquerySimulator) Finished() bool {
 }
 
 // Next advances a Point to the next state in the generator.
-func (g *MetaquerySimulator) Next(p *common.Point) bool {
+func (g *MetaquerySimulator) Next(p *common.Point) int64 {
 	p.SetMeasurementName(measKey)
 	p.SetTimestamp(&g.timestampNow)
 
@@ -105,5 +106,16 @@ func (g *MetaquerySimulator) Next(p *common.Point) bool {
 	g.madePoints++
 	g.madeValues++
 	g.timestampNow = g.timestampNow.Add(g.stepTime)
-	return true
+	return g.madePoints
+}
+
+func (g *MetaquerySimulator) NextSql(wr io.Writer) int64 {
+	return 0
+}
+
+func (g *MetaquerySimulator) SetWrittenPoints(num int64) {
+}
+
+func (g *MetaquerySimulator) SetSqlTemplate(sqlTemplates []string) error {
+	return nil
 }

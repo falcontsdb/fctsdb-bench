@@ -1,4 +1,4 @@
-package bulk_query_fctsdb
+package fctsdb_query_gen
 
 import (
 	"fmt"
@@ -15,8 +15,8 @@ var (
 		Start:            now.Add(time.Hour * -1000),
 		End:              now,
 		SamplingInterval: time.Second,
-		VehicleCount:     100000,
-		VehicleOffset:    0,
+		DeviceCount:      100000,
+		DeviceOffset:     0,
 	}
 	sim = cfg.ToSimulator()
 )
@@ -40,8 +40,8 @@ func TestCarsNewest(t *testing.T) {
 		Start:            now.Add(time.Hour * -1000),
 		End:              now,
 		SamplingInterval: time.Second,
-		VehicleCount:     100000,
-		VehicleOffset:    0,
+		DeviceCount:      100000,
+		DeviceOffset:     0,
 	}
 	sim := cfg.ToSimulator()
 

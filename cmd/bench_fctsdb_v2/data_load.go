@@ -266,6 +266,8 @@ func (l *DataLoad) PrepareProcess(i int) {
 	c := &HTTPWriterConfig{
 		Host:      l.daemonUrls[i%len(l.daemonUrls)],
 		Database:  l.dbName,
+		Debug:     l.debug,
+		Gzip:      l.useGzip,
 		DebugInfo: fmt.Sprintf("worker #%d", i),
 	}
 
@@ -386,13 +388,13 @@ func (l *DataLoad) processBatches(w *HTTPWriter, telemetryWorkerLabel string, wo
 			compressedBatch := l.bufPool.Get().(*bytes.Buffer)
 			fasthttp.WriteGzip(compressedBatch, batch.Buffer.Bytes())
 			//bodySize = len(compressedBatch.Bytes())
-			_, err = w.WriteLineProtocol(compressedBatch.Bytes(), true, l.debug)
+			_, err = w.WriteLineProtocol(compressedBatch.Bytes())
 			// Return the compressed batch buffer to the pool.
 			compressedBatch.Reset()
 			l.bufPool.Put(compressedBatch)
 		} else {
 			//bodySize = len(batch.Bytes())
-			_, err = w.WriteLineProtocol(batch.Buffer.Bytes(), false, l.debug)
+			_, err = w.WriteLineProtocol(batch.Buffer.Bytes())
 		}
 		if err != nil {
 			return fmt.Errorf("error writing: %s", err.Error())

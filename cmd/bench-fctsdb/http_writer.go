@@ -27,23 +27,8 @@ var (
 
 // HTTPWriterConfig is the configuration used to create an HTTPWriter.
 type HTTPWriterConfig struct {
-	// URL of the host, in form "http://example.com:8086"
-	Host string
-
-	// Name of the target database into which points will be written.
+	Host     string
 	Database string
-
-	// Id of the target bucket into which points will be written. (InfluxDB v2)
-	BucketId string
-
-	// Id of the organization to which bucket belongs. (InfluxDB v2)
-	OrgId string
-
-	// Authorization token.(InfluxDB v2)
-	AuthToken string
-
-	BackingOffChan chan bool
-	BackingOffDone chan struct{}
 
 	// Debug label for more informative errors.
 	DebugInfo string
@@ -51,20 +36,46 @@ type HTTPWriterConfig struct {
 
 // HTTPWriter is a Writer that writes to an InfluxDB HTTP server.
 type HTTPWriter struct {
-	client fasthttp.Client
-	c      HTTPWriterConfig
-	url    []byte
+	client   fasthttp.Client
+	c        HTTPWriterConfig
+	writeUrl []byte
+	queryUrl []byte
 }
 
 // NewHTTPWriter returns a new HTTPWriter from the supplied HTTPWriterConfig.
-func NewHTTPWriter(c HTTPWriterConfig, url string) *HTTPWriter {
+func NewHTTPWriter(c HTTPWriterConfig) *HTTPWriter {
+	writeUrl := make([]byte, 0)
+	if c.Host[len(c.Host)-1] == '/' {
+		writeUrl = append(writeUrl, c.Host...)
+		writeUrl = append(writeUrl, "write?db="...)
+		writeUrl = fasthttp.AppendQuotedArg(writeUrl, []byte(c.Database))
+	} else {
+		writeUrl = append(writeUrl, c.Host...)
+		writeUrl = append(writeUrl, "/write?db="...)
+		writeUrl = fasthttp.AppendQuotedArg(writeUrl, []byte(c.Database))
+	}
+
+	queryUrl := make([]byte, 0)
+	if c.Host[len(c.Host)-1] == '/' {
+		queryUrl = append(queryUrl, c.Host...)
+		queryUrl = append(queryUrl, "query?db="...)
+		queryUrl = fasthttp.AppendQuotedArg(queryUrl, []byte(c.Database))
+		queryUrl = append(queryUrl, "&q="...)
+	} else {
+		queryUrl = append(queryUrl, c.Host...)
+		queryUrl = append(queryUrl, "/query?db="...)
+		queryUrl = fasthttp.AppendQuotedArg(queryUrl, []byte(c.Database))
+		queryUrl = append(queryUrl, "&q="...)
+	}
+
 	return &HTTPWriter{
 		client: fasthttp.Client{
 			Name:                "bulk_load_influx",
 			MaxIdleConnDuration: DefaultIdleConnectionTimeout,
 		},
-		c:   c,
-		url: []byte(url),
+		c:        c,
+		queryUrl: queryUrl,
+		writeUrl: writeUrl,
 	}
 }
 
@@ -77,16 +88,13 @@ var (
 // WriteLineProtocol writes the given byte slice to the HTTP server described in the Writer's HTTPWriterConfig.
 // It returns the latency in nanoseconds and any error received while sending the data over HTTP,
 // or it returns a new error if the HTTP response isn't as expected.
-func (w *HTTPWriter) WriteLineProtocol(body []byte, isGzip bool) (int64, error) {
+func (w *HTTPWriter) WriteLineProtocol(body []byte, isGzip, debug bool) (int64, error) {
 	req := fasthttp.AcquireRequest()
 	req.Header.SetContentTypeBytes(textPlain)
 	req.Header.SetMethodBytes(post)
-	req.Header.SetRequestURIBytes(w.url)
+	req.Header.SetRequestURIBytes(w.writeUrl)
 	if isGzip {
 		req.Header.Add("Content-Encoding", "gzip")
-	}
-	if w.c.AuthToken != "" {
-		req.Header.Add("Authorization", fmt.Sprintf("Token %s", w.c.AuthToken))
 	}
 	// fmt.Println(string(body))
 	req.SetBody(body)
@@ -104,6 +112,9 @@ func (w *HTTPWriter) WriteLineProtocol(body []byte, isGzip bool) (int64, error) 
 		} else if sc != fasthttp.StatusNoContent {
 			err = fmt.Errorf("[DebugInfo: %s] Invalid write response (status %d): %s", w.c.DebugInfo, sc, resp.Body())
 		}
+		if debug {
+			fmt.Println(string(w.writeUrl))
+		}
 	}
 	fasthttp.ReleaseResponse(resp)
 	fasthttp.ReleaseRequest(req)
@@ -111,19 +122,15 @@ func (w *HTTPWriter) WriteLineProtocol(body []byte, isGzip bool) (int64, error) 
 	return lat, err
 }
 
-func (w *HTTPWriter) QueryLineProtocol(lines []byte, debug bool) (int64, error) {
-	furl := fasthttp.AcquireURI()
-	furl.Parse(nil, w.url)
-	furl.QueryArgs().AddBytesKV([]byte("q"), lines)
+func (w *HTTPWriter) QueryLineProtocol(lines []byte, isGzip, debug bool) (int64, error) {
+	uri := fasthttp.AppendQuotedArg(w.queryUrl, lines)
 	req := fasthttp.AcquireRequest()
 	req.Header.SetContentTypeBytes(textPlain)
 	req.Header.SetMethodBytes(get)
-	req.Header.SetRequestURIBytes(furl.FullURI())
-	req.Header.Add("Accept-Encoding", "gzip")
-	if w.c.AuthToken != "" {
-		req.Header.Add("Authorization", fmt.Sprintf("Token %s", w.c.AuthToken))
+	req.Header.SetRequestURIBytes(uri)
+	if isGzip {
+		req.Header.Add("Accept-Encoding", "gzip")
 	}
-
 	resp := fasthttp.AcquireResponse()
 	start := time.Now()
 	err := w.client.Do(req, resp)
@@ -137,11 +144,10 @@ func (w *HTTPWriter) QueryLineProtocol(lines []byte, debug bool) (int64, error) 
 			err = fmt.Errorf("[DebugInfo: %s] Invalid write response (status %d): %s", w.c.DebugInfo, sc, resp.Body())
 		}
 		if debug {
-			fmt.Println(furl.String())
+			fmt.Println(string(uri))
 			fmt.Fprintln(os.Stdout, string(resp.Body()))
 		}
 	}
-	fasthttp.ReleaseURI(furl)
 	fasthttp.ReleaseResponse(resp)
 	fasthttp.ReleaseRequest(req)
 

@@ -8,8 +8,6 @@ import (
 	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
 )
 
-const NAirqSims = 1
-
 // Count of choices for auto-generated tag values:
 const (
 	MachineRackChoicesPerDatacenter = 100
@@ -49,10 +47,6 @@ func NewAirqDeviceMeasurements(start time.Time) []common.SimulatedMeasurement {
 	sm := []common.SimulatedMeasurement{
 		NewCityAirQualityMeasurement(start),
 	}
-
-	if len(sm) != NAirqSims {
-		panic("logic error: incorrect number of measurements")
-	}
 	return sm
 }
 
@@ -60,13 +54,11 @@ func NewAirqDevice(i int, offset int, start time.Time) AirqDevice {
 	sm := NewAirqDeviceMeasurements(start)
 	region := Region.SearchGBT2260(string(common.RandChoice(AreaCode)))
 	h := AirqDevice{
-		// Tag Values that are static throughout the life of a Host:
-		Province: []byte(region[0]),
-		City:     []byte(region[1]),
-		County:   []byte(region[2]),
-		SiteType: common.RandChoice(SiteTypeChoices),
-		SiteID:   []byte(fmt.Sprintf("DEV%09d", i+offset)),
-
+		Province:              []byte(region[0]),
+		City:                  []byte(region[1]),
+		County:                []byte(region[2]),
+		SiteType:              common.RandChoice(SiteTypeChoices),
+		SiteID:                []byte(fmt.Sprintf("DEV%09d", i+offset)),
 		SimulatedMeasurements: sm,
 	}
 
