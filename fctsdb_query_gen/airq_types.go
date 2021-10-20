@@ -48,7 +48,7 @@ func init() {
 	// case3中包含两个语句，这里是第二条
 	AirQuality.Regist(&QueryType{
 		Name:    "分页查询某个站点最近一天的空气质量数据(分页查询)",
-		RawSql:  "select * from city_air_quality where device_id = '{site_id}' and time > '{now}'-1d order by time desc limit 100 offset 0;",
+		RawSql:  "select * from city_air_quality where site_id = '{site_id}' and time > '{now}'-1d order by time desc limit 100 offset 0;",
 		Comment: "业务用途：用于统计分析查询\n数据库能力：指定tag和时间段，分页查看数据",
 		// Generator: &limitOffsetWithTimeOfOneSite{Period: time.Hour * 24},
 	})
