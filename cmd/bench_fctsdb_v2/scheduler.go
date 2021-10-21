@@ -121,11 +121,11 @@ func runBenchTaskByConfig(index int, fileName string, config *BasicBenchTaskConf
 	if err != nil {
 		return err
 	}
-	if nmonEndpoint != "" && !config.NeedPrePare {
-		SendStartMonitorSignal(nmonEndpoint, fmt.Sprintf("testcase_%03d_", index))
+	if nmonEndpoint != "" {
+		SendStartMonitorSignal(nmonEndpoint, fileName[:len(fileName)-4], fmt.Sprintf("testcase_%03d", index))
 	}
 	result := RunBenchTask(basicBenchTask)
-	if nmonEndpoint != "" && !config.NeedPrePare {
+	if nmonEndpoint != "" {
 		SendStopAllMonitorSignal(nmonEndpoint)
 	}
 

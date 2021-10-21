@@ -115,6 +115,8 @@ func (d *BasicBenchTask) Validate() {
 		defer pprof.StopCPUProfile()
 	}
 
+	log.Println("Use case", d.useCase)
+
 	var queryCase *fctsdb.QueryCase
 	switch d.useCase {
 	case fctsdb.AirQuality.CaseName:
@@ -136,12 +138,15 @@ func (d *BasicBenchTask) Validate() {
 	if d.mixMode != "write_only" {
 		if len(d.sqlTemplate) < 1 {
 			log.Fatalln("the sql template is empty")
+		} else {
+			for _, sql := range d.sqlTemplate {
+				log.Println("Use sql:", sql)
+			}
 		}
 	}
 }
 
 func (d *BasicBenchTask) PrepareWorkers() int {
-
 	d.bufPool = sync.Pool{
 		New: func() interface{} {
 			return bytes.NewBuffer(make([]byte, 0, 4*1024*1024))
@@ -149,8 +154,6 @@ func (d *BasicBenchTask) PrepareWorkers() int {
 	}
 	d.inputDone = make(chan struct{})
 	d.writers = make([]DBWriter, d.workers)
-
-	d.respCollector = ResponseCollector{}
 
 	switch d.useCase {
 	case common.UseCaseVehicle:
@@ -225,6 +228,8 @@ func (d *BasicBenchTask) PrepareWorkers() int {
 	d.valuesRead = 0
 	d.bytesRead = 0
 	d.qureyRead = 0
+	d.respCollector = ResponseCollector{}
+
 	return d.workers
 }
 

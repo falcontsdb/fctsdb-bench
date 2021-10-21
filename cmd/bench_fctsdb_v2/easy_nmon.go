@@ -11,7 +11,7 @@ import (
 
 //start monitor
 
-func SendStartMonitorSignal(endpoint string, reportName string) error {
+func SendStartMonitorSignal(endpoint, dirName, reportName string) error {
 	u, err := url.Parse(endpoint)
 	if err != nil {
 		log.Fatal("Invalid easy nmon address:", endpoint, ", error:", err.Error())
@@ -24,7 +24,7 @@ func SendStartMonitorSignal(endpoint string, reportName string) error {
 	q.Set("n", reportName)
 	q.Set("t", "86400")
 	q.Set("f", "1")
-	// q.Set("dn", dirName)
+	q.Set("dn", dirName)
 	u.RawQuery = q.Encode()
 	log.Println(u.String())
 	cli := http.Client{}
