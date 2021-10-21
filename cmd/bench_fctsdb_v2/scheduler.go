@@ -81,7 +81,7 @@ func ScheduleBenchTask() {
 		}
 	}
 
-	fileName := time.Now().Format("benchmark-jan2_15-04-05") + ".csv"
+	fileName := time.Now().Format("benchmark_0102_150405") + ".csv"
 	if configsPath != "" {
 		configsFile, err := os.Open(configsPath)
 		if err != nil {
