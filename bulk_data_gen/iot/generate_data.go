@@ -2,6 +2,7 @@ package iot
 
 import (
 	"fmt"
+	"io"
 	"time"
 
 	. "git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
@@ -76,7 +77,7 @@ func (g *IotSimulator) Finished() bool {
 }
 
 // Next advances a Point to the next state in the generator.
-func (g *IotSimulator) Next(p *Point) bool {
+func (g *IotSimulator) Next(p *Point) int64 {
 	for {
 		//find home which has not send measurement
 		homeFound := false
@@ -115,5 +116,14 @@ func (g *IotSimulator) Next(p *Point) bool {
 		g.madeValues += int64(len(p.FieldValues))
 		break
 	}
-	return true
+	return g.madePoints
+}
+
+func (g *IotSimulator) NextSql(wr io.Writer) int64 {
+	return 0
+}
+func (g *IotSimulator) SetWrittenPoints(num int64) {
+}
+func (g *IotSimulator) SetSqlTemplate(sqlTemplates []string) error {
+	return nil
 }

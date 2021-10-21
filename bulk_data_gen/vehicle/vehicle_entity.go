@@ -111,7 +111,8 @@ func (m *EntityMeasurement) ToPoint(p *common.Point) bool {
 			cache, remain = rand.Int63(), letterIdxMax
 		}
 		if idx := int(cache & letterIdxMask); idx < len(randomNumbers[i]) {
-			p.AppendField(EntityFieldKeys[i], randomNumbers[i][idx])
+			// p.AppendField(EntityFieldKeys[i], randomNumbers[i][idx])
+			p.AppendInt64Field(EntityFieldKeys[i], randomNumbers[i][idx])
 			i--
 		}
 		cache >>= letterIdxBits

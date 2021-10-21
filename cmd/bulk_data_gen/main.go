@@ -230,10 +230,10 @@ func main() {
 		sim = cfg.ToSimulator()
 	case common.UseCaseChoices[7]:
 		cfg := &vehicle.VehicleSimulatorConfig{
-			Start:         timestampStart,
-			End:           timestampEnd,
-			VehicleCount:  scaleVar,
-			VehicleOffset: scaleVarOffset,
+			Start:        timestampStart,
+			End:          timestampEnd,
+			DeviceCount:  scaleVar,
+			DeviceOffset: scaleVarOffset,
 		}
 		sim = cfg.ToSimulator()
 	case common.UseCaseChoices[8]:
@@ -241,8 +241,8 @@ func main() {
 			Start: timestampStart,
 			End:   timestampEnd,
 
-			AirqDeviceCount:  scaleVar,
-			AirqDeviceOffset: scaleVarOffset,
+			DeviceCount:  scaleVar,
+			DeviceOffset: scaleVarOffset,
 		}
 		sim = cfg.ToSimulator()
 

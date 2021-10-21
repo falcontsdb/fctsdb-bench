@@ -1,4 +1,4 @@
-package bulk_query_fctsdb
+package fctsdb_query_gen
 
 import (
 	"sync"

@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"testing"
 	"time"
+
+	"github.com/valyala/fasthttp"
 )
 
 func TestQps(t *testing.T) {
@@ -36,4 +39,82 @@ func TestUrl(t *testing.T) {
 	// 	fmt.Println(111)
 	// }
 	SendStartMonitorSignal("http://124.71.230.36:3603", "adf*dfak")
+	qurl := []byte("http://localhost:9086/query?db=benchmark&q=")
+	// lines := []byte("select * from vehicle where VIN='LSVNV2182E000087113' order by time desc limit 1;")
+	// uri := fasthttp.AppendQuotedArg(qurl, lines)
+	fmt.Println(string(qurl)[:len(qurl)])
+}
+
+func BenchmarkFastUrl(b *testing.B) {
+	qurl := []byte("http://localhost:9086/query?db=benchmark&q=")
+	lines := []byte("select * from vehicle where VIN='LSVNV2182E000087113' order by time desc limit 1;")
+	// b.RunParallel(func(pb *testing.PB) {
+	// 	for pb.Next() {
+	// 		url.QueryEscape(string(lines))
+	// 		uri := append(qurl, lines...)
+	// 		_ = uri
+	// 	}
+	// })
+	// b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		uri := fasthttp.AppendQuotedArg(qurl, lines)
+		_ = uri
+	}
+}
+
+var jsonstr = []byte(`{"results":[{"statement_id":0,"series":[{"name":"city_air_quality","tags":{"site_id":"DEV000008449"},"columns":["time","aqi","city","co","county","no2","o3","pm10","pm25","province","site_type","so2","tips"],"values":[["2018-01-15T23:59:00Z",222,"齐齐哈尔市",1.1729999780654907,"富裕县",45,221,161,375,"黑龙江省","国控站",39,"CtVspYnOzdcKQkpCdxgj"]]},{"name":"city_air_quality","tags":{"site_id":"DEV000008141"},"columns":["time","aqi","city","co","county","no2","o3","pm10","pm25","province","site_type","so2","tips"],"values":[["2018-01-15T23:59:00Z",91,"临汾市",0.6290000081062317,"大宁县",133,121,445,282,"山西省","市控点",50,"zxRPWuNkgCunQBoouLtD"]]},{"name":"city_air_quality","tags":{"site_id":"DEV000007942"},"columns":["time","aqi","city","co","county","no2","o3","pm10","pm25","province","site_type","so2","tips"],"values":[["2018-01-15T23:59:00Z",120,"仙桃市",1.187999963760376,"潜江市",53,185,455,254,"湖北省","市控点",3,"JYwkzpboyiAurmzJeWCA"]]},{"name":"city_air_quality","tags":{"site_id":"DEV000005752"},"columns":["time","aqi","city","co","county","no2","o3","pm10","pm25","province","site_type","so2","tips"],"values":[["2018-01-15T23:59:00Z",119,"楚雄彝族自治州",0.9409999847412109,"双柏县",32,254,497,165,"云南省","市控点",45,"EiiTmwGoWIKUBkeCvYQX"]]},{"name":"city_air_quality","tags":{"site_id":"DEV000005339"},"columns":["time","aqi","city","co","county","no2","o3","pm10","pm25","province","site_type","so2","tips"],"values":[["2018-01-15T23:59:00Z",455,"德阳市",1.4850000143051147,"绵竹市",33,28,100,85,"四川省","市控点",12,"UvXCMQLuXDzroHvOYcow"]]},{"name":"city_air_quality","tags":{"site_id":"DEV000003112"},"columns":["time","aqi","city","co","county","no2","o3","pm10","pm25","province","site_type","so2","tips"],"values":[["2018-01-15T23:59:00Z",379,"凉山彝族自治州",1.0759999752044678,"越西县",31,173,278,347,"四川省","省控点",36,"PHTwjOHYhEWrgIcxSUKd"]]},{"name":"city_air_quality","tags":{"site_id":"DEV000002629"},"columns":["time","aqi","city","co","county","no2","o3","pm10","pm25","province","site_type","so2","tips"],"values":[["2018-01-15T23:59:00Z",155,"广元市",1.2569999694824219,"利州区",103,214,109,460,"四川省","省控点",53,"vzhUuirNwXXjMwCoJvnC"]]},{"name":"city_air_quality","tags":{"site_id":"DEV000000929"},"columns":["time","aqi","city","co","county","no2","o3","pm10","pm25","province","site_type","so2","tips"],"values":[["2018-01-15T23:59:00Z",308,"娄底市",0.6499999761581421,"娄星区",91,239,418,247,"湖南省","省控点",32,"cjMzTTcftPvJXlFBEvxi"]]},{"name":"city_air_quality","tags":{"site_id":"DEV000000632"},"columns":["time","aqi","city","co","county","no2","o3","pm10","pm25","province","site_type","so2","tips"],"values":[["2018-01-15T23:59:00Z",270,"日喀则市",0.9789999723434448,"萨嘎县",46,255,345,292,"西藏自治区","省控点",19,"JdnLlgyJQESKoCAhXeqS"]]},{"name":"city_air_quality","tags":{"site_id":"DEV000000445"},"columns":["time","aqi","city","co","county","no2","o3","pm10","pm25","province","site_type","so2","tips"],"values":[["2018-01-15T23:59:00Z",388,"龙岩市",0.8199999928474426,"武平县",95,97,383,238,"福建省","市控点",25,"PyBhxPqxUmGDIWGpsfaS"]]},{"name":"city_air_quality","tags":{"site_id":"DEV000008449"},"columns":["time","aqi","city","co","county","no2","o3","pm10","pm25","province","site_type","so2","tips"],"values":[["2018-01-14T23:59:00Z",414,"齐齐哈尔市",0.8289999961853027,"富裕县",27,84,60,402,"黑龙江省","国控站",28,"CxaErKCjMqFBtdrBkCbF"]]},{"name":"city_air_quality","tags":{"site_id":"DEV000008141"},"columns":["time","aqi","city","co","county","no2","o3","pm10","pm25","province","site_type","so2","tips"],"values":[["2018-01-14T23:59:00Z",446,"临汾市",0.9320000410079956,"大宁县",65,108,367,108,"山西省","市控点",50,"aiCTzQnwnYfODHYbNEmJ"]]},{"name":"city_air_quality","tags":{"site_id":"DEV000007942"},"columns":["time","aqi","city","co","county","no2","o3","pm10","pm25","province","site_type","so2","tips"],"values":[["2018-01-14T23:59:00Z",250,"仙桃市",1.3650000095367432,"潜江市",127,175,354,226,"湖北省","市控点",12,"KniJDbCWvcJDVoVHPeMr"]]},{"name":"city_air_quality","tags":{"site_id":"DEV000005752"},"columns":["time","aqi","city","co","county","no2","o3","pm10","pm25","province","site_type","so2","tips"],"values":[["2018-01-14T23:59:00Z",328,"楚雄彝族自治州",0.6779999732971191,"双柏县",55,114,305,80,"云南省","市控点",23,"vRbvHcuVitibslyqKhqG"]]},{"name":"city_air_quality","tags":{"site_id":"DEV000005339"},"columns":["time","aqi","city","co","county","no2","o3","pm10","pm25","province","site_type","so2","tips"],"values":[["2018-01-14T23:59:00Z",111,"德阳市",1.3940000534057617,"绵竹市",113,123,32,234,"四川省","市控点",51,"bYmoWPzzeIcwxzWUTIPv"]]},{"name":"city_air_quality","tags":{"site_id":"DEV000003112"},"columns":["time","aqi","city","co","county","no2","o3","pm10","pm25","province","site_type","so2","tips"],"values":[["2018-01-14T23:59:00Z",261,"凉山彝族自治州",1.0469999313354492,"越西县",41,36,417,289,"四川省","省控点",52,"hjniOSJTngKULDJZIdFM"]]},{"name":"city_air_quality","tags":{"site_id":"DEV000002629"},"columns":["time","aqi","city","co","county","no2","o3","pm10","pm25","province","site_type","so2","tips"],"values":[["2018-01-14T23:59:00Z",192,"广元市",0.7599999904632568,"利州区",33,21,375,472,"四川省","省控点",51,"djFkWfxGFgRRiLiMOSkd"]]},{"name":"city_air_quality","tags":{"site_id":"DEV000000929"},"columns":["time","aqi","city","co","county","no2","o3","pm10","pm25","province","site_type","so2","tips"],"values":[["2018-01-14T23:59:00Z",206,"娄底市",1.128000020980835,"娄星区",71,88,495,300,"湖南省","省控点",32,"zlsCziwXWwjYkJpCwUXr"]]},{"name":"city_air_quality","tags":{"site_id":"DEV000000632"},"columns":["time","aqi","city","co","county","no2","o3","pm10","pm25","province","site_type","so2","tips"],"values":[["2018-01-14T23:59:00Z",159,"日喀则市",0.7569999694824219,"萨嘎县",82,253,349,401,"西藏自治区","省控点",42,"rLWYitYXBLROULRTrSzy"]]},{"name":"city_air_quality","tags":{"site_id":"DEV000000445"},"columns":["time","aqi","city","co","county","no2","o3","pm10","pm25","province","site_type","so2","tips"],"values":[["2018-01-14T23:59:00Z",249,"龙岩市",0.9650000333786011,"武平县",34,13,466,163,"福建省","市控点",46,"VxtYJdiLQKQgBXFabOqo"]]},{"name":"city_air_quality","tags":{"site_id":"DEV000008449"},"columns":["time","aqi","city","co","county","no2","o3","pm10","pm25","province","site_type","so2","tips"],"values":[["2018-01-07T23:59:00Z",177,"齐齐哈尔市",1.2079999446868896,"富裕县",34,164,85,128,"黑龙江省","国控站",23,"jCqwIdBVTmawfdbZqpMk"]]},{"name":"city_air_quality","tags":{"site_id":"DEV000008141"},"columns":["time","aqi","city","co","county","no2","o3","pm10","pm25","province","site_type","so2","tips"],"values":[["2018-01-07T23:59:00Z",358,"临汾市",0.9779999852180481,"大宁县",130,199,462,240,"山西省","市控点",31,"emsUIgoogGCtXIrPswLo"]]},{"name":"city_air_quality","tags":{"site_id":"DEV000007942"},"columns":["time","aqi","city","co","county","no2","o3","pm10","pm25","province","site_type","so2","tips"],"values":[["2018-01-07T23:59:00Z",221,"仙桃市",1.2950000762939453,"潜江市",10,181,182,416,"湖北省","市控点",30,"fwYNnfXQnvIfoFXTMxBI"]]},{"name":"city_air_quality","tags":{"site_id":"DEV000005752"},"columns":["time","aqi","city","co","county","no2","o3","pm10","pm25","province","site_type","so2","tips"],"values":[["2018-01-07T23:59:00Z",173,"楚雄彝族自治州",1.5019999742507935,"双柏县",50,165,497,45,"云南省","市控点",11,"EsfvnSROQSqXnkJWdJrN"]]},{"name":"city_air_quality","tags":{"site_id":"DEV000005339"},"columns":["time","aqi","city","co","county","no2","o3","pm10","pm25","province","site_type","so2","tips"],"values":[["2018-01-07T23:59:00Z",249,"德阳市",0.8330000042915344,"绵竹市",121,28,172,239,"四川省","市控点",11,"CAEyGiZRrTLnjjhitRwM"]]},{"name":"city_air_quality","tags":{"site_id":"DEV000003112"},"columns":["time","aqi","city","co","county","no2","o3","pm10","pm25","province","site_type","so2","tips"],"values":[["2018-01-07T23:59:00Z",46,"凉山彝族自治州",0.9539999961853027,"越西县",96,16,307,204,"四川省","省控点",35,"VPvXnkQCmTCFFGKdPVea"]]},{"name":"city_air_quality","tags":{"site_id":"DEV000002629"},"columns":["time","aqi","city","co","county","no2","o3","pm10","pm25","province","site_type","so2","tips"],"values":[["2018-01-07T23:59:00Z",374,"广元市",1.0780000686645508,"利州区",109,76,38,153,"四川省","省控点",65,"xpjGbIsvVkQEoqQZyfOE"]]},{"name":"city_air_quality","tags":{"site_id":"DEV000000929"},"columns":["time","aqi","city","co","county","no2","o3","pm10","pm25","province","site_type","so2","tips"],"values":[["2018-01-07T23:59:00Z",351,"娄底市",1.496000051498413,"娄星区",75,42,383,144,"湖南省","省控点",27,"aBNdAHPnOPuQXcPkwkVd"]]},{"name":"city_air_quality","tags":{"site_id":"DEV000000632"},"columns":["time","aqi","city","co","county","no2","o3","pm10","pm25","province","site_type","so2","tips"],"values":[["2018-01-07T23:59:00Z",471,"日喀则市",0.6060000061988831,"萨嘎县",10,110,154,418,"西藏自治区","省控点",42,"HfPxpvBcmmVeBjYBGddo"]]},{"name":"city_air_quality","tags":{"site_id":"DEV000000445"},"columns":["time","aqi","city","co","county","no2","o3","pm10","pm25","province","site_type","so2","tips"],"values":[["2018-01-07T23:59:00Z",390,"龙岩市",1.4809999465942383,"武平县",68,164,32,243,"福建省","市控点",2,"UIYOGBKdeDctskxNRiOM"]]}]}]}`)
+
+type Response struct {
+	Results []Result
+	Err     string `json:"error,omitempty"`
+}
+
+// Message represents a user message.
+type Message struct {
+	Level string
+	Text  string
+}
+
+// Result represents a resultset returned from a single statement.
+type Result struct {
+	StatementId int `json:"statement_id"`
+	Series      []Row
+	Messages    []*Message
+	Err         string `json:"error,omitempty"`
+}
+
+type Row struct {
+	Name    string            `json:"name,omitempty"`
+	Tags    map[string]string `json:"tags,omitempty"`
+	Columns []string          `json:"columns,omitempty"`
+	Values  [][]interface{}   `json:"values,omitempty"`
+	Partial bool              `json:"partial,omitempty"`
+}
+
+func BenchmarkJonsUn(b *testing.B) {
+	// var r Response
+	// var json = jsoniter.ConfigCompatibleWithStandardLibrary
+	var ok = []byte(`"time"`)
+	for i := 0; i < b.N; i++ {
+		bytes.Contains(jsonstr, ok)
+	}
+}
+
+func TestContain(b *testing.T) {
+	jsonstr := []byte("timeout")
+	var ok = []byte(`"time"`)
+	fmt.Println(bytes.Contains(jsonstr, ok))
+}
+
+func ReturnBytes() []byte {
+	return []byte(`json:"partial,omitempty"`)
+}
+
+func BenchmarkBytes(b *testing.B) {
+
+	for i := 0; i < b.N; i++ {
+		for j := 0; j < 100; j++ {
+			bytes.Contains(ReturnBytes(), []byte("partial"))
+		}
+	}
 }

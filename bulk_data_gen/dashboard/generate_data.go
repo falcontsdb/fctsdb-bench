@@ -1,6 +1,7 @@
 package dashboard
 
 import (
+	"io"
 	"time"
 
 	. "git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
@@ -76,7 +77,7 @@ func (d *DashboardSimulatorConfig) ToSimulator() *DashboardSimulator {
 }
 
 // Next advances a Point to the next state in the generator.
-func (d *DashboardSimulator) Next(p *Point) bool {
+func (d *DashboardSimulator) Next(p *Point) int64 {
 	// switch to the next host if needed
 	if d.simulatedMeasurementIndex == NHostSims {
 		d.simulatedMeasurementIndex = 0
@@ -111,5 +112,15 @@ func (d *DashboardSimulator) Next(p *Point) bool {
 	d.simulatedMeasurementIndex++
 	d.madeValues += int64(len(p.FieldValues))
 
-	return true
+	return d.madePoints
+}
+
+func (d *DashboardSimulator) NextSql(wr io.Writer) int64 {
+	return 0
+}
+
+func (g *DashboardSimulator) SetWrittenPoints(num int64) {
+}
+func (g *DashboardSimulator) SetSqlTemplate(sqlTemplates []string) error {
+	return nil
 }

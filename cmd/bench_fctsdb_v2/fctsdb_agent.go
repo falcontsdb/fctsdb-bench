@@ -1,9 +1,6 @@
 package main
 
 import (
-	"bufio"
-	"encoding/csv"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -13,246 +10,179 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
-	"reflect"
 	"strconv"
 	"syscall"
 	"time"
 
-	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
+	"github.com/BurntSushi/toml"
 	"github.com/shirou/gopsutil/process"
 	"github.com/spf13/cobra"
 )
 
-type DataWriteAll struct {
-	configsPath   string
-	agentEndpoint string
-	nmonEndpoint  string
+type DbConfig struct {
+	BindAddress  string             `toml:"bind-address"`
+	Meta         MetaConfig         `toml:"meta"`
+	Data         DataConfig         `toml:"data"`
+	RpcServer    RpcServerConfig    `toml:"rpc-server"`
+	OplogReplica OplogReplicaConfig `toml:"oplog-replica"`
+	Coordinator  CoordinatorConfig  `toml:"coordinator"`
+	Subscriber   SubscriberConfig   `toml:"subscriber"`
+	Http         HttpConfig         `toml:"http"`
+	Logging      LoggingConfig      `toml:"logging"`
+	Tls          TlsConfig          `toml:"tls"`
+	Security     SecurityConfig     `toml:"security"`
+	License      LicenseConfig      `toml:"license"`
+}
+type MetaConfig struct {
+	Dir        string `toml:"dir"`
+	AutoCreate bool   `toml:"retention-autocreate"`
+}
+type DataConfig struct {
+	Dir                string `toml:"dir"`
+	SnapshotDir        string `toml:"snapshot-dir"`
+	IndexVersion       string `toml:"index-version"`
+	TimeIndexEnabled   bool   `toml:"series-time-index-enabled"`
+	WalDir             string `toml:"wal-dir"`
+	QueryLogEnabled    bool   `toml:"query-log-enabled"`
+	LazyLoadingEnabled bool   `toml:"lazy-loading-enabled"`
+	HotShards          int    `toml:"hot-shards"`
+}
+type RpcServerConfig struct {
+	BindAddress string `toml:"bind-address"`
 }
 
-// 一个简化版的配置，用来指定连续运行的
-type DataWriteConfig struct {
-	UseCase          string
-	Workers          int
-	BatchSize        int
-	ScaleVar         int64
-	SamplingInterval string
-	DataDuration     string
-	UseGzip          int
+type OplogReplicaConfig struct {
+	Role             string `toml:"role"`
+	ReplicaEnabled   bool   `toml:"replica-enabled"`
+	RemoteServerAddr string `toml:"remote-server-addr"`
+	AuthEnabled      bool   `toml:"auth-enabled"`
+	Certificate      string `toml:"certificate"`
+	PrivateKey       string `toml:"private-key"`
+}
+type CoordinatorConfig struct {
+	LogQueriesAfter    string `toml:"log-queries-after"`
+	SlowQueriesLogFile string `toml:"slow-queries-log-file"`
+}
+type SubscriberConfig struct {
+	InsecureSkipVerify bool   `toml:"insecure-skip-verify"`
+	CaCerts            string `toml:"ca-certs"`
+}
+
+type HttpConfig struct {
+	BindAddress           string `toml:"bind-address"`
+	PprofEnable           bool   `toml:"pprof-enabled"`
+	PprofBindAddress      string `toml:"pprof-bind-address"`
+	LogEnabled            bool   `toml:"log-enabled"`
+	SuppressWriteLog      bool   `toml:"suppress-write-log"`
+	HttpsEnabled          bool   `toml:"https-enabled"`
+	HttpsCertificate      string `toml:"https-certificate"`
+	HttpsPrivateKey       string `toml:"https-private-key"`
+	UnixSocketEnabled     bool   `toml:"unix-socket-enabled"`
+	UnixSocketPermissions string `toml:"unix-socket-permissions"`
+	BindSocket            string `toml:"bind-socket"`
+	AccessLogPath         string `toml:"access-log-path"`
+}
+
+type LoggingConfig struct {
+	Format          string `toml:"format"`
+	Level           string `toml:"level"`
+	SuppressLogo    bool   `toml:"suppress-logo"`
+	EnableLogToFile bool   `toml:"enable-log-to-file"`
+	Filename        string `toml:"filename"`
+	MaxSize         int    `toml:"max-size"`
+	MaxDays         int    `toml:"max-days"`
+	MaxBackups      int    `toml:"max-backups"`
+}
+
+type TlsConfig struct {
+	MinVersion string `toml:"min-version"`
+	MaxVersion string `toml:"max-version"`
+}
+
+type SecurityConfig struct {
+	SafeModeEnabled bool `toml:"safe-mode-enabled"`
+}
+
+type LicenseConfig struct {
+	LicensePath string `toml:"license-path"`
+}
+
+//NewConfig returns a new dbconfig instance
+func NewConfig() *DbConfig {
+	dbconfig := &DbConfig{}
+	dbconfig.Meta = MetaConfig{}
+	dbconfig.Data = DataConfig{}
+	dbconfig.RpcServer = RpcServerConfig{}
+	dbconfig.OplogReplica = OplogReplicaConfig{}
+	dbconfig.Coordinator = CoordinatorConfig{}
+	dbconfig.Subscriber = SubscriberConfig{}
+	dbconfig.Http = HttpConfig{}
+	dbconfig.Logging = LoggingConfig{}
+	dbconfig.Tls = TlsConfig{}
+	dbconfig.Security = SecurityConfig{}
+	dbconfig.License = LicenseConfig{}
+	return dbconfig
+}
+
+//DecodeFromConfigFile generates a DbConfig by using the config file
+func DecodeFromConfigFile(configFile string) (*DbConfig, error) {
+	dbconfig := NewConfig()
+	if _, err := toml.DecodeFile(configFile, dbconfig); err != nil {
+		return nil, err
+	}
+	return dbconfig, nil
+}
+
+type FctsdbAgent struct {
+	port       string
+	fctsdbPath string
+	configPath string
+
+	//run var
+	dbConfig *DbConfig
 }
 
 var (
-	buildinConfig_1 = DataWriteConfig{Workers: 64, BatchSize: 5000, UseCase: "vehicle", ScaleVar: 1, SamplingInterval: "10s", DataDuration: "3650d", UseGzip: 1}
-	buildinConfig_2 = DataWriteConfig{Workers: 64, BatchSize: 5000, UseCase: "vehicle", ScaleVar: 1000, SamplingInterval: "100s", DataDuration: "30d", UseGzip: 1}
-	buildinConfig_3 = DataWriteConfig{Workers: 64, BatchSize: 5000, UseCase: "vehicle", ScaleVar: 10000, SamplingInterval: "30s", DataDuration: "1d", UseGzip: 1}
-	buildinConfig_4 = DataWriteConfig{Workers: 64, BatchSize: 5000, UseCase: "vehicle", ScaleVar: 100000, SamplingInterval: "60s", DataDuration: "1h", UseGzip: 1}
-	buildinConfig_5 = DataWriteConfig{Workers: 64, BatchSize: 5000, UseCase: "air-quality", ScaleVar: 1, SamplingInterval: "10s", DataDuration: "3650d", UseGzip: 1}
-	buildinConfig_6 = DataWriteConfig{Workers: 64, BatchSize: 5000, UseCase: "air-quality", ScaleVar: 1000, SamplingInterval: "30s", DataDuration: "30d", UseGzip: 1}
-	buildinConfig_7 = DataWriteConfig{Workers: 64, BatchSize: 5000, UseCase: "air-quality", ScaleVar: 10000, SamplingInterval: "10s", DataDuration: "1d", UseGzip: 1}
-	buildinConfig_8 = DataWriteConfig{Workers: 64, BatchSize: 5000, UseCase: "air-quality", ScaleVar: 100000, SamplingInterval: "5s", DataDuration: "1h", UseGzip: 1}
-	buildinConfigs  = []DataWriteConfig{buildinConfig_1, buildinConfig_2, buildinConfig_3, buildinConfig_4, buildinConfig_5, buildinConfig_6, buildinConfig_7, buildinConfig_8}
-
-	dataWriteAll    = DataWriteAll{}
-	dataWriteAllCmd = &cobra.Command{
-		Use:   "all",
-		Short: "隐藏命令，可以连续运行内置的写入用例",
-		Run: func(cmd *cobra.Command, args []string) {
-			// b, _ := json.Marshal(DataWriteConfig{})
-			dataWriteAll.Run()
-		},
-		Hidden: true, // 隐藏此命令，不对外使用，内部测试使用
-	}
-
-	dataWriteShowCmd = &cobra.Command{
-		Use:   "show",
-		Short: "隐藏命令，展示内置的写入用例",
-		Run: func(cmd *cobra.Command, args []string) {
-			// b, _ := json.Marshal(DataWriteConfig{})
-			for _, config := range buildinConfigs {
-				configShow, err := json.Marshal(config)
-				if err != nil {
-					fmt.Println("marshal buildin config faild:", err.Error())
-				} else {
-					fmt.Println(string(configShow))
-				}
-
-			}
-		},
-		Hidden: true, // 隐藏此命令，不对外使用，内部测试使用
-	}
-
 	dataWriteAgentCmd = &cobra.Command{
 		Use:   "agent",
-		Short: "隐藏命令，远程控制",
+		Short: "代理程序，和数据库运行在一起，支持被远程调用开启关闭数据库（开发团队内部使用）",
 		Run: func(cmd *cobra.Command, args []string) {
 			RunAsAgent()
 			// GetPidOnLinux("fctsdb")
 		},
-		Hidden: true, // 隐藏此命令，不对外使用，内部测试使用
+		// Hidden: true, // 隐藏此命令，不对外使用，内部测试使用
 	}
 
 	fctsdbWriteAgent = FctsdbAgent{}
+	cleanPath        = "/clean"
+	startPath        = "/start"
+	stopPath         = "/stop"
 )
 
 func init() {
-
-	dataWriteAll.Init(dataWriteAllCmd)
-	dataWriteCmd.AddCommand(dataWriteAllCmd)
-	dataWriteCmd.AddCommand(dataWriteShowCmd)
 	fctsdbWriteAgent.Init(dataWriteAgentCmd)
-	dataWriteCmd.AddCommand(dataWriteAgentCmd)
-	// 隐藏agent上级命令的flag
-	dataWriteAgentCmd.SetUsageTemplate(`Usage:{{if .Runnable}}
-  {{.UseLine}}{{end}}{{if .HasAvailableLocalFlags}}
-
-Flags:
-{{.LocalFlags.FlagUsages | trimTrailingWhitespaces}}{{end}}
-
-Global Flags:
-  -h, --help                   查看帮助信息
-`)
+	rootCmd.AddCommand(dataWriteAgentCmd)
 }
+func StartRemoteFalconTSDB(endpoint string) error {
+	_, err := httpGet(endpoint, startPath)
+	return err
+}
+func StopRemoteFalconTSDB(endpoint string) error {
+	_, err := httpGet(endpoint, stopPath)
+	return err
+}
+func CleanRemoteFalconTSDB(endpoint string) error {
+	_, err := httpGet(endpoint, cleanPath)
+	return err
+}
+func httpGet(endpoint, path string) ([]byte, error) {
 
-func (d *DataWriteConfig) CopyToDataWrite(dw *DataWrite) error {
-	dw.useGzip = d.UseGzip
-	dw.workers = d.Workers
-	dw.batchSize = d.BatchSize
-	dw.useCase = d.UseCase
-	dw.scaleVar = d.ScaleVar
-	sampInter, err := ParseDuration(d.SamplingInterval)
+	u, err := url.Parse(endpoint)
 	if err != nil {
-		return fmt.Errorf("can not parse the SamplingInterval")
-	}
-	dw.samplingInterval = sampInter
-	dataDuration, err := ParseDuration(d.DataDuration)
-	if err != nil {
-		return fmt.Errorf("can not parse the DataDuration")
-	}
-	defaultTimestampStart, _ := time.Parse(time.RFC3339, common.DefaultDateTimeStart)
-	dw.timestampEndStr = defaultTimestampStart.Add(dataDuration).Format(time.RFC3339)
-	return nil
-}
-
-func (d *DataWriteAll) Init(cmd *cobra.Command) {
-	flags := cmd.Flags()
-	flags.StringVar(&d.configsPath, "config-file", "", "config路径")
-	flags.StringVar(&d.agentEndpoint, "agent", "", "数据库代理服务地址，为空表示不使用")
-	flags.StringVar(&d.nmonEndpoint, "easy-nmon", "", "easy-nmon地址，为空表示不使用监控 (默认不使用)")
-}
-
-func (d *DataWriteAll) Validate() {
-}
-
-func (d *DataWriteAll) Run() {
-	fileName := time.Now().Format("w-jan2_15-04-05") + ".csv"
-	if d.configsPath != "" {
-		configsFile, err := os.Open(d.configsPath)
-		if err != nil {
-			log.Fatal("Invalid config path:", configsFile)
-		}
-		var config DataWriteConfig
-		scanner := bufio.NewScanner(bufio.NewReaderSize(configsFile, 4*1024*1024))
-		lindID := 0
-		for scanner.Scan() {
-			line := scanner.Bytes()
-			lindID++
-			err := json.Unmarshal(line, &config)
-			if err != nil {
-				log.Println("cannot unmarshal the config line:", lindID)
-			}
-			err = config.CopyToDataWrite(dataWrite)
-			if err != nil {
-				log.Println(err.Error())
-				continue
-			}
-			if d.nmonEndpoint != "" {
-				SendStartMonitorSignal(d.nmonEndpoint, fmt.Sprintf("case_%d_", lindID))
-			}
-			result := dataWrite.RunWrite()
-			if d.nmonEndpoint != "" {
-				SendStopAllMonitorSignal(d.nmonEndpoint)
-			}
-			var writeHead bool = true
-			if lindID > 1 {
-				writeHead = false
-			}
-			d.WriteResult(fileName, result, config, writeHead)
-			d.AfterRun()
-		}
-	} else {
-		for lindID, config := range buildinConfigs {
-			err := config.CopyToDataWrite(dataWrite)
-			if err != nil {
-				log.Println(err.Error())
-				continue
-			}
-			if d.nmonEndpoint != "" {
-				SendStartMonitorSignal(d.nmonEndpoint, fmt.Sprintf("case_%d", lindID+1))
-			}
-			result := dataWrite.RunWrite()
-			if d.nmonEndpoint != "" {
-				SendStopAllMonitorSignal(d.nmonEndpoint)
-			}
-			var writeHead bool = true
-			if lindID > 0 {
-				writeHead = false
-			}
-			d.WriteResult(fileName, result, config, writeHead)
-			d.AfterRun()
-		}
-	}
-}
-
-func (d *DataWriteAll) WriteResult(fileName string, r map[string]string, c DataWriteConfig, writeHead bool) {
-	csvFile, err := os.OpenFile(fileName, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0666)
-	if err != nil {
-		log.Println("open result csv failed, error:", err.Error())
-	}
-	defer csvFile.Close()
-	csvWriter := csv.NewWriter(csvFile)
-	tag := reflect.TypeOf(c)
-	value := reflect.ValueOf(c)
-	for k := 0; k < tag.NumField(); k++ {
-		r[tag.Field(k).Name] = fmt.Sprintf("%v", value.Field(k).Interface())
-	}
-
-	heads := []string{"UseCase", "Workers", "BatchSize", "ScaleVar", "SamplingInterval", "DataDuration",
-		"UseGzip", "Points", "PointRate(p/s)", "ValueRate(v/s)", "BytesRate(MB/s)", "RunSec(s)", "Start", "End"}
-
-	if writeHead {
-		err := csvWriter.Write(heads)
-		if err != nil {
-			log.Println("write result csv failed, error:", err.Error())
-		}
-	}
-
-	oneLine := make([]string, len(heads))
-	for i := 0; i < len(heads); i++ {
-		oneLine[i] = r[heads[i]]
-	}
-	err = csvWriter.Write(oneLine)
-	if err != nil {
-		log.Println("write result csv failed, error:", err.Error())
-	}
-	csvWriter.Flush()
-}
-
-func (d *DataWriteAll) AfterRun() {
-	if d.agentEndpoint != "" {
-		d.HttpGet("/clean")
-		time.Sleep(time.Second * 5)
-		d.HttpGet("/start")
-		time.Sleep(time.Second * 10)
-	}
-}
-
-func (d *DataWriteAll) HttpGet(path string) ([]byte, error) {
-
-	u, err := url.Parse(d.agentEndpoint)
-	if err != nil {
-		log.Fatal("Invalid agent address:", d.agentEndpoint, ", error:", err.Error())
+		log.Fatal("Invalid agent address:", endpoint, ", error:", err.Error())
 	}
 	if u.Scheme == "" {
-		log.Fatal("Invalid agent address:", d.agentEndpoint)
+		log.Fatal("Invalid agent address:", endpoint)
 	}
 	u.Path = path
 
@@ -262,17 +192,6 @@ func (d *DataWriteAll) HttpGet(path string) ([]byte, error) {
 	}
 	rData, err := ioutil.ReadAll(resp.Body)
 	return rData, err
-}
-
-// agent 代码
-
-type FctsdbAgent struct {
-	port       string
-	fctsdbPath string
-	configPath string
-
-	//run var
-	dbConfig *DbConfig
 }
 
 func RunAsAgent() {
@@ -302,9 +221,9 @@ func (f *FctsdbAgent) ParseConfig() {
 
 func (f *FctsdbAgent) ListenAndServe() {
 
-	http.HandleFunc("/clean", f.CleanHandler)
-	http.HandleFunc("/start", f.StartDBHandler)
-	http.HandleFunc("/stop", f.StopDBHandler)
+	http.HandleFunc(cleanPath, f.CleanHandler)
+	http.HandleFunc(startPath, f.StartDBHandler)
+	http.HandleFunc(stopPath, f.StopDBHandler)
 	log.Println("Start service 0.0.0.0:" + f.port)
 	err := http.ListenAndServe("0.0.0.0:"+f.port, nil)
 	if err != nil {
@@ -354,18 +273,18 @@ func (f *FctsdbAgent) StopDBHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
-		log.Println("HTTP: clean falconTSDB successful")
+		log.Println("HTTP: stop falconTSDB successful")
 	}
 }
 
 func (f *FctsdbAgent) CleanFalconTSDB(deleteData bool) error {
 	pid, err := GetPidOnLinux("fctsdb")
 	if err != nil {
-		log.Println("Clean fctsdb failed, error: " + err.Error())
+		log.Println("Get fctsdb failed, error: " + err.Error())
 		return err
 	}
 	if err = KillOnLinux(pid); err != nil {
-		log.Println("Clean fctsdb failed, error: " + err.Error())
+		log.Println("Kill fctsdb failed, error: " + err.Error())
 		return err
 	}
 

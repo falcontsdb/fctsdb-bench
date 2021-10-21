@@ -38,7 +38,6 @@ var formatChoices = []string{"influx-bulk", "es-bulk", "es-bulk6x", "es-bulk7x",
 type DataGenerator struct {
 	format           string
 	useCase          string
-	configFile       string
 	scaleVar         int64
 	scaleVarOffset   int64
 	samplingInterval time.Duration
@@ -57,12 +56,6 @@ type DataGenerator struct {
 
 // Program option vars:
 var (
-	CaseChoices = []string{
-		common.UseCaseVehicle,
-		common.UseCaseAirQuality,
-		common.UseCaseDevOps,
-	}
-
 	dataGenCmd = &cobra.Command{
 		Use:   "data-gen",
 		Short: "生成不同场景（case）的数据，输出到stdout，搭配data-load使用",

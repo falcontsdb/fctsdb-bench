@@ -33,7 +33,6 @@ type QueryLoad struct {
 	inputDone             chan struct{}
 	progressIntervalItems uint64
 	scanFinished          bool
-	totalBackOffSecs      float64
 	writers               []*HTTPWriter
 	itemsRead             int64
 	sourceReader          *os.File
@@ -158,6 +157,8 @@ func (q *QueryLoad) PrepareProcess(i int) {
 	c := &HTTPWriterConfig{
 		Host:      q.daemonUrls[i%len(q.daemonUrls)],
 		Database:  q.dbName,
+		Debug:     q.debug,
+		Gzip:      q.useGzip,
 		DebugInfo: fmt.Sprintf("worker #%d", i),
 	}
 	q.writers[i] = NewHTTPWriter(*c)
@@ -294,7 +295,7 @@ func (q *QueryLoad) processBatches(w *HTTPWriter, telemetryWorkerLabel string, w
 	for batch := range q.batchChan {
 		buf := q.bufPool.Get().(*bytes.Buffer)
 		buf.Write(batch.Buffer.Bytes())
-		lat, err := w.QueryLineProtocol(buf.Bytes(), q.useGzip, q.debug)
+		lat, err := w.QueryLineProtocol(buf.Bytes())
 		if err != nil {
 			q.respCollector.AddOne(q.dbName, lat, false)
 			return fmt.Errorf("error writing: %s", err.Error())
