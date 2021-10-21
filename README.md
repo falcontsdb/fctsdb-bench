@@ -1,14 +1,19 @@
 # fctsdb-bench
 fctsdb场景性能测试工具基于开源的[influxdb-comparisons](https://github.com/influxdata/influxdb-comparisons)工具改编而来。
 用于实现[海东青性能测试用例设计](https://rockontrol.yuque.com/gtoifn/zd5mco/erg0pp))的内容.
+
 influxdb-comparisons工具数据生成、写入、查询等所有过程分开，每个过程一套工具。
 fctsdb-bench设计时不采用这种思想，一个fctsdb-bench工具集合了数据的生成、写入、查询语句生成、查询等所有命令
 
 ## 1 编译
 进入fctsdb-bench的目录，在此目录下执行以下命令make即可生成fctsdb-bench工具
+
 会生成三个可执行文件：
+
 fcbench是本机可以执行程序，一般使用这个程序
+
 fcbench-linux是amd64处理器的linux系统可执行文件
+
 fcbench-arm是arm64处理器的linux系统可执行文件
 
 其他influxdb-comparisons原生自带的工具仍然可以编译，详情见influxdb-comparisons的文档，此处不再累述。
@@ -52,16 +57,20 @@ Flags:
       --do-db-create                 是否创建数据库 (default true)
 ```
 <b>注意：带*的参数叫做信息元参数，其他为运行参数</b>
+
 例如：使用以下命令
 ```
 fcbench write --use-case vehicle --scale-var 1000 --sampling-interval 10s --urls http://localhost:8086
 ```
 上述命令表示使用车载（vehicle）场景，模拟1000辆车，每个车采样时间间隔10s，在默认时间范围2018-01-01T00:00:00Z~~~2018-01-02T00:00:00Z的写入默认数据库benchmark_db中。
+
 fcbench write这个命令集合了数据生成和数据写入两个过程，在这个过程中如果发现数据库不存在，会自动创建数据库。
+
 如果已有数据库，不想创建数据库，可以添加--do-db-create=false
 
 ###  2.2 查询测试
 使用fcbench query命令可以进行查询测试，它需要先使用2.1中的命令将数据写入到数据库进行测试。
+
 <b>注意：
 为了保证查询语句能命中数据，以下参数中带*号的信息元参数必须和fcbench write保持一致。</b>
 ```
@@ -93,15 +102,18 @@ Flags:
 fcbench list
 ```
 --detail可以获取到更多的关于说明。
+
 2、写入数据，注意信息元参数
 ```
 fcbench write --use-case vehicle --scale-var 1000 --sampling-interval 10s --urls http://localhost:8086
 ```
+
 3、对应步骤2章节的查询，信息元参数一致，如下：
 ```
 fcbench query --query-type 1 --use-case vehicle --scale-var 1000 --sampling-interval 10s --urls http://localhost:8086 --query-count 1000
 ```
 查询测试提供两种结束控制，一种是以查询语句数量，使用--query-count标签；另一种是使用运行时间，--time-limit标签。
+
 注意：一旦使用--time-limit标签，--query-count就无效了。例如下面测试5分钟：
 ```
 fcbench query --query-type 1 --use-case vehicle --scale-var 1000 --sampling-interval 10s --urls http://localhost:8086 --time-limit 5m
@@ -133,6 +145,7 @@ Flags:
       --do-db-create                 是否创建数据库 (default true)
 ```
 一种典型的混合场景测试过程如下：
+
 1、写入准备数据，<b>注意timestamp-start、timestamp-end参数，表明数据库里先储存timestamp-start到timestamp-end的数据</b>
 ```
 fcbench write --use-case vehicle --scale-var 1000 --timestamp-start "2018-01-01T00:00:00Z" --timestamp-end "2018-01-02T00:00:00Z" --sampling-interval 10s --urls http://localhost:8086 
@@ -169,10 +182,13 @@ fcbench query-load --urls http://localhost:8086 --file query.txt
 
 ###  2.5 高级功能-调度器
 使用fcbench schedule命令可以连续执行多次测试，配合需要使用fcbench agent命令
+
 一般情况下，我们的测试拓扑如下：
+
 测试机（fcbench-schedule） ------- 被测机（fctsdb数据库+fcbench-agent）
 
 为了支持两次测试间清理数据库：fcbench agent命令提供了一种方式，可以在被测机上，开启、关闭、清理数据库。
+
 可以查看调度器内置的配置文件，写入到testcase.txt：
 ```
 fcbench schedule list > testcase.txt
