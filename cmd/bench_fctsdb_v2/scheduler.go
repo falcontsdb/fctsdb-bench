@@ -50,7 +50,6 @@ var (
 	agentEndpoint string
 	nmonEndpoint  string
 	debug         bool
-	useClean      bool
 )
 
 var (
@@ -67,19 +66,12 @@ func init() {
 	scheduleCmd.PersistentFlags().StringVar(&agentEndpoint, "agent", "", "数据库代理服务地址，为空表示不使用 (默认不使用)")
 	scheduleCmd.PersistentFlags().StringVar(&nmonEndpoint, "easy-nmon", "", "easy-nmon地址，为空表示不使用监控 (默认不使用)")
 	scheduleCmd.PersistentFlags().BoolVar(&debug, "debug", false, "是否打印详细日志(default false).")
-	scheduleCmd.PersistentFlags().BoolVar(&useClean, "use-clean", false, "是否在开始前多清理一次数据库(default false).")
 	rootCmd.AddCommand(scheduleCmd)
 	scheduleCmd.AddCommand(showCmd)
 	AddBuildinConfigs()
 }
 
 func ScheduleBenchTask() {
-	if useClean {
-		if agentEndpoint != "" {
-			CleanRemoteFalconTSDB(agentEndpoint)
-			StartRemoteFalconTSDB(agentEndpoint)
-		}
-	}
 
 	fileName := time.Now().Format("benchmark_0102_150405") + ".csv"
 	if configsPath != "" {
@@ -117,6 +109,22 @@ func ScheduleBenchTask() {
 
 func runBenchTaskByConfig(index int, fileName string, config *BasicBenchTaskConfig) error {
 	log.Printf("---index %d ------------------------------------------------------------\n", index)
+	if agentEndpoint != "" {
+		var err error
+		if config.Clean {
+			err = CleanRemoteFalconTSDB(agentEndpoint)
+		} else {
+			err = StopRemoteFalconTSDB(agentEndpoint)
+		}
+		if err != nil {
+			log.Println("request agent error:", err.Error())
+		}
+		err = StartRemoteFalconTSDB(agentEndpoint)
+		if err != nil {
+			log.Println("request agent error:", err.Error())
+		}
+	}
+
 	basicBenchTask, err := NewBasicBenchTask(csvDaemonUrls, config)
 	if err != nil {
 		return err
@@ -135,14 +143,6 @@ func runBenchTaskByConfig(index int, fileName string, config *BasicBenchTaskConf
 	}
 	writeResultToCsv(fileName, result, writeHead)
 
-	if agentEndpoint != "" {
-		if config.Clean {
-			CleanRemoteFalconTSDB(agentEndpoint)
-		} else {
-			StopRemoteFalconTSDB(agentEndpoint)
-		}
-		StartRemoteFalconTSDB(agentEndpoint)
-	}
 	return nil
 }
 
@@ -299,11 +299,11 @@ func AddBuildinConfigs() {
 	buildinConfigs = append(buildinConfigs, BasicBenchTaskConfig{MixMode: "write_only", Workers: 64, BatchSize: 1000, UseCase: "air-quality", ScaleVar: 10000, SamplingInterval: "1s", TimeLimit: defaultTimeLimite, UseGzip: 1, Clean: true})
 
 	// 纯读 air-quality
-	// 先写数据
-	needPrePare := true
+	// 先写数据， 第一个用例在开始前要清理所有数据和写入准备数据， NeedPrePare和Clean必须为ture，之后都不需要
+	needPrePareAndClean := true
 	for i := 0; i < fctsdb_query_gen.AirQuality.Count; i++ {
-		buildinConfigs = append(buildinConfigs, BasicBenchTaskConfig{MixMode: "read_only", Workers: 64, BatchSize: 1, UseCase: "air-quality", ScaleVar: 10000, SamplingInterval: "60s", TimeLimit: defaultTimeLimite, PrePareData: "90d", NeedPrePare: needPrePare, UseGzip: 1, Clean: false, SqlTemplate: []string{fctsdb_query_gen.AirQuality.Types[i+1].RawSql}})
-		needPrePare = false // 不用在准备数据
+		buildinConfigs = append(buildinConfigs, BasicBenchTaskConfig{MixMode: "read_only", Workers: 64, BatchSize: 1, UseCase: "air-quality", ScaleVar: 10000, SamplingInterval: "60s", TimeLimit: defaultTimeLimite, PrePareData: "90d", NeedPrePare: needPrePareAndClean, UseGzip: 1, Clean: needPrePareAndClean, SqlTemplate: []string{fctsdb_query_gen.AirQuality.Types[i+1].RawSql}})
+		needPrePareAndClean = false // 不用在准备数据
 	}
 
 	// 混合读写
@@ -348,12 +348,14 @@ func AddBuildinConfigs() {
 
 	// 不同的混合模式
 	buildinConfigs = append(buildinConfigs, BasicBenchTaskConfig{MixMode: "parallel", Workers: 64, BatchSize: 1000, UseCase: "vehicle", ScaleVar: 10000, SamplingInterval: "1s", TimeLimit: defaultTimeLimite, PrePareData: "10m", NeedPrePare: true, UseGzip: 1, QueryPercent: 20, Clean: true, SqlTemplate: []string{fctsdb_query_gen.Vehicle.Types[1].RawSql}})
-	buildinConfigs = append(buildinConfigs, BasicBenchTaskConfig{MixMode: "parallel", Workers: 64, BatchSize: 1000, UseCase: "vehicle", ScaleVar: 10000, SamplingInterval: "1s", TimeLimit: defaultTimeLimite, PrePareData: "10m", NeedPrePare: true, UseGzip: 1, QueryPercent: 20, Clean: true, SqlTemplate: []string{fctsdb_query_gen.Vehicle.Types[5].RawSql}})
 	buildinConfigs = append(buildinConfigs, BasicBenchTaskConfig{MixMode: "parallel", Workers: 64, BatchSize: 1000, UseCase: "vehicle", ScaleVar: 10000, SamplingInterval: "1s", TimeLimit: defaultTimeLimite, PrePareData: "10m", NeedPrePare: true, UseGzip: 1, QueryPercent: 40, Clean: true, SqlTemplate: []string{fctsdb_query_gen.Vehicle.Types[1].RawSql}})
-	buildinConfigs = append(buildinConfigs, BasicBenchTaskConfig{MixMode: "parallel", Workers: 64, BatchSize: 1000, UseCase: "vehicle", ScaleVar: 10000, SamplingInterval: "1s", TimeLimit: defaultTimeLimite, PrePareData: "10m", NeedPrePare: true, UseGzip: 1, QueryPercent: 40, Clean: true, SqlTemplate: []string{fctsdb_query_gen.Vehicle.Types[5].RawSql}})
 	buildinConfigs = append(buildinConfigs, BasicBenchTaskConfig{MixMode: "parallel", Workers: 64, BatchSize: 1000, UseCase: "vehicle", ScaleVar: 10000, SamplingInterval: "1s", TimeLimit: defaultTimeLimite, PrePareData: "10m", NeedPrePare: true, UseGzip: 1, QueryPercent: 60, Clean: true, SqlTemplate: []string{fctsdb_query_gen.Vehicle.Types[1].RawSql}})
-	buildinConfigs = append(buildinConfigs, BasicBenchTaskConfig{MixMode: "parallel", Workers: 64, BatchSize: 1000, UseCase: "vehicle", ScaleVar: 10000, SamplingInterval: "1s", TimeLimit: defaultTimeLimite, PrePareData: "10m", NeedPrePare: true, UseGzip: 1, QueryPercent: 60, Clean: true, SqlTemplate: []string{fctsdb_query_gen.Vehicle.Types[5].RawSql}})
 	buildinConfigs = append(buildinConfigs, BasicBenchTaskConfig{MixMode: "parallel", Workers: 64, BatchSize: 1000, UseCase: "vehicle", ScaleVar: 10000, SamplingInterval: "1s", TimeLimit: defaultTimeLimite, PrePareData: "10m", NeedPrePare: true, UseGzip: 1, QueryPercent: 80, Clean: true, SqlTemplate: []string{fctsdb_query_gen.Vehicle.Types[1].RawSql}})
-	buildinConfigs = append(buildinConfigs, BasicBenchTaskConfig{MixMode: "parallel", Workers: 64, BatchSize: 1000, UseCase: "vehicle", ScaleVar: 10000, SamplingInterval: "1s", TimeLimit: defaultTimeLimite, PrePareData: "10m", NeedPrePare: true, UseGzip: 1, QueryPercent: 80, Clean: true, SqlTemplate: []string{fctsdb_query_gen.Vehicle.Types[5].RawSql}})
+
+	buildinConfigs = append(buildinConfigs, BasicBenchTaskConfig{MixMode: "parallel", Workers: 64, BatchSize: 1000, UseCase: "vehicle", ScaleVar: 10000, SamplingInterval: "1s", TimeLimit: defaultTimeLimite, PrePareData: "10m", NeedPrePare: true, UseGzip: 1, QueryPercent: 20, Clean: true, SqlTemplate: []string{fctsdb_query_gen.Vehicle.Types[6].RawSql}})
+	buildinConfigs = append(buildinConfigs, BasicBenchTaskConfig{MixMode: "parallel", Workers: 64, BatchSize: 1000, UseCase: "vehicle", ScaleVar: 10000, SamplingInterval: "1s", TimeLimit: defaultTimeLimite, PrePareData: "10m", NeedPrePare: true, UseGzip: 1, QueryPercent: 40, Clean: true, SqlTemplate: []string{fctsdb_query_gen.Vehicle.Types[6].RawSql}})
+	buildinConfigs = append(buildinConfigs, BasicBenchTaskConfig{MixMode: "parallel", Workers: 64, BatchSize: 1000, UseCase: "vehicle", ScaleVar: 10000, SamplingInterval: "1s", TimeLimit: defaultTimeLimite, PrePareData: "10m", NeedPrePare: true, UseGzip: 1, QueryPercent: 60, Clean: true, SqlTemplate: []string{fctsdb_query_gen.Vehicle.Types[6].RawSql}})
+	buildinConfigs = append(buildinConfigs, BasicBenchTaskConfig{MixMode: "parallel", Workers: 64, BatchSize: 1000, UseCase: "vehicle", ScaleVar: 10000, SamplingInterval: "1s", TimeLimit: defaultTimeLimite, PrePareData: "10m", NeedPrePare: true, UseGzip: 1, QueryPercent: 80, Clean: true, SqlTemplate: []string{fctsdb_query_gen.Vehicle.Types[6].RawSql}})
+
 	// buildinConfigs = append(buildinConfigs, BasicBenchTaskConfig{MixMode: "parallel", Workers: 64, BatchSize: 1000, UseCase: "air-quality", ScaleVar: 100000, SamplingInterval: "1s", TimeLimit: defaultTimeLimite, UseGzip: 1, QueryPercent: 50, Clean: true, SqlTemplate: []string{fctsdb_query_gen.AirQuality.Types[1].RawSql}})
 }

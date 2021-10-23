@@ -49,7 +49,7 @@ func init() {
 	// case 3
 	Vehicle.Regist(&QueryType{
 		Name:    "分页查询某辆车的最近一天的状态变化",
-		RawSql:  "select * from vehicle where VIN='{vin}' and time > '{now}'-1d order by time desc limit 100 offset 100;",
+		RawSql:  "select * from vehicle where VIN='{vin}' and time > '{now}'-1d order by time desc limit 100 offset 0;",
 		Comment: "业务用途：用于展示查看一段时间车辆的状态变化\n数据库能力：指定tag和时间段，分页查看数据",
 		// Generator: &CarPaging{},
 	})
