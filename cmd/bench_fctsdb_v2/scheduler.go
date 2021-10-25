@@ -7,7 +7,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/url"
 	"os"
+	"strings"
 	"time"
 
 	"git.querycap.com/falcontsdb/fctsdb-bench/bulk_data_gen/common"
@@ -20,9 +22,11 @@ var (
 		Use:   "schedule",
 		Short: "从配置文件中读取执行任务并顺序执行",
 		Run: func(cmd *cobra.Command, args []string) {
-			ScheduleBenchTask()
+			scheduler.ScheduleBenchTask()
 		},
 	}
+
+	scheduler = &Scheduler{}
 
 	showCmd = &cobra.Command{
 		Use:   "list",
@@ -44,12 +48,6 @@ var (
 		},
 		// Hidden: true, // 隐藏此命令，不对外使用，内部测试使用
 	}
-
-	csvDaemonUrls string
-	configsPath   string
-	agentEndpoint string
-	nmonEndpoint  string
-	debug         bool
 )
 
 var (
@@ -60,22 +58,30 @@ var (
 	buildinConfigs []BasicBenchTaskConfig
 )
 
+type Scheduler struct {
+	csvDaemonUrls   string
+	configsPath     string
+	agentEndpoint   string
+	grafanaEndpoint string
+	debug           bool
+}
+
 func init() {
-	scheduleCmd.PersistentFlags().StringVar(&csvDaemonUrls, "urls", "http://localhost:8086", "被测数据库的地址")
-	scheduleCmd.PersistentFlags().StringVar(&configsPath, "config-file", "", "调度器配置文件地址 (默认不使用)")
-	scheduleCmd.PersistentFlags().StringVar(&agentEndpoint, "agent", "", "数据库代理服务地址，为空表示不使用 (默认不使用)")
-	scheduleCmd.PersistentFlags().StringVar(&nmonEndpoint, "easy-nmon", "", "easy-nmon地址，为空表示不使用监控 (默认不使用)")
-	scheduleCmd.PersistentFlags().BoolVar(&debug, "debug", false, "是否打印详细日志(default false).")
+	scheduleCmd.PersistentFlags().StringVar(&scheduler.csvDaemonUrls, "urls", "http://localhost:8086", "被测数据库的地址")
+	scheduleCmd.PersistentFlags().StringVar(&scheduler.configsPath, "config-file", "", "调度器配置文件地址 (默认不使用)")
+	scheduleCmd.PersistentFlags().StringVar(&scheduler.agentEndpoint, "agent", "", "数据库代理服务地址，为空表示不使用 (默认不使用)")
+	scheduleCmd.PersistentFlags().StringVar(&scheduler.grafanaEndpoint, "grafana", "", "grafana的dashboard地址，例如: http://124.71.230.36:4000/sources/1/dashboards/4")
+	scheduleCmd.PersistentFlags().BoolVar(&scheduler.debug, "debug", false, "是否打印详细日志(default false).")
 	rootCmd.AddCommand(scheduleCmd)
 	scheduleCmd.AddCommand(showCmd)
 	AddBuildinConfigs()
 }
 
-func ScheduleBenchTask() {
+func (s *Scheduler) ScheduleBenchTask() {
 
 	fileName := time.Now().Format("benchmark_0102_150405") + ".csv"
-	if configsPath != "" {
-		configsFile, err := os.Open(configsPath)
+	if s.configsPath != "" {
+		configsFile, err := os.Open(s.configsPath)
 		if err != nil {
 			log.Fatal("Invalid config path:", configsFile)
 		}
@@ -90,7 +96,7 @@ func ScheduleBenchTask() {
 			if err != nil {
 				log.Println("cannot unmarshal the config line:", lindID)
 			}
-			err = runBenchTaskByConfig(lindID, fileName, &config)
+			err = s.runBenchTaskByConfig(lindID, fileName, &config)
 			if err != nil {
 				log.Println(err)
 				continue
@@ -98,7 +104,7 @@ func ScheduleBenchTask() {
 		}
 	} else {
 		for i, config := range buildinConfigs {
-			err := runBenchTaskByConfig(i+1, fileName, &config)
+			err := s.runBenchTaskByConfig(i+1, fileName, &config)
 			if err != nil {
 				log.Println(err)
 				continue
@@ -107,43 +113,91 @@ func ScheduleBenchTask() {
 	}
 }
 
-func runBenchTaskByConfig(index int, fileName string, config *BasicBenchTaskConfig) error {
+func (s *Scheduler) runBenchTaskByConfig(index int, fileName string, config *BasicBenchTaskConfig) error {
 	log.Printf("---index %d ------------------------------------------------------------\n", index)
-	if agentEndpoint != "" {
+	if s.agentEndpoint != "" {
 		var err error
 		if config.Clean {
-			err = CleanRemoteFalconTSDB(agentEndpoint)
+			err = CleanRemoteFalconTSDB(s.agentEndpoint)
+			log.Println("Clean the fctsdb")
 		} else {
-			err = StopRemoteFalconTSDB(agentEndpoint)
+			err = StopRemoteFalconTSDB(s.agentEndpoint)
+			log.Println("Restart the fctsdb")
 		}
 		if err != nil {
 			log.Println("request agent error:", err.Error())
 		}
-		err = StartRemoteFalconTSDB(agentEndpoint)
+		err = StartRemoteFalconTSDB(s.agentEndpoint)
 		if err != nil {
 			log.Println("request agent error:", err.Error())
 		}
 	}
 
-	basicBenchTask, err := NewBasicBenchTask(csvDaemonUrls, config)
+	basicBenchTask, err := NewBasicBenchTask(s.csvDaemonUrls, config, s.debug)
 	if err != nil {
 		return err
 	}
-	if nmonEndpoint != "" {
-		SendStartMonitorSignal(nmonEndpoint, fileName[:len(fileName)-4], fmt.Sprintf("testcase_%03d", index))
-	}
 	result := RunBenchTask(basicBenchTask)
-	if nmonEndpoint != "" {
-		SendStopAllMonitorSignal(nmonEndpoint)
-	}
-
 	var writeHead = true
 	if index > 1 {
 		writeHead = false
 	}
-	writeResultToCsv(fileName, result, writeHead)
+	s.writeResultToCsv(fileName, result, writeHead)
 
 	return nil
+}
+
+func (s *Scheduler) writeResultToCsv(fileName string, info map[string]string, writeHead bool) {
+	csvFile, err := os.OpenFile(fileName, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0666)
+	if err != nil {
+		log.Println("open result csv failed, error:", err.Error())
+	}
+	defer csvFile.Close()
+	csvWriter := csv.NewWriter(csvFile)
+	// var heads []string
+	// for key := range info {
+	// 	heads = append(heads, key)
+	// }
+
+	heads := []string{"Mod", "UseCase", "Cardinality", "Workers", "BatchSize", "QueryPercent", "SamplingTime",
+		"P50(r)", "P90(r)", "P95(r)", "P99(r)", "Min(r)", "Max(r)", "Avg(r)", "Fail(r)", "Total(r)", "Qps(r)",
+		"P50(w)", "P90(w)", "P95(w)", "P99(w)", "Min(w)", "Max(w)", "Avg(w)", "Fail(w)", "Total(w)", "Qps(w)", "PointRate(p/s)", "ValueRate(v/s)", "TotalPoints",
+		"RunSec", "Sql", "Monitor"}
+
+	if writeHead {
+		err := csvWriter.Write(heads)
+		if err != nil {
+			log.Println("write result csv failed, error:", err.Error())
+		}
+	}
+
+	if s.grafanaEndpoint != "" {
+		u, err := url.Parse(s.grafanaEndpoint)
+		if err != nil {
+			log.Println("The grafana url is error:", err.Error())
+		} else {
+			fu, _ := url.Parse(s.csvDaemonUrls)
+			u.RawQuery = fmt.Sprintf("refresh=Paused&tempVars[host]=%s&lower=%s&upper=%s",
+				strings.Split(fu.Host, ":")[0], info["Start"], info["End"])
+			info["Monitor"] = u.String()
+		}
+	}
+
+	oneLine := make([]string, len(heads))
+	for i := 0; i < len(heads); i++ {
+		value, ok := info[heads[i]]
+		if ok {
+			oneLine[i] = value
+		} else {
+			oneLine[i] = ""
+		}
+
+	}
+	err = csvWriter.Write(oneLine)
+	if err != nil {
+		log.Println("write result csv failed, error:", err.Error())
+	}
+	csvWriter.Flush()
 }
 
 type BasicBenchTaskConfig struct {
@@ -162,7 +216,7 @@ type BasicBenchTaskConfig struct {
 	SqlTemplate      []string
 }
 
-func NewBasicBenchTask(csvDaemonUrls string, conf *BasicBenchTaskConfig) (*BasicBenchTask, error) {
+func NewBasicBenchTask(csvDaemonUrls string, conf *BasicBenchTaskConfig, debug bool) (*BasicBenchTask, error) {
 	sampInter, err := ParseDuration(conf.SamplingInterval)
 	if err != nil {
 		return nil, fmt.Errorf("can not parse the SamplingInterval")
@@ -212,46 +266,6 @@ func NewBasicBenchTask(csvDaemonUrls string, conf *BasicBenchTaskConfig) (*Basic
 		dbName:            "benchmark_db",
 		needPrePare:       conf.NeedPrePare,
 	}, nil
-}
-
-func writeResultToCsv(fileName string, info map[string]string, writeHead bool) {
-	csvFile, err := os.OpenFile(fileName, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0666)
-	if err != nil {
-		log.Println("open result csv failed, error:", err.Error())
-	}
-	defer csvFile.Close()
-	csvWriter := csv.NewWriter(csvFile)
-	// var heads []string
-	// for key := range info {
-	// 	heads = append(heads, key)
-	// }
-	heads := []string{"Mod", "UseCase", "Cardinality", "Workers", "BatchSize", "QueryPercent", "SamplingTime",
-		"P50(r)", "P90(r)", "P95(r)", "P99(r)", "Min(r)", "Max(r)", "Avg(r)", "Fail(r)", "Total(r)", "Qps(r)",
-		"P50(w)", "P90(w)", "P95(w)", "P99(w)", "Min(w)", "Max(w)", "Avg(w)", "Fail(w)", "Total(w)", "Qps(w)", "PointRate(p/s)", "ValueRate(v/s)", "TotalPoints",
-		"RunSec", "Sql"}
-
-	if writeHead {
-		err := csvWriter.Write(heads)
-		if err != nil {
-			log.Println("write result csv failed, error:", err.Error())
-		}
-	}
-
-	oneLine := make([]string, len(heads))
-	for i := 0; i < len(heads); i++ {
-		value, ok := info[heads[i]]
-		if ok {
-			oneLine[i] = value
-		} else {
-			oneLine[i] = ""
-		}
-
-	}
-	err = csvWriter.Write(oneLine)
-	if err != nil {
-		log.Println("write result csv failed, error:", err.Error())
-	}
-	csvWriter.Flush()
 }
 
 func AddBuildinConfigs() {

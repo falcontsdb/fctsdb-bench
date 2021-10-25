@@ -30,8 +30,8 @@ type RespTimeResult struct {
 	Total  int     // 总数
 	RunSec float64 // 运行时间（秒）
 	Qps    float64
-	Start  int // 开始时间
-	End    int // 结束时间
+	Start  time.Time // 开始时间
+	End    time.Time // 结束时间
 }
 
 type GroupResult []RespTimeResult
@@ -94,8 +94,8 @@ func (c *ResponseCollector) GetDetail() RespTimeResult {
 			Total:  len(c.states),
 			Qps:    Round(qps, 3),
 			RunSec: Round(runSec, 3),
-			Start:  int(c.startTime.Unix()),
-			End:    int(c.endTime.Unix()),
+			Start:  c.startTime,
+			End:    c.endTime,
 		}
 	}
 	return RespTimeResult{}
@@ -123,8 +123,8 @@ func (c *ResponseCollector) GetGroupDetail() (gr GroupResult) {
 		r.Fail = groupCount[label] - len(respTimes)
 		r.Total = groupCount[label]
 		r.RunSec = Round(runSec, 3)
-		r.Start = int(c.startTime.Unix())
-		r.End = int(c.endTime.Unix())
+		r.Start = c.startTime
+		r.End = c.endTime
 		if len(respTimes) > 0 {
 			sort.Slice(respTimes, func(i, j int) bool { return respTimes[i] < respTimes[j] })
 			qps := float64(len(respTimes)) / c.endTime.Sub(c.startTime).Seconds()
@@ -253,6 +253,7 @@ func (g GroupResult) Show() {
 					keys[k] = fmt.Sprintf("%v(s) ", t.Field(k).Name)
 				case "Start", "End":
 					continue
+					// keys[k] = fmt.Sprintf("%v ", t.Field(k).Name)
 				default:
 					keys[k] = fmt.Sprintf("%v(ms) ", t.Field(k).Name)
 				}
@@ -318,9 +319,17 @@ func (g GroupResult) ToMap() map[string]string {
 		}
 		for k := 0; k < t.NumField(); k++ {
 			switch t.Field(k).Name {
-			case "RunSec", "Start", "End":
+			case "RunSec":
 				key := fmt.Sprintf("%v", t.Field(k).Name)
 				value := fmt.Sprintf("%v", v.Field(k).Interface())
+				m[key] = value
+			case "Start":
+				key := "Start"
+				value := r.Start.UTC().Format(time.RFC3339)
+				m[key] = value
+			case "End":
+				key := "End"
+				value := r.End.UTC().Format(time.RFC3339)
 				m[key] = value
 			case "Label":
 			default:
