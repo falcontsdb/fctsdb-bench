@@ -393,6 +393,7 @@ func (d *BasicBenchTask) processWrite(w DBWriter, batchSize int, useCountLimit b
 	var err error
 	var batchItemCount int = 0
 	var pointMadeIndex int64
+	var vaulesWritten int = 0
 	for batchItemCount < batchSize {
 		pointMadeIndex = d.simulator.Next(point)
 		if pointMadeIndex > d.simulator.Total() && useCountLimit { // 以point结束为结束
@@ -400,15 +401,16 @@ func (d *BasicBenchTask) processWrite(w DBWriter, batchSize int, useCountLimit b
 		}
 		d.serializer.SerializePoint(buf, point)
 		batchItemCount++
-		atomic.AddInt64(&d.valuesRead, int64(len(point.FieldValues)+len(point.Int64FiledValues)))
+		vaulesWritten += (len(point.FieldValues) + len(point.Int64FiledValues))
 		point.Reset()
 	}
 
 	if batchItemCount > 0 {
-		atomic.AddInt64(&d.bytesRead, int64(buf.Len()))
-		atomic.AddInt64(&d.itemsRead, int64(batchItemCount))
 		err = d.writeToDb(w, buf)
 		if err == nil {
+			atomic.AddInt64(&d.bytesRead, int64(buf.Len()))
+			atomic.AddInt64(&d.valuesRead, int64(vaulesWritten))
+			atomic.AddInt64(&d.itemsRead, int64(batchItemCount))
 			d.simulator.SetWrittenPoints(pointMadeIndex)
 		}
 	}

@@ -129,8 +129,8 @@ Flags:
       --scale-var int                *场景的变量，一般情况下是场景中模拟机的数量 (default 1)
       --scale-var-offset int         *场景偏移量，一般情况下是模拟机的起始MN编号 (default 0)
       --sampling-interval duration   *模拟机的采样时间 (default 1s)
-      --timestamp-start string       *模拟机开始采样的时间 (RFC3339) (default "2018-01-01T00:00:00Z")
-      --timestamp-end string         *模拟机采样结束数据 (RFC3339) (default "2018-01-02T00:00:00Z")
+      --timestamp-start string       *开始测试前准备数据的开始时间 (RFC3339) (default "2018-01-01T00:00:00Z")
+      --timestamp-prepare string     *开始测试前准备数据的结束时间 (RFC3339) (default "2018-01-01T00:10:00Z")
       --seed int                     *全局随机数种子(设置为0是使用当前时间作为随机数种子) (default 12345678)
       --batch-size int               1个http请求中携带Point个数 (default 100)
       --gzip int                     是否使用gzip,level[0-9],小于0表示不使用 (default 1)
@@ -146,13 +146,9 @@ Flags:
 ```
 一种典型的混合场景测试过程如下：
 
-1、写入准备数据，<b>注意timestamp-start、timestamp-end参数，表明数据库里先储存timestamp-start到timestamp-end的数据</b>
+1、执行以下命令，<b>注意timestamp-start、timestamp-prepare参数，表明测试混合前先准备timestamp-start到timestamp-prepare的数据</b>
 ```
-fcbench write --use-case vehicle --scale-var 1000 --timestamp-start "2018-01-01T00:00:00Z" --timestamp-end "2018-01-02T00:00:00Z" --sampling-interval 10s --urls http://localhost:8086 
-```
-2、对应混合读写测试因使用以下命令，<b>注意timestamp-start参数，表明新写入数据从timestamp-start开始，这里的timestamp-start应该对应第一步中的timestamp-end参数</b>：
-```
-fcbench mixed --query-type 1 --use-case vehicle --scale-var 1000 --timestamp-start "2018-01-02T00:00:00Z" --sampling-interval 10s --urls http://localhost:8086 --time-limit 5m 
+fcbench  mixed --query-type 1  write --use-case vehicle --scale-var 1000 --timestamp-start "2018-01-01T00:00:00Z" --timestamp-prepare "2018-01-02T00:00:00Z" --sampling-interval 10s --urls http://localhost:8086 
 ```
 
 ###  2.4 数据写入的其他方式
@@ -199,5 +195,5 @@ fchench schedule --agent http://{被测机ip}:端口  --config-path testcase.txt
 ```
 
 ###  2.6 高级功能-mock
-使用fcbench mock支持mock一个海东青数据库，用以测试环境是否达标
+使用fcbench mock支持mock一个海东青数据库，用以测试环境是否达标。
 
