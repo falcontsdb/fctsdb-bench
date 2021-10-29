@@ -34,6 +34,8 @@ type HTTPWriterConfig struct {
 	Database string
 	Gzip     bool
 	Debug    bool
+	User     string
+	Password string
 	// Debug label for more informative errors.
 	DebugInfo string
 }

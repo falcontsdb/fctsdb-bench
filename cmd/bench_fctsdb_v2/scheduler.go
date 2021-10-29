@@ -94,7 +94,8 @@ func (s *Scheduler) ScheduleBenchTask() {
 			lindID++
 			err := json.Unmarshal(line, &config)
 			if err != nil {
-				log.Println("cannot unmarshal the config line:", lindID)
+				log.Println("cannot unmarshal the config line:", lindID, "error:", err.Error())
+				continue
 			}
 			err = s.runBenchTaskByConfig(lindID, fileName, &config)
 			if err != nil {

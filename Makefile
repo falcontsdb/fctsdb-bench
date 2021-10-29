@@ -5,8 +5,8 @@ BUILD_VERSION       := 'main.BuildVersion=${BRANCH}(${COMMIT_ID}) ${BUILD_VERSIO
 
 all:
 
-	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o fcbench-arm -ldflags "-s -w -X ${BUILD_VERSION}" cmd/bench_fctsdb_v2/*.go
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o fcbench-linux -ldflags "-s -w -X ${BUILD_VERSION}" cmd/bench_fctsdb_v2/*.go
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o fcbench-arm64 -ldflags "-s -w -X ${BUILD_VERSION}" cmd/bench_fctsdb_v2/*.go
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o fcbench-amd64 -ldflags "-s -w -X ${BUILD_VERSION}" cmd/bench_fctsdb_v2/*.go
 	go build -o fcbench -ldflags "-s -w -X ${BUILD_VERSION}" cmd/bench_fctsdb_v2/*.go
 
 .PHONY : all
