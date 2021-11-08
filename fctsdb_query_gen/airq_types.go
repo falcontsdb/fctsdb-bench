@@ -176,12 +176,12 @@ func init() {
 	})
 
 	// case 19
-	AirQuality.Regist(&QueryType{
-		Name:    "查看最近一个月的全国城市排序",
-		RawSql:  "select top(aqi, 100) as aqi, city from (select mean(aqi) as aqi from city_air_quality where time > '{now}'-1d group by city)",
-		Comment: "业务用途：查看全国最近一月的所有城市排名\n数据库能力：对子查询求topN。子查询为：指定最近一个月时间段，并按中层级分组，查询某字段平均值",
-		// Generator: &topOfMeanGroupByCity1{Period: time.Hour * 24 * 30},
-	})
+	// AirQuality.Regist(&QueryType{
+	// 	Name:    "查看最近一个月的全国城市排序",
+	// 	RawSql:  "select top(aqi, 100) as aqi, city from (select mean(aqi) as aqi from city_air_quality where time > '{now}'-30d group by city)",
+	// 	Comment: "业务用途：查看全国最近一月的所有城市排名\n数据库能力：对子查询求topN。子查询为：指定最近一个月时间段，并按中层级分组，查询某字段平均值",
+	// 	// Generator: &topOfMeanGroupByCity1{Period: time.Hour * 24 * 30},
+	// })
 
 	// case 20
 	AirQuality.Regist(&QueryType{
