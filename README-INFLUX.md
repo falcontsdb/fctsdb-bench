@@ -342,7 +342,7 @@ Executing the benchmarks requires the Go compiler and tools to be installed on y
 Running benchmarks requires installing the data and query generators along with loaders and benchmarkers for the platforms you wish to test. For example, to install and run load tests for InfluxDB, execute:
 
 ```
-go get git.querycap.com/falcontsdb/fctsdb-bench/cmd/bulk_data_gen git.querycap.com/falcontsdb/fctsdb-bench/cmd/bulk_load_influx
+go get git.querycap.com/falcontsdb/fctsdb-bench/cmd/data_generator git.querycap.com/falcontsdb/fctsdb-bench/cmd/bulk_load_influx
 ```
 
 This will download and install the latest code from GitHub (including dependencies). Check the ``cmd`` directory for additional database implementations to download and install. For query benchmarking, install the query generator and benchmark executor for your platform. E.g. for InfluxDB:
@@ -356,8 +356,8 @@ go get git.querycap.com/falcontsdb/fctsdb-bench/cmd/bulk_query_gen git.querycap.
 For any module, you can run the executable with the ``-h`` flag and it will print a list of command line parameters. E.g.
 
 ```
--bash-4.1$ $GOPATH/bin/bulk_data_gen -h
-Usage of /home/clarsen/go/bin/bulk_data_gen:
+-bash-4.1$ $GOPATH/bin/data_generator -h
+Usage of /home/clarsen/go/bin/data_generator:
   -debug int
     	Debug printing (choices: 0, 1, 2) (default 0).
   -format string
@@ -383,19 +383,19 @@ Usage of /home/clarsen/go/bin/bulk_data_gen:
 To generate and write data to a database, execute the bulk data generator using optional command line parameters and pipe the output to a bulk loader. For example, load data in an InfluxDB instance, run:
 
 ```
-$GOPATH/bin/bulk_data_gen | $GOPATH/bin/bulk_load_influx -urls http://localhost:8086
+$GOPATH/bin/data_generator | $GOPATH/bin/bulk_load_influx -urls http://localhost:8086
 ``` 
 
 This will automatically create a database instance and load about 19,440 data points. For additional data, set the start and end times. Also note that the default generation data format is ``influx-bulk``. If you want to test another database, use the ``-format`` parameter with the proper loader. E.g. for OpenTSDB:
 
 ```
-$GOPATH/bin/bulk_data_gen -format opentsdb | $GOPATH/bin/bulk_load_opentsdb -urls http://localhost:4242
+$GOPATH/bin/data_generator -format opentsdb | $GOPATH/bin/bulk_load_opentsdb -urls http://localhost:4242
 ```
 
 A successful run will the number of items generated and stored along with the total time and mean rate per second.
 
 ```
--bash-4.1$ $GOPATH/bin/bulk_data_gen | $GOPATH/bin/bulk_load_influx  -urls http://druidzoo-1.yms.gq1.yahoo.com:8086
+-bash-4.1$ $GOPATH/bin/data_generator | $GOPATH/bin/bulk_load_influx  -urls http://druidzoo-1.yms.gq1.yahoo.com:8086
 using random seed 329234002
 daemon URLs: [http://druidzoo-1.yms.gq1.yahoo.com:8086]
 [worker 0] backoffs took a total of 0.000000sec of runtime
