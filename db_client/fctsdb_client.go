@@ -1,4 +1,4 @@
-package db_writer
+package db_client
 
 // This file lifted wholesale from mountainflux by Mark Rushakoff.
 
@@ -29,18 +29,18 @@ var (
 	backoffMagicWords5  []byte = []byte("write failed: can not exceed max connections of 500")
 )
 
-// FctsdbWriter is a Writer that writes to an InfluxDB HTTP server.
-type FctsdbWriter struct {
+// FctsdbClient is a Writer that writes to a fctsdb HTTP server.
+type FctsdbClient struct {
 	client   fasthttp.Client
-	c        common.WriterConfig
+	c        common.ClientConfig
 	writeUrl []byte
 	queryUrl []byte
 	host     []byte
 	buf      *bytes.Buffer
 }
 
-// NewFctsdbWriter returns a new HTTPWriter from the supplied HTTPWriterConfig.
-func NewFctsdbWriter(c common.WriterConfig) *FctsdbWriter {
+// NewFctsdbClient returns a new HTTPWriter from the supplied HTTPWriterConfig.
+func NewFctsdbClient(c common.ClientConfig) *FctsdbClient {
 	var host []byte
 	writeUrl := make([]byte, 0)
 	if c.Host[len(c.Host)-1] == '/' {
@@ -58,7 +58,7 @@ func NewFctsdbWriter(c common.WriterConfig) *FctsdbWriter {
 	queryUrl = fasthttp.AppendQuotedArg(queryUrl, []byte(c.Database))
 	queryUrl = append(queryUrl, "&q="...)
 
-	return &FctsdbWriter{
+	return &FctsdbClient{
 		client: fasthttp.Client{
 			Name:                "bulk_load_influx",
 			MaxIdleConnDuration: DefaultIdleConnectionTimeout,
@@ -78,10 +78,10 @@ var (
 	responseMustContain = []byte(`"statement_id"`)
 )
 
-// WriteLineProtocol writes the given byte slice to the HTTP server described in the Writer's HTTPWriterConfig.
+// Write writes the given byte slice to the HTTP server described in the Writer's HTTPWriterConfig.
 // It returns the latency in nanoseconds and any error received while sending the data over HTTP,
 // or it returns a new error if the HTTP response isn't as expected.
-func (w *FctsdbWriter) WriteLineProtocol(body []byte) (int64, error) {
+func (w *FctsdbClient) Write(body []byte) (int64, error) {
 	req := fasthttp.AcquireRequest()
 	req.Header.SetContentTypeBytes(textPlain)
 	req.Header.SetMethodBytes(post)
@@ -112,7 +112,7 @@ func (w *FctsdbWriter) WriteLineProtocol(body []byte) (int64, error) {
 	return lat, err
 }
 
-func (w *FctsdbWriter) QueryLineProtocol(lines []byte) (int64, error) {
+func (w *FctsdbClient) Query(lines []byte) (int64, error) {
 	uri := fasthttp.AppendQuotedArg(w.queryUrl, lines)
 	req := fasthttp.AcquireRequest()
 	req.Header.SetContentTypeBytes(textPlain)
@@ -170,7 +170,7 @@ func (w *FctsdbWriter) QueryLineProtocol(lines []byte) (int64, error) {
 	return lat, err
 }
 
-func (d *FctsdbWriter) CreateDb() error {
+func (d *FctsdbClient) CreateDb() error {
 	u, _ := url.Parse(string(d.host))
 
 	// serialize params the right way:
@@ -199,7 +199,7 @@ func (d *FctsdbWriter) CreateDb() error {
 }
 
 // listDatabases lists the existing databases in InfluxDB.
-func (d *FctsdbWriter) ListDatabases() ([]string, error) {
+func (d *FctsdbClient) ListDatabases() ([]string, error) {
 
 	u := fmt.Sprintf("%s/query?q=show%%20databases", d.host)
 	resp, err := http.Get(u)
@@ -241,7 +241,7 @@ func (d *FctsdbWriter) ListDatabases() ([]string, error) {
 	return ret, nil
 }
 
-func (d *FctsdbWriter) Ping() error {
+func (d *FctsdbClient) Ping() error {
 	u := fmt.Sprintf("%s/ping", d.host)
 	req, err := http.NewRequest(string(get), u, nil)
 	if err != nil {

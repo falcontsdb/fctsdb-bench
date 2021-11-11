@@ -64,6 +64,9 @@ type Scheduler struct {
 	agentEndpoint   string
 	grafanaEndpoint string
 	debug           bool
+	format          string
+	username        string
+	password        string
 }
 
 func init() {
@@ -71,6 +74,9 @@ func init() {
 	scheduleCmd.PersistentFlags().StringVar(&scheduler.configsPath, "config-file", "", "调度器配置文件地址 (默认不使用)")
 	scheduleCmd.PersistentFlags().StringVar(&scheduler.agentEndpoint, "agent", "", "数据库代理服务地址，为空表示不使用 (默认不使用)")
 	scheduleCmd.PersistentFlags().StringVar(&scheduler.grafanaEndpoint, "grafana", "", "grafana的dashboard地址，例如: http://124.71.230.36:4000/sources/1/dashboards/4")
+	scheduleCmd.PersistentFlags().StringVar(&scheduler.format, "format", "fctsdb", "目标数据库类型，当前仅支持fctsdb和mysql")
+	scheduleCmd.PersistentFlags().StringVar(&scheduler.username, "username", "", "用户名")
+	scheduleCmd.PersistentFlags().StringVar(&scheduler.password, "password", "", "密码")
 	scheduleCmd.PersistentFlags().BoolVar(&scheduler.debug, "debug", false, "是否打印详细日志(default false).")
 	rootCmd.AddCommand(scheduleCmd)
 	scheduleCmd.AddCommand(showCmd)
@@ -134,7 +140,7 @@ func (s *Scheduler) runBenchTaskByConfig(index int, fileName string, config *Bas
 		}
 	}
 
-	basicBenchTask, err := NewBasicBenchTask(s.csvDaemonUrls, config, s.debug)
+	basicBenchTask, err := s.NewBasicBenchTask(config)
 	if err != nil {
 		return err
 	}
@@ -217,7 +223,7 @@ type BasicBenchTaskConfig struct {
 	SqlTemplate      []string
 }
 
-func NewBasicBenchTask(csvDaemonUrls string, conf *BasicBenchTaskConfig, debug bool) (*BasicBenchTask, error) {
+func (s *Scheduler) NewBasicBenchTask(conf *BasicBenchTaskConfig) (*BasicBenchTask, error) {
 	sampInter, err := ParseDuration(conf.SamplingInterval)
 	if err != nil {
 		return nil, fmt.Errorf("can not parse the SamplingInterval")
@@ -247,7 +253,7 @@ func NewBasicBenchTask(csvDaemonUrls string, conf *BasicBenchTaskConfig, debug b
 		}
 	}
 	return &BasicBenchTask{
-		csvDaemonUrls:     csvDaemonUrls,
+		csvDaemonUrls:     s.csvDaemonUrls,
 		mixMode:           conf.MixMode,
 		useCase:           conf.UseCase,
 		workers:           conf.Workers,
@@ -263,9 +269,12 @@ func NewBasicBenchTask(csvDaemonUrls string, conf *BasicBenchTaskConfig, debug b
 		doDBCreate:        true,
 		queryPercent:      conf.QueryPercent,
 		queryCount:        100,
-		debug:             debug,
+		debug:             s.debug,
 		dbName:            "benchmark_db",
 		needPrePare:       conf.NeedPrePare,
+		format:            s.format,
+		username:          s.username,
+		password:          s.password,
 	}, nil
 }
 

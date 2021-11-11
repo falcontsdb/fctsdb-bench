@@ -17,7 +17,7 @@ import (
 	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/airq"
 	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/devops"
 	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/vehicle"
-	"git.querycap.com/falcontsdb/fctsdb-bench/db_writer"
+	"git.querycap.com/falcontsdb/fctsdb-bench/db_client"
 	fctsdb "git.querycap.com/falcontsdb/fctsdb-bench/query_generator"
 	"git.querycap.com/falcontsdb/fctsdb-bench/serializers"
 	"git.querycap.com/falcontsdb/fctsdb-bench/util/fastrand"
@@ -48,6 +48,8 @@ type BasicBenchTask struct {
 	queryType         int
 	queryCount        int64
 	needPrePare       bool
+	username          string
+	password          string
 
 	//runtime vars
 	timestampStart time.Time
@@ -55,7 +57,7 @@ type BasicBenchTask struct {
 	daemonUrls     []string
 	bufPool        sync.Pool
 	inputDone      chan struct{}
-	writers        []common.DBWriter
+	writers        []common.DBClient
 	valuesRead     int64
 	itemsRead      int64
 	bytesRead      int64
@@ -68,6 +70,9 @@ type BasicBenchTask struct {
 
 func (d *BasicBenchTask) Validate() {
 	d.daemonUrls = strings.Split(d.csvDaemonUrls, ",")
+	if d.format != "fctsdb" && d.format != "mysql" {
+		log.Fatal("wrong database format,support fctsdb,mysql ")
+	}
 	if len(d.daemonUrls) == 0 {
 		log.Fatal("missing 'urls' flag")
 	}
@@ -155,7 +160,28 @@ func (d *BasicBenchTask) PrepareWorkers() int {
 		},
 	}
 	d.inputDone = make(chan struct{})
-	d.writers = make([]common.DBWriter, d.workers)
+	d.writers = make([]common.DBClient, d.workers)
+	for i := 0; i < len(d.writers); i++ {
+		c := &common.ClientConfig{
+			Host:      d.daemonUrls[i%len(d.daemonUrls)],
+			Database:  d.dbName,
+			Gzip:      d.useGzip > 0,
+			Debug:     d.debug,
+			DebugInfo: fmt.Sprintf("worker #%d", i),
+			User:      d.username,
+			Password:  d.password,
+		}
+		switch d.format {
+		case "fctsdb":
+			d.writers[i] = db_client.NewFctsdbClient(*c)
+		case "mysql":
+			cli, err := db_client.NewMysqlClient(*c)
+			if err != nil {
+				log.Fatalln("open mysql failed" + err.Error())
+			}
+			d.writers[i] = cli
+		}
+	}
 
 	switch d.useCase {
 	case common.UseCaseVehicle:
@@ -202,11 +228,7 @@ func (d *BasicBenchTask) PrepareWorkers() int {
 		}
 	}
 
-	c := &common.WriterConfig{
-		Host:     d.daemonUrls[0],
-		Database: d.dbName,
-	}
-	writer := db_writer.NewFctsdbWriter(*c)
+	writer := d.writers[0]
 
 	err := d.checkDbConnection(writer)
 	if err != nil {
@@ -215,8 +237,38 @@ func (d *BasicBenchTask) PrepareWorkers() int {
 	if d.doDBCreate {
 		d.createDb(writer)
 	}
-	d.serializer = serializers.NewSerializerInflux()
+	switch d.format {
 
+	case "mysql":
+		d.serializer = serializers.NewSerializerMysql()
+		if d.needPrePare {
+			w, ok := writer.(*db_client.MysqlClient)
+			if !ok {
+				log.Fatalln("wrong mysql client")
+			}
+			s, ok := d.serializer.(*serializers.SerializerMysql)
+			if !ok {
+				log.Fatalln("wrong mysql serializer")
+			}
+			point := common.MakeUsablePoint()
+			createdMeasurement := make(map[string]bool, 0)
+			buf := bytes.NewBuffer(make([]byte, 0, 1024))
+			for {
+				d.simulator.Next(point)
+				if _, ok := createdMeasurement[string(point.MeasurementName)]; ok {
+					break
+				}
+				s.CreateTableFromPoint(buf, point)
+				_, err = w.Write(buf.Bytes())
+				if err != nil {
+					log.Fatalln(err)
+				}
+				createdMeasurement[string(point.MeasurementName)] = true
+			}
+		}
+	case "fctsdb":
+		d.serializer = serializers.NewSerializerInflux()
+	}
 	if d.needPrePare {
 		d.runPrepareData()
 	} else {
@@ -235,16 +287,9 @@ func (d *BasicBenchTask) PrepareWorkers() int {
 	return d.workers
 }
 
+//这里添加每个client协程中的准备工具，当前没有，后续按需进行添加
 func (d *BasicBenchTask) PrepareProcess(i int) {
 
-	c := &common.WriterConfig{
-		Host:      d.daemonUrls[i%len(d.daemonUrls)],
-		Database:  d.dbName,
-		Gzip:      d.useGzip > 0,
-		Debug:     d.debug,
-		DebugInfo: fmt.Sprintf("worker #%d", i),
-	}
-	d.writers[i] = db_writer.NewFctsdbWriter(*c)
 }
 
 func (d *BasicBenchTask) RunProcess(i int, waitGroup *sync.WaitGroup) {
@@ -384,10 +429,16 @@ func (d *BasicBenchTask) Report(start, end time.Time) map[string]string {
 }
 
 func (d *BasicBenchTask) CleanUp() {
+	if d.format == "mysql" {
+		for i := 0; i < len(d.writers); i++ {
+			w := d.writers[i].(*db_client.MysqlClient)
+			w.Close()
+		}
+	}
 }
 
 // processWrite reads byte buffers from batchChan and writes them to the target server, while tracking stats on the write.
-func (d *BasicBenchTask) processWrite(w common.DBWriter, batchSize int, useCountLimit bool, point *common.Point) error {
+func (d *BasicBenchTask) processWrite(w common.DBClient, batchSize int, useCountLimit bool, point *common.Point) error {
 	// var batchesSeen int64
 	// 发送http write
 
@@ -421,7 +472,7 @@ func (d *BasicBenchTask) processWrite(w common.DBWriter, batchSize int, useCount
 	return err
 }
 
-func (d *BasicBenchTask) processQuery(w common.DBWriter, batchSize int, useCountLimit bool) error {
+func (d *BasicBenchTask) processQuery(w common.DBClient, batchSize int, useCountLimit bool) error {
 	var err error
 	var lat int64
 	buf := d.bufPool.Get().(*bytes.Buffer)
@@ -439,7 +490,7 @@ func (d *BasicBenchTask) processQuery(w common.DBWriter, batchSize int, useCount
 
 	if batchItemCount > 0 {
 		atomic.AddInt64(&d.qureyRead, int64(batchItemCount))
-		lat, err = w.QueryLineProtocol(buf.Bytes())
+		lat, err = w.Query(buf.Bytes())
 		if err != nil {
 			d.respCollector.AddOne("query", lat, false)
 		} else {
@@ -490,23 +541,23 @@ func (d *BasicBenchTask) processQueryOnly(i int) {
 	}
 }
 
-func (d *BasicBenchTask) writeToDb(w common.DBWriter, buf *bytes.Buffer) error {
+func (d *BasicBenchTask) writeToDb(w common.DBClient, buf *bytes.Buffer) error {
 	// var batchesSeen int64
 	// 发送http write
 	var err error
 	var lat int64
-	if d.useGzip > 0 {
+	if d.useGzip > 0 && d.format == "fctsdb" {
 		compressedBatch := d.bufPool.Get().(*bytes.Buffer)
 		fasthttp.WriteGzipLevel(compressedBatch, buf.Bytes(), d.useGzip)
 		//bodySize = len(compressedBatch.Bytes())
-		lat, err = w.WriteLineProtocol(compressedBatch.Bytes())
+		lat, err = w.Write(compressedBatch.Bytes())
 		// Return the compressed batch buffer to the pool.
 		compressedBatch.Reset()
 		d.bufPool.Put(compressedBatch)
 	} else {
 		//bodySize = len(batch.Bytes())
 		// fmt.Println(string(buf.Bytes()))
-		lat, err = w.WriteLineProtocol(buf.Bytes())
+		lat, err = w.Write(buf.Bytes())
 	}
 
 	if err != nil {
@@ -517,7 +568,7 @@ func (d *BasicBenchTask) writeToDb(w common.DBWriter, buf *bytes.Buffer) error {
 	return nil
 }
 
-func (d *BasicBenchTask) createDb(writer common.DBWriter) {
+func (d *BasicBenchTask) createDb(writer common.DBClient) {
 	// this also test db connection
 	existingDatabases, err := writer.ListDatabases()
 	if err != nil {
@@ -543,7 +594,7 @@ func (d *BasicBenchTask) createDb(writer common.DBWriter) {
 	log.Printf("Database %s created", d.dbName)
 }
 
-func (d *BasicBenchTask) checkDbConnection(w common.DBWriter) error {
+func (d *BasicBenchTask) checkDbConnection(w common.DBClient) error {
 	for i := 0; i < 12; i++ {
 		err := w.Ping()
 		if err != nil {

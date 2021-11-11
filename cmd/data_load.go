@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"git.querycap.com/falcontsdb/fctsdb-bench/common"
-	"git.querycap.com/falcontsdb/fctsdb-bench/db_writer"
+	"git.querycap.com/falcontsdb/fctsdb-bench/db_client"
 	"git.querycap.com/falcontsdb/fctsdb-bench/serializers"
 	"github.com/spf13/cobra"
 	"github.com/valyala/fasthttp"
@@ -50,7 +50,7 @@ type DataLoad struct {
 	inputDone             chan struct{}
 	progressIntervalItems uint64
 	scanFinished          bool
-	writers               []*db_writer.FctsdbWriter
+	writers               []*db_client.FctsdbClient
 	valuesRead            int64
 	itemsRead             int64
 	bytesRead             int64
@@ -238,7 +238,7 @@ func (l *DataLoad) PrepareWorkers() {
 	l.batchChan = make(chan batch, l.workers)
 	l.inputDone = make(chan struct{})
 
-	l.writers = make([]*db_writer.FctsdbWriter, l.workers)
+	l.writers = make([]*db_client.FctsdbClient, l.workers)
 }
 
 func (l *DataLoad) EmptyBatchChanel() {
@@ -261,7 +261,7 @@ func (l *DataLoad) GetScanner() Scanner {
 
 func (l *DataLoad) PrepareProcess(i int) {
 
-	c := &common.WriterConfig{
+	c := &common.ClientConfig{
 		Host:      l.daemonUrls[i%len(l.daemonUrls)],
 		Database:  l.dbName,
 		Debug:     l.debug,
@@ -269,7 +269,7 @@ func (l *DataLoad) PrepareProcess(i int) {
 		DebugInfo: fmt.Sprintf("worker #%d", i),
 	}
 
-	l.writers[i] = db_writer.NewFctsdbWriter(*c)
+	l.writers[i] = db_client.NewFctsdbClient(*c)
 }
 
 func (l *DataLoad) RunProcess(i int, waitGroup *sync.WaitGroup) error {
@@ -378,7 +378,7 @@ outer:
 }
 
 // processBatches reads byte buffers from batchChan and writes them to the target server, while tracking stats on the write.
-func (l *DataLoad) processBatches(w *db_writer.FctsdbWriter, telemetryWorkerLabel string, workersGroup *sync.WaitGroup) error {
+func (l *DataLoad) processBatches(w *db_client.FctsdbClient, telemetryWorkerLabel string, workersGroup *sync.WaitGroup) error {
 	defer workersGroup.Done()
 	for batch := range l.batchChan {
 		var err error
@@ -386,13 +386,13 @@ func (l *DataLoad) processBatches(w *db_writer.FctsdbWriter, telemetryWorkerLabe
 			compressedBatch := l.bufPool.Get().(*bytes.Buffer)
 			fasthttp.WriteGzip(compressedBatch, batch.Buffer.Bytes())
 			//bodySize = len(compressedBatch.Bytes())
-			_, err = w.WriteLineProtocol(compressedBatch.Bytes())
+			_, err = w.Write(compressedBatch.Bytes())
 			// Return the compressed batch buffer to the pool.
 			compressedBatch.Reset()
 			l.bufPool.Put(compressedBatch)
 		} else {
 			//bodySize = len(batch.Bytes())
-			_, err = w.WriteLineProtocol(batch.Buffer.Bytes())
+			_, err = w.Write(batch.Buffer.Bytes())
 		}
 		if err != nil {
 			return fmt.Errorf("error writing: %s", err.Error())
