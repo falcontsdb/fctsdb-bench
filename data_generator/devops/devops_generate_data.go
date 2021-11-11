@@ -91,12 +91,12 @@ func (d *DevopsSimulator) Next(p *Point) int64 {
 	// host := &d.hosts[d.hostIndex]
 
 	madePoint := atomic.AddInt64(&d.madePoints, 1)
-	poindIndex := madePoint - 1 //由于atomic是先加后返回值，为了保证next中方法从0开始，需要先置为-1
-	hostIndex := (poindIndex / NHostSims) % int64(len(d.hosts))
+	pointIndex := madePoint - 1 //由于atomic是先加后返回值，为了保证next中方法从0开始，需要先置为-1
+	hostIndex := (pointIndex / NHostSims) % int64(len(d.hosts))
 	host := &d.hosts[hostIndex]
 	// 为了多协程timestamp不混乱, 这里不使用TickAll方法
 	// madePoint 增加int64(len(d.hosts))*NHostSims次，timestamp增加一次，保证每张表里面两条数据之间的间隔为 EpochDuration
-	timestamp := d.timestampStart.Add(EpochDuration * time.Duration(poindIndex/int64(len(d.hosts))/NHostSims))
+	timestamp := d.timestampStart.Add(EpochDuration * time.Duration(pointIndex/int64(len(d.hosts))/NHostSims))
 	p.SetTimestamp(&timestamp)
 	if hostIndex == int64(len(d.hosts)-1) {
 		for i := 0; i < len(d.hosts); i++ {

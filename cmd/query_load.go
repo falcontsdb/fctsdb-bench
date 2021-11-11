@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"git.querycap.com/falcontsdb/fctsdb-bench/common"
-	"git.querycap.com/falcontsdb/fctsdb-bench/db_writer"
+	"git.querycap.com/falcontsdb/fctsdb-bench/db_client"
 	"github.com/spf13/cobra"
 )
 
@@ -35,7 +35,7 @@ type QueryLoad struct {
 	inputDone             chan struct{}
 	progressIntervalItems uint64
 	scanFinished          bool
-	writers               []*db_writer.FctsdbWriter
+	writers               []*db_client.FctsdbClient
 	itemsRead             int64
 	sourceReader          *os.File
 	respCollector         ResponseCollector
@@ -156,14 +156,14 @@ func (q *QueryLoad) Validate() {
 
 func (q *QueryLoad) PrepareProcess(i int) {
 
-	c := &common.WriterConfig{
+	c := &common.ClientConfig{
 		Host:      q.daemonUrls[i%len(q.daemonUrls)],
 		Database:  q.dbName,
 		Debug:     q.debug,
 		Gzip:      q.useGzip,
 		DebugInfo: fmt.Sprintf("worker #%d", i),
 	}
-	q.writers[i] = db_writer.NewFctsdbWriter(*c)
+	q.writers[i] = db_client.NewFctsdbClient(*c)
 }
 
 func (q *QueryLoad) PrepareWorkers() {
@@ -177,7 +177,7 @@ func (q *QueryLoad) PrepareWorkers() {
 	q.batchChan = make(chan batch, q.workers)
 	q.inputDone = make(chan struct{})
 
-	q.writers = make([]*db_writer.FctsdbWriter, q.workers)
+	q.writers = make([]*db_client.FctsdbClient, q.workers)
 }
 
 func (q *QueryLoad) EmptyBatchChanel() {
@@ -290,14 +290,14 @@ outer:
 }
 
 // processBatches reads byte buffers from batchChan and writes them to the target server, while tracking stats on the write.
-func (q *QueryLoad) processBatches(w *db_writer.FctsdbWriter, telemetryWorkerLabel string, workersGroup *sync.WaitGroup) error {
+func (q *QueryLoad) processBatches(w *db_client.FctsdbClient, telemetryWorkerLabel string, workersGroup *sync.WaitGroup) error {
 	// var batchesSeen int64
 
 	defer workersGroup.Done()
 	for batch := range q.batchChan {
 		buf := q.bufPool.Get().(*bytes.Buffer)
 		buf.Write(batch.Buffer.Bytes())
-		lat, err := w.QueryLineProtocol(buf.Bytes())
+		lat, err := w.Query(buf.Bytes())
 		if err != nil {
 			q.respCollector.AddOne(q.dbName, lat, false)
 			return fmt.Errorf("error writing: %s", err.Error())
