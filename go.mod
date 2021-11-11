@@ -5,6 +5,7 @@ go 1.15
 require (
 	github.com/BurntSushi/toml v0.3.1
 	github.com/StackExchange/wmi v1.2.1 // indirect
+	github.com/gomarkdown/markdown v0.0.0-20211105120026-16f708f914c3
 	github.com/google/flatbuffers v1.12.0
 	github.com/pelletier/go-toml v1.9.3
 	github.com/shirou/gopsutil v3.21.8+incompatible
