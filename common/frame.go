@@ -14,8 +14,8 @@ var (
 	}
 )
 
-// WriterConfig is the configuration used to create an DBWriter.
-type WriterConfig struct {
+// ClientConfig is the configuration used to create an DBClient.
+type ClientConfig struct {
 	Host     string
 	Database string
 	Gzip     bool
@@ -26,9 +26,9 @@ type WriterConfig struct {
 	DebugInfo string
 }
 
-type DBWriter interface {
-	WriteLineProtocol([]byte) (int64, error)
-	QueryLineProtocol([]byte) (int64, error)
+type DBClient interface {
+	Write([]byte) (int64, error)
+	Query([]byte) (int64, error)
 	ListDatabases() ([]string, error)
 	CreateDb() error
 	Ping() error
