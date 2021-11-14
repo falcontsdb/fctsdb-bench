@@ -1,42 +1,43 @@
 package reporter
 
 import (
-	"bytes"
 	"fmt"
-	"html/template"
 	"io"
+	"strings"
 
 	"git.querycap.com/falcontsdb/fctsdb-bench/reporter/src"
-	"git.querycap.com/falcontsdb/fctsdb-bench/reporter/templates"
-	"github.com/go-echarts/go-echarts/v2/charts"
-	"github.com/go-echarts/go-echarts/v2/opts"
 	"github.com/gomarkdown/markdown"
 	"github.com/gomarkdown/markdown/html"
 )
 
-type Charter interface {
-	Type() string
-	GetAssets() opts.Assets
-	Validate()
-	SetGlobalOptions(options ...charts.GlobalOpts) *charts.RectChart
-}
-
 type TestCase interface {
+	GetName() string
 	ToHtml() string
 }
 
 type PerformanceTestCase struct {
-	Name     string
+	name     string
+	Title    string
 	Document string
 	Table    *Table
-	Picture  Charter
+	Picture  Picture
+}
+
+func NewPerformanceTestCase(name string) *PerformanceTestCase {
+	return &PerformanceTestCase{
+		name: name,
+	}
+}
+
+func (t *PerformanceTestCase) GetName() string {
+	return t.name
 }
 
 func (t *PerformanceTestCase) ToHtml() string {
 	var htm string
 	var md string
-	md += ("## " + t.Name + "\n\n")
-	md += (t.Document + "\n\n")
+	md += ("## " + t.name + "\n\n")
+	md += (strings.ReplaceAll(t.Document, "\n", "\n\n") + "\n\n")
 	if t.Table != nil {
 		md += (t.Table.ToMarkDown() + "\n\n")
 	}
@@ -44,35 +45,8 @@ func (t *PerformanceTestCase) ToHtml() string {
 	mdOpts := html.RendererOptions{Flags: htmlFlags}
 	renderer := html.NewRenderer(mdOpts)
 	htm += string(markdown.ToHTML([]byte(md), nil, renderer))
-
-	var err error
-
 	if t.Picture != nil {
-		t.Picture.SetGlobalOptions(
-			charts.WithTitleOpts(opts.Title{Title: "图-" + t.Name, Left: "30px", Top: "8px"}),
-			charts.WithInitializationOpts(opts.Initialization{Width: "800px", Height: "400px"}),
-			charts.WithLegendOpts(opts.Legend{Show: true, Top: "12px"}),
-			charts.WithTooltipOpts(opts.Tooltip{Show: true, Trigger: "axis"}),
-			charts.WithToolboxOpts(opts.Toolbox{Show: true, Right: "20px", Feature: &opts.ToolBoxFeature{SaveAsImage: &opts.ToolBoxFeatureSaveAsImage{Show: true}}}))
-		buf := bytes.NewBuffer(make([]byte, 0, 4*1024))
-		tpl, _ := template.New("chart").Parse("")
-		tpl.Funcs(template.FuncMap{
-			"safeJS": func(s interface{}) template.JS {
-				return template.JS(fmt.Sprint(s))
-			},
-		})
-		tpl, err = tpl.Parse(templates.BaseTpl)
-		if err != nil {
-			fmt.Println("parse error: ", err.Error())
-			return htm
-		}
-		t.Picture.Validate()
-		err = tpl.Execute(buf, t.Picture)
-		if err != nil {
-			fmt.Println("execute error", err.Error())
-			return htm
-		}
-		htm += buf.String()
+		htm += t.Picture.ToHtml()
 	}
 	return htm
 }
@@ -87,9 +61,23 @@ type Page struct {
 
 func NewPage(title string) *Page {
 	return &Page{
-		Css: src.Css,
-		Js:  src.EchartsJs,
+		Title:     title,
+		Css:       src.Css,
+		Js:        src.EchartsJs,
+		TestCases: make([]TestCase, 0),
 	}
+}
+
+func (p *Page) HasTestCase(name string) bool {
+	return getTestCaseIndex(name, p.TestCases) >= 0
+}
+
+func (p *Page) AddTestCase(testCase TestCase) {
+	p.TestCases = append(p.TestCases, testCase)
+}
+
+func (p *Page) GetTestCase(name string) TestCase {
+	return p.TestCases[getTestCaseIndex(name, p.TestCases)]
 }
 
 func (p *Page) ToHtmlOneFile(w io.Writer) error {
@@ -106,7 +94,10 @@ func (p *Page) ToHtmlOneFile(w io.Writer) error {
 `
 
 	w.Write([]byte(fmt.Sprintf(pageHeadTmp, p.Title, p.Js, p.Css)))
-	pageBody := fmt.Sprintf("<h1>%s</h1>\n<p>%s</p>\n", p.Title, p.Document)
+	pageBody := fmt.Sprintf("<h1>%s</h1>\n", p.Title)
+	for _, line := range strings.Split(p.Document, "\n") {
+		pageBody += fmt.Sprintf("<p>%s</p>\n", line)
+	}
 	for _, tcase := range p.TestCases {
 		pageBody += tcase.ToHtml()
 		pageBody += `<div contenteditable="true"><p>执行无异常。</p></div>`
@@ -115,4 +106,13 @@ func (p *Page) ToHtmlOneFile(w io.Writer) error {
 	pageEnd := "</div>\n</body>\n</html>"
 	w.Write([]byte(pageEnd))
 	return nil
+}
+
+func getTestCaseIndex(name string, slice []TestCase) int {
+	for i, v := range slice {
+		if v.GetName() == name {
+			return i
+		}
+	}
+	return -1
 }

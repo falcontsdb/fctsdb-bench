@@ -76,7 +76,7 @@ func init() {
 
 func (s *Scheduler) ScheduleBenchTask() {
 
-	fileName := time.Now().Format("benchmark_0102_150405") + ".csv"
+	fileName := time.Now().Format("benchmark_0102_150405")
 	if s.configsPath != "" {
 		configsFile, err := os.Open(s.configsPath)
 		if err != nil {
@@ -108,6 +108,7 @@ func (s *Scheduler) ScheduleBenchTask() {
 				continue
 			}
 		}
+		buildin_testcase.CreateReport(fileName)
 	}
 }
 
@@ -140,24 +141,21 @@ func (s *Scheduler) runBenchTaskByConfig(index int, fileName string, config *bui
 	if index > 1 {
 		writeHead = false
 	}
+	result["Group"] = config.Group
 	s.writeResultToCsv(fileName, result, writeHead)
 
 	return nil
 }
 
 func (s *Scheduler) writeResultToCsv(fileName string, info map[string]string, writeHead bool) {
-	csvFile, err := os.OpenFile(fileName, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0666)
+	csvFile, err := os.OpenFile(fileName+".csv", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0666)
 	if err != nil {
 		log.Println("open result csv failed, error:", err.Error())
 	}
 	defer csvFile.Close()
 	csvWriter := csv.NewWriter(csvFile)
-	// var heads []string
-	// for key := range info {
-	// 	heads = append(heads, key)
-	// }
 
-	heads := []string{"Mod", "UseCase", "Cardinality", "Workers", "BatchSize", "QueryPercent", "SamplingTime",
+	heads := []string{"Group", "Mod", "UseCase", "Cardinality", "Workers", "BatchSize", "QueryPercent", "SamplingTime",
 		"P50(r)", "P90(r)", "P95(r)", "P99(r)", "Min(r)", "Max(r)", "Avg(r)", "Fail(r)", "Total(r)", "Qps(r)",
 		"P50(w)", "P90(w)", "P95(w)", "P99(w)", "Min(w)", "Max(w)", "Avg(w)", "Fail(w)", "Total(w)", "Qps(w)", "PointRate(p/s)", "ValueRate(v/s)", "TotalPoints",
 		"RunSec", "Sql", "Monitor"}
