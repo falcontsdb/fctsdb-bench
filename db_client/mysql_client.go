@@ -18,7 +18,7 @@ type MysqlClient struct {
 
 // NewMysqlClient returns a new DBClient of Mysql .
 func NewMysqlClient(c common.ClientConfig) (*MysqlClient, error) {
-	dsn := fmt.Sprintf("%s:%s@%s(%s)/%s?multiStatements=true", c.User, c.Password, "tcp", c.Host, c.Database)
+	dsn := fmt.Sprintf("%s:%s@%s(%s)/%s?multiStatements=true&charset=utf8", c.User, c.Password, "tcp", c.Host, c.Database)
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
 		return nil, err
