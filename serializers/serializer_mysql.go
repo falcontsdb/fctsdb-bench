@@ -18,13 +18,13 @@ func NewSerializerMysql() *SerializerMysql {
 func (s *SerializerMysql) SerializePoint(w io.Writer, p *common.Point) (err error) {
 	buf := scratchBufPool.Get().([]byte)
 	// buf := make([]byte, 0, 4*1024)
-	buf = append(buf, "insert into "...)
-	buf = append(buf, p.MeasurementName...)
-	buf = append(buf, " values("...)
+	//buf = append(buf, "insert into "...)
+	//buf = append(buf, p.MeasurementName...)
+	buf = append(buf, "("...)
 
 	// add the timestamp
 	buf = append(buf, '"')
-	buf = append(buf, p.Timestamp.String()[:19]...)
+	buf = append(buf, p.Timestamp.Format("2006-01-02 15:04:05.000")...)
 	buf = append(buf, '"')
 
 	for i := 0; i < len(p.TagKeys); i++ {
@@ -51,7 +51,7 @@ func (s *SerializerMysql) SerializePoint(w io.Writer, p *common.Point) (err erro
 			buf = append(buf, ',')
 		}
 	}
-	buf = append(buf, ");"...)
+	buf = append(buf, ")"...)
 	_, err = w.Write(buf)
 
 	buf = buf[:0]
@@ -67,7 +67,7 @@ func (s *SerializerMysql) SerializeSize(w io.Writer, points int64, values int64)
 func (s *SerializerMysql) CreateTableFromPoint(w io.Writer, p *common.Point) error {
 	buf := scratchBufPool.Get().([]byte)
 	// buf := make([]byte, 0, 4*1024)
-	buf = append(buf, "create table "...)
+	buf = append(buf, "create table IF NOT EXISTS "...)
 	buf = append(buf, p.MeasurementName...)
 	buf = append(buf, " ("...)
 
@@ -97,7 +97,7 @@ func (s *SerializerMysql) CreateTableFromPoint(w io.Writer, p *common.Point) err
 			buf = append(buf, " char(64)"...)
 		case bool:
 			//mysql不支持bool，一般使用tinyint(1)来存储，这里使用char是因为这样就不需要修改fastFormatAppend函数
-			buf = append(buf, " char(16)"...)
+			buf = append(buf, " char(64)"...)
 		default:
 			panic(fmt.Sprintf("unknown field type for %#v", v))
 		}
