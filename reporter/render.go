@@ -3,6 +3,7 @@ package reporter
 import (
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 
 	"git.querycap.com/falcontsdb/fctsdb-bench/reporter/src"
@@ -12,8 +13,8 @@ import (
 
 type TestCase interface {
 	GetName() string
-	ToHtml() string
-	ToMarkDown() string
+	ToHtml(string) string
+	ToMarkDown(string) string
 }
 
 type PerformanceTestCase struct {
@@ -34,10 +35,10 @@ func (t *PerformanceTestCase) GetName() string {
 	return t.name
 }
 
-func (t *PerformanceTestCase) ToHtml() string {
+func (t *PerformanceTestCase) ToHtml(index string) string {
 	var htm string
 	var md string
-	md += ("## " + t.Title + "\n\n")
+	md += ("## " + index + t.Title + "\n\n")
 	md += (strings.ReplaceAll(t.Document, "\n", "\n\n") + "\n\n")
 	if t.Table != nil {
 		md += (t.Table.ToMarkDown() + "\n\n")
@@ -52,9 +53,9 @@ func (t *PerformanceTestCase) ToHtml() string {
 	return htm
 }
 
-func (t *PerformanceTestCase) ToMarkDown() string {
+func (t *PerformanceTestCase) ToMarkDown(index string) string {
 	var md string
-	md += ("## " + t.Title + "\n\n")
+	md += ("## " + index + t.Title + "\n\n")
 	md += (strings.ReplaceAll(t.Document, "\n", "\n\n") + "\n\n")
 	if t.Table != nil {
 		md += (t.Table.ToMarkDown() + "\n\n")
@@ -109,8 +110,8 @@ func (p *Page) ToHtmlOneFile(w io.Writer) error {
 	for _, line := range strings.Split(p.Document, "\n") {
 		pageBody += fmt.Sprintf("<p>%s</p>\n", line)
 	}
-	for _, tcase := range p.TestCases {
-		pageBody += tcase.ToHtml()
+	for index, tcase := range p.TestCases {
+		pageBody += tcase.ToHtml(strconv.Itoa(index+1) + ". ")
 		pageBody += `<div contenteditable="true"><p>执行无异常。</p></div>`
 	}
 	w.Write([]byte(pageBody))
@@ -123,8 +124,8 @@ func (p *Page) ToMarkDown(w io.Writer) error {
 	var md string
 	md += ("# " + p.Title + "\n\n")
 	md += (strings.ReplaceAll(p.Document, "\n", "\n\n") + "\n\n")
-	for _, tcase := range p.TestCases {
-		md += tcase.ToMarkDown()
+	for index, tcase := range p.TestCases {
+		md += tcase.ToMarkDown(strconv.Itoa(index+1) + ". ")
 	}
 	_, err := w.Write([]byte(md))
 	return err

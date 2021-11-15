@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 
 	"git.querycap.com/falcontsdb/fctsdb-bench/query_generator"
 	"git.querycap.com/falcontsdb/fctsdb-bench/reporter"
@@ -25,7 +26,7 @@ var (
 	csvHeaders = []string{"Group", "Mod", "场景", "Series", "并发数", "Batch Size", "查询百分比", "采样时间",
 		"P50(r)", "P90(r)", "P95(r)", "P99(r)", "Min(r)", "Max(r)", "Avg(r)", "Fail(r)", "Total(r)", "查询(query/s)",
 		"P50(w)", "P90(w)", "P95(w)", "P99(w)", "Min(w)", "Max(w)", "Avg(w)", "Fail(w)", "Total(w)", "Qps(w)", "写入(point/s)", "写入(value/s)", "TotalPoints",
-		"RunSec", "Gzip", "Sql", "Monitor"}
+		"RunSec", "Gzip", "Sql", "监控"}
 	csvHeaderMap = make(map[string]int)
 
 	performances = make(map[string]*fcbenchCaseDefine)
@@ -211,7 +212,7 @@ func init() {
 
 }
 
-func CreateReport(fileNames ...string) {
+func CreateReport(out string, fileNames ...string) {
 
 	// filesOrder := make([]string, 0)
 
@@ -248,10 +249,15 @@ func CreateReport(fileNames ...string) {
 				}
 				// 比较第一个csv和最后一个csv的差值
 				for _, field := range caseDefine.TableFeilds {
-					tableHeaders = append(tableHeaders, "比较"+field+": "+fileNames[0]+"与"+fileNames[len(fileNames)-1])
+					keywords := strings.Split(field, "(")[0]
+					tableHeaders = append(tableHeaders, "比较"+keywords+": "+fileNames[0]+"与"+fileNames[len(fileNames)-1])
+				}
+				for _, fileName := range fileNames {
+					tableHeaders = append(tableHeaders, "监控: "+fileName)
 				}
 			} else {
 				tableHeaders = append(tableHeaders, caseDefine.TableFeilds...)
+				tableHeaders = append(tableHeaders, "监控")
 			}
 
 			// 判断是否需要创建表格
@@ -271,7 +277,16 @@ func CreateReport(fileNames ...string) {
 
 				// 先记录tag
 				for _, header := range caseDefine.TableTags {
-					rowData = append(rowData, row[csvHeaderMap[header]])
+
+					// 替换场景的英文单词为中文单词，方便显示美观
+					data := row[csvHeaderMap[header]]
+					switch data {
+					case "vehicle":
+						data = "车载"
+					case "air-quality":
+						data = "空气质量"
+					}
+					rowData = append(rowData, data)
 				}
 				// 记录所有csv的相同field值
 				for _, field := range caseDefine.TableFeilds {
@@ -293,9 +308,27 @@ func CreateReport(fileNames ...string) {
 					}
 					rowData = append(rowData, fmt.Sprintf("%.2f%%", (newData-oldData)/oldData*100))
 				}
+
+				// 监控列
+				for _, fileName := range fileNames {
+					rowData = append(rowData, "[地址]("+allCsvRecords[fileName][rowIndex][csvHeaderMap["监控"]]+")")
+				}
+
 			} else {
 				for _, header := range tableHeaders {
-					rowData = append(rowData, row[csvHeaderMap[header]])
+					if header == "监控" { // 监控特例化
+						rowData = append(rowData, "[地址]("+row[csvHeaderMap[header]]+")")
+					} else {
+						// 替换场景的英文单词为中文单词，方便显示美观
+						data := row[csvHeaderMap[header]]
+						switch data {
+						case "vehicle":
+							data = "车载"
+						case "air-quality":
+							data = "空气质量"
+						}
+						rowData = append(rowData, data)
+					}
 				}
 			}
 			currentTestCase.Table.AddRows(rowData...)
@@ -326,8 +359,14 @@ func CreateReport(fileNames ...string) {
 			}
 		}
 	}
-	f, _ := os.Create(fileNames[len(fileNames)-1] + ".html")
-	defer f.Close()
-	report.ToHtmlOneFile(f)
-	// report.ToMarkDown(f)
+
+	if out == "html" {
+		f, _ := os.Create(fileNames[len(fileNames)-1] + ".html")
+		defer f.Close()
+		report.ToHtmlOneFile(f)
+	} else {
+		f, _ := os.Create(fileNames[len(fileNames)-1] + ".md")
+		defer f.Close()
+		report.ToMarkDown(f)
+	}
 }

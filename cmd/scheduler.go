@@ -48,6 +48,18 @@ var (
 			}
 		},
 	}
+
+	creatReportCmd = &cobra.Command{
+		Use:   "create",
+		Short: "根据csv文件生成测试报告",
+		Run: func(cmd *cobra.Command, args []string) {
+			fileNames := make([]string, 0)
+			for _, arg := range args {
+				fileNames = append(fileNames, strings.TrimSuffix(arg, ".csv"))
+			}
+			buildin_testcase.CreateReport("html", fileNames...)
+		},
+	}
 )
 
 type Scheduler struct {
@@ -72,6 +84,7 @@ func init() {
 	scheduleCmd.PersistentFlags().BoolVar(&scheduler.debug, "debug", false, "是否打印详细日志(default false).")
 	rootCmd.AddCommand(scheduleCmd)
 	scheduleCmd.AddCommand(showCmd)
+	scheduleCmd.AddCommand(creatReportCmd)
 }
 
 func (s *Scheduler) ScheduleBenchTask() {
@@ -108,7 +121,7 @@ func (s *Scheduler) ScheduleBenchTask() {
 				continue
 			}
 		}
-		buildin_testcase.CreateReport(fileName)
+		buildin_testcase.CreateReport("html", fileName)
 	}
 }
 

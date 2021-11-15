@@ -34,7 +34,8 @@ table{padding:0;border-collapse:collapse;border-spacing:0;font-size:1em;font:inh
 tbody{margin:0;padding:0;border:0}
 table tr{border:0;border-top:1px solid #CCC;background-color:white;margin:0;padding:0}
 table tr:nth-child(2n){background-color:#F8F8F8}
-table tr th,table tr td{font-size:1em;border:1px solid #CCC;margin:0;padding:0.5em 1em}
+table tr th,table tr td{font-size:14px;border:1px solid #CCC;margin:0;padding:0.5em 0.5em}
 table tr th{font-weight:bold;background-color:#F0F0F0}
 p{font-size:16px;line-height:1.75em;padding-right:0.5em;padding-left:0.5em}
-strong,b{color:#BF360C}`
+strong,b{color:#BF360C}
+th {word-break: keep-all}`
