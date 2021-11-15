@@ -417,6 +417,7 @@ func (d *BasicBenchTask) Report(start, end time.Time) map[string]string {
 	result["QueryPercent"] = fmt.Sprintf("%d", d.queryPercent)
 	result["Cardinality"] = fmt.Sprintf("%d", d.scaleVar)
 	result["SamplingTime"] = d.samplingInterval.String()
+	result["Gzip"] = fmt.Sprintf("%d", d.useGzip)
 
 	// buf := bytes.NewBuffer(make([]byte, 0, 1024))
 	// jsonEncoder := json.NewEncoder(buf)

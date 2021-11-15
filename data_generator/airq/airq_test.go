@@ -15,6 +15,7 @@ import (
 	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/airq/gbt2260"
 	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/devops"
 	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/vehicle"
+	"git.querycap.com/falcontsdb/fctsdb-bench/serializers"
 )
 
 func TestRegion(t *testing.T) {
@@ -77,7 +78,7 @@ func BenchmarkNewPointVehicle(b *testing.B) {
 	out := mockWriter{
 		outchan: outchan,
 	}
-	serializer := common.NewSerializerInflux()
+	serializer := serializers.NewSerializerInflux()
 	// str := []byte("aaa")
 	for j := 0; j < runtime.NumCPU(); j++ {
 		go func() {
@@ -181,7 +182,7 @@ func BenchmarkNewPointAirq1_2(b *testing.B) {
 	out := mockWriter{
 		outchan: outchan,
 	}
-	serializer := common.NewSerializerInflux()
+	serializer := serializers.NewSerializerInflux()
 	sim := cfg.ToSimulator()
 	// point := common.MakeUsablePoint()
 	// for i := 0; i < b.N; i++ {
@@ -240,7 +241,7 @@ func BenchmarkNewPointAirq2_2(b *testing.B) {
 	out := mockWriter{
 		outchan: outchan,
 	}
-	serializer := common.NewSerializerInflux()
+	serializer := serializers.NewSerializerInflux()
 	sim := cfg.ToSimulator()
 	// point := common.MakeUsablePoint()
 	// for i := 0; i < b.N; i++ {
@@ -296,7 +297,7 @@ func BenchmarkNewPointAirq2_4(b *testing.B) {
 	out := mockWriter{
 		outchan: outchan,
 	}
-	serializer := common.NewSerializerInflux()
+	serializer := serializers.NewSerializerInflux()
 	sim := cfg.ToSimulator()
 	// point := common.MakeUsablePoint()
 	// for i := 0; i < b.N; i++ {
@@ -354,7 +355,7 @@ func BenchmarkNewPointAirq2_4_New(b *testing.B) {
 	out := mockWriter{
 		outchan: outchan,
 	}
-	serializer := common.NewSerializerInflux()
+	serializer := serializers.NewSerializerInflux()
 	sim := cfg.ToSimulator()
 	// point := common.MakeUsablePoint()
 	// for i := 0; i < b.N; i++ {
@@ -416,7 +417,7 @@ func BenchmarkNewPointAirqHand(b *testing.B) {
 	out := mockWriter{
 		outchan: outchan,
 	}
-	serializer := common.NewSerializerInflux()
+	serializer := serializers.NewSerializerInflux()
 	sim := cfg.ToSimulator()
 	// point := common.MakeUsablePoint()
 	// for i := 0; i < b.N; i++ {
@@ -472,7 +473,7 @@ func BenchmarkNewPointAirq(b *testing.B) {
 	out := mockWriter{
 		outchan: outchan,
 	}
-	serializer := common.NewSerializerInflux()
+	serializer := serializers.NewSerializerInflux()
 	sim := cfg.ToSimulator()
 	// point := common.MakeUsablePoint()
 	// for i := 0; i < b.N; i++ {
@@ -616,7 +617,7 @@ func BenchmarkNewPointAirq2SimWith(b *testing.B) {
 	}
 	for j := 0; j < simCount; j++ {
 		go func(w int) {
-			serializer := common.NewSerializerInflux()
+			serializer := serializers.NewSerializerInflux()
 			for point := range outPointChan {
 				serializer.SerializePoint(out, point)
 				point.Reset()
@@ -644,7 +645,7 @@ func TestNewPointVehicle(t *testing.T) {
 	outchan := make(chan []byte, 10000)
 	sim := cfg.ToSimulator()
 	out := bytes.NewBuffer(make([]byte, 0, 1024))
-	serializer := common.NewSerializerInflux()
+	serializer := serializers.NewSerializerInflux()
 	// str := []byte("aaa")
 	var num int32 = 4
 	for j := int32(0); j < num; j++ {
@@ -729,7 +730,7 @@ func TestNewPointVehicleEasy(t *testing.T) {
 
 	point := common.MakeUsablePoint()
 	out := bytes.NewBuffer(make([]byte, 0, 1024))
-	ser := common.NewSerializerInflux()
+	ser := serializers.NewSerializerInflux()
 	for i := 0; i < 10; i++ {
 		sim.Next(point)
 		ser.SerializePoint(out, point)
@@ -777,7 +778,7 @@ func TestNewPointAirqEasy(t *testing.T) {
 		DeviceOffset:     0,
 	}
 	sim := cfg.ToSimulator()
-	ser := common.NewSerializerInflux()
+	ser := serializers.NewSerializerInflux()
 	point := common.MakeUsablePoint()
 	out := Printer{}
 	// for i := 0; i < 10; i++ {
@@ -816,7 +817,7 @@ func TestNewPointDevopsEasy(t *testing.T) {
 		HostOffset: 0,
 	}
 	sim := cfg.ToSimulator()
-	ser := common.NewSerializerInflux()
+	ser := serializers.NewSerializerInflux()
 	point := common.MakeUsablePoint()
 	out := Printer{}
 	for i := 0; i < 20; i++ {

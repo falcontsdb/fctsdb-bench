@@ -1,4 +1,4 @@
-package fctsdb_query_gen
+package query_generator
 
 var (
 	AirQuality = NewQueryCase("air-quality")

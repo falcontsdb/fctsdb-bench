@@ -71,7 +71,7 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 			RunLoad()
 		},
-		// Hidden: true,
+		Hidden: !FullFunction,
 	}
 )
 
