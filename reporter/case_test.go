@@ -82,10 +82,10 @@ func TestCharts(t *testing.T) {
 		// Picture:  line,
 	}
 
-	fmt.Println(testcase.ToHtml())
+	fmt.Println(testcase.ToHtml("1. "))
 	f, _ := os.Create("hah.html")
 	defer f.Close()
-	f.Write([]byte(testcase.ToHtml()))
+	f.Write([]byte(testcase.ToHtml("1. ")))
 
 }
 
