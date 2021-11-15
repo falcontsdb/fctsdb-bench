@@ -22,9 +22,9 @@ type BasicBenchTaskConfig struct {
 }
 
 var (
-	defaultTimeLimite       = "10s"
-	defaultQueryPrePareData = "5d"
-	defaultMixedPrePareData = "1m"
+	defaultTimeLimite       = "5m"
+	defaultQueryPrePareData = "90d"
+	defaultMixedPrePareData = "10m"
 
 	// BuildinConfigs = []BasicBenchTaskConfig{buildinConfig_1, buildinConfig_2, buildinConfig_3, buildinConfig_4, buildinConfig_5, buildinConfig_6, buildinConfig_7, buildinConfig_8, buildinConfig_9, buildinConfig_10}
 	// BuildinConfigs = []BasicBenchTaskConfig{BasicBenchTaskConfig{MixMode: "parallel", Workers: 64, BatchSize: 1000, UseCase: "air-quality", ScaleVar: 100000, SamplingInterval: "1s", TimeLimit: defaultTimeLimite, UseGzip: 1, QueryPercent: 50, Clean: true, SqlTemplate: []string{query_generator.AirQuality.Types[i+1].RawSql}}}
