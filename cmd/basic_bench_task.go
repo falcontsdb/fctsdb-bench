@@ -241,7 +241,7 @@ func (d *BasicBenchTask) PrepareWorkers() int {
 
 	case "mysql":
 		d.serializer = serializers.NewSerializerMysql()
-		if d.needPrePare {
+		if d.doDBCreate {
 			w, ok := writer.(*db_client.MysqlClient)
 			if !ok {
 				log.Fatalln("wrong mysql client")
@@ -453,6 +453,13 @@ func (d *BasicBenchTask) processWrite(w common.DBClient, batchSize int, useCount
 		if pointMadeIndex > d.simulator.Total() && useCountLimit { // 以point结束为结束
 			break
 		}
+		if d.format == "mysql" {
+			if batchItemCount == 0 {
+				buf.Write(append(append([]byte("insert into "), point.MeasurementName...), " values"...))
+			} else {
+				buf.Write([]byte{','})
+			}
+		}
 		d.serializer.SerializePoint(buf, point)
 		batchItemCount++
 		vaulesWritten += (len(point.FieldValues) + len(point.Int64FiledValues))
@@ -460,6 +467,9 @@ func (d *BasicBenchTask) processWrite(w common.DBClient, batchSize int, useCount
 	}
 
 	if batchItemCount > 0 {
+		if d.format == "mysql" {
+			buf.Write([]byte{';'})
+		}
 		err = d.writeToDb(w, buf)
 		if err == nil {
 			atomic.AddInt64(&d.bytesRead, int64(buf.Len()))
