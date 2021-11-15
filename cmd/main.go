@@ -12,7 +12,8 @@ const TOOL_NAME = "fcbench"
 
 var (
 	BuildVersion string
-	rootCmd      = &cobra.Command{
+	FullFunction bool = true
+	rootCmd           = &cobra.Command{
 		Use:   TOOL_NAME + " [command] [flags]",
 		Short: TOOL_NAME + " 一个用于海东青数据库的测试工具",
 		Run: func(cmd *cobra.Command, args []string) {

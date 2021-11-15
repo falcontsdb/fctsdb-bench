@@ -142,7 +142,7 @@ func (l *Line) ToHtml() string {
 		for i, data := range datas {
 			lineDatas[i] = opts.LineData{Value: data}
 		}
-		cline = cline.AddSeries(key, lineDatas, charts.WithLabelOpts(opts.Label{Show: true}))
+		cline = cline.AddSeries(key, lineDatas, charts.WithLabelOpts(opts.Label{Show: true})) //, charts.WithLineChartOpts(opts.LineChart{YAxisIndex: 1}))
 	}
 
 	return renderCharter(l.name, cline)
@@ -157,6 +157,7 @@ func renderCharter(name string, charter Charter) string {
 		charts.WithLegendOpts(opts.Legend{Show: true, Top: "20px"}),
 		charts.WithTooltipOpts(opts.Tooltip{Show: true, Trigger: "axis"}),
 		charts.WithToolboxOpts(opts.Toolbox{Show: true, Right: "20px", Feature: &opts.ToolBoxFeature{SaveAsImage: &opts.ToolBoxFeatureSaveAsImage{Show: true}}}),
+		// charts.WithYAxisOpts(opts.YAxis{Name: "写入", Type: "value"}, 0),
 	)
 
 	buf := bytes.NewBuffer(make([]byte, 0, 4*1024))

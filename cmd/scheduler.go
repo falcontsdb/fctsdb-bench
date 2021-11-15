@@ -24,6 +24,7 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 			scheduler.ScheduleBenchTask()
 		},
+		Hidden: !FullFunction,
 	}
 
 	scheduler = &Scheduler{}
@@ -46,7 +47,6 @@ var (
 				buf.Reset()
 			}
 		},
-		// Hidden: true, // 隐藏此命令，不对外使用，内部测试使用
 	}
 )
 
@@ -158,7 +158,7 @@ func (s *Scheduler) writeResultToCsv(fileName string, info map[string]string, wr
 	heads := []string{"Group", "Mod", "UseCase", "Cardinality", "Workers", "BatchSize", "QueryPercent", "SamplingTime",
 		"P50(r)", "P90(r)", "P95(r)", "P99(r)", "Min(r)", "Max(r)", "Avg(r)", "Fail(r)", "Total(r)", "Qps(r)",
 		"P50(w)", "P90(w)", "P95(w)", "P99(w)", "Min(w)", "Max(w)", "Avg(w)", "Fail(w)", "Total(w)", "Qps(w)", "PointRate(p/s)", "ValueRate(v/s)", "TotalPoints",
-		"RunSec", "Sql", "Monitor"}
+		"RunSec", "Gzip", "Sql", "Monitor"}
 
 	if writeHead {
 		err := csvWriter.Write(heads)

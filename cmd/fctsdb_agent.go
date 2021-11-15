@@ -150,7 +150,7 @@ var (
 			RunAsAgent()
 			// GetPidOnLinux("fctsdb")
 		},
-		// Hidden: true, // 隐藏此命令，不对外使用，内部测试使用
+		Hidden: !FullFunction, // 隐藏此命令，不对外使用，内部测试使用
 	}
 
 	fctsdbWriteAgent = FctsdbAgent{}

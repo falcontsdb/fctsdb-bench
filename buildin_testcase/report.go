@@ -25,7 +25,7 @@ var (
 	csvHeaders = []string{"Group", "Mod", "场景", "Series", "并发数", "Batch Size", "查询百分比", "采样时间",
 		"P50(r)", "P90(r)", "P95(r)", "P99(r)", "Min(r)", "Max(r)", "Avg(r)", "Fail(r)", "Total(r)", "查询(query/s)",
 		"P50(w)", "P90(w)", "P95(w)", "P99(w)", "Min(w)", "Max(w)", "Avg(w)", "Fail(w)", "Total(w)", "Qps(w)", "写入(point/s)", "写入(value/s)", "TotalPoints",
-		"RunSec", "Sql", "Monitor"}
+		"RunSec", "Gzip", "Sql", "Monitor"}
 	csvHeaderMap = make(map[string]int)
 
 	performances = make(map[string]*fcbenchCaseDefine)
@@ -40,7 +40,7 @@ func init() {
 func init() {
 
 	performances["车载Series变化"] = &fcbenchCaseDefine{
-		Title:       "车载Series变化",
+		Title:       "车载场景-写入性能-Series变化",
 		Document:    "测试车载场景（1个tag，60个field），series个数对写入性能的影响。",
 		TableTags:   []string{"场景", "Series", "并发数", "Batch Size", "采样时间"},
 		TableFeilds: []string{"写入(point/s)"},
@@ -49,7 +49,7 @@ func init() {
 	}
 
 	performances["车载batchsize变化"] = &fcbenchCaseDefine{
-		Title:       "车载batchsize变化",
+		Title:       "车载场景-写入性能-batchsize变化",
 		Document:    "测试车载场景（1个tag，60个field），每个http携带数据量（batchsize）对写入性能的影响",
 		TableTags:   []string{"场景", "Series", "并发数", "Batch Size", "采样时间"},
 		TableFeilds: []string{"写入(point/s)"},
@@ -58,7 +58,7 @@ func init() {
 	}
 
 	performances["车载采样时间变化"] = &fcbenchCaseDefine{
-		Title:       "车载采样时间变化",
+		Title:       "车载场景-写入性能-采样时间变化",
 		Document:    "测试车载场景（1个tag，60个field），采样时间（每个series两条数据timestamp间隔）对写入性能的影响",
 		TableTags:   []string{"场景", "Series", "并发数", "Batch Size", "采样时间"},
 		TableFeilds: []string{"写入(point/s)"},
@@ -67,7 +67,7 @@ func init() {
 	}
 
 	performances["车载并发数变化"] = &fcbenchCaseDefine{
-		Title:       "车载并发数变化",
+		Title:       "车载场景-写入性能-并发数变化",
 		Document:    "测试车载场景（1个tag，60个field），并发数对写入性能的影响",
 		TableTags:   []string{"场景", "Series", "并发数", "Batch Size", "采样时间"},
 		TableFeilds: []string{"写入(point/s)"},
@@ -75,8 +75,17 @@ func init() {
 		PicXAxisTag: "并发数",
 	}
 
+	performances["车载Gzip变化"] = &fcbenchCaseDefine{
+		Title:       "车载场景-写入性能-Gzip等级变化",
+		Document:    "测试车载场景（1个tag，60个field），Gzip是否开启及等级对写入性能的影响",
+		TableTags:   []string{"场景", "Series", "并发数", "Batch Size", "采样时间", "Gzip"},
+		TableFeilds: []string{"写入(point/s)"},
+		PicType:     "line",
+		PicXAxisTag: "Gzip",
+	}
+
 	performances["空气质量Series变化"] = &fcbenchCaseDefine{
-		Title:       "空气质量Series变化",
+		Title:       "空气质量场景-写入性能-Series变化",
 		Document:    "测试空气质量（5个tag，8个field），series个数对写入性能的影响",
 		TableTags:   []string{"场景", "Series", "并发数", "Batch Size", "采样时间"},
 		TableFeilds: []string{"写入(point/s)"},
@@ -85,7 +94,7 @@ func init() {
 	}
 
 	performances["空气质量batchsize变化"] = &fcbenchCaseDefine{
-		Title:       "空气质量batchsize变化",
+		Title:       "空气质量场景-写入性能-batchsize变化",
 		Document:    "测试空气质量（5个tag，8个field），每个http携带数据量（batchsize）对写入性能的影响",
 		TableTags:   []string{"场景", "Series", "并发数", "Batch Size", "采样时间"},
 		TableFeilds: []string{"写入(point/s)"},
@@ -94,7 +103,7 @@ func init() {
 	}
 
 	performances["空气质量采样时间变化"] = &fcbenchCaseDefine{
-		Title:       "空气质量采样时间变化",
+		Title:       "空气质量场景-写入性能-采样时间变化",
 		Document:    "测试空气质量（5个tag，8个field），采样时间（每个series两条数据timestamp间隔）对写入性能的影响",
 		TableTags:   []string{"场景", "Series", "并发数", "Batch Size", "采样时间"},
 		TableFeilds: []string{"写入(point/s)"},
@@ -103,7 +112,7 @@ func init() {
 	}
 
 	performances["空气质量并发数变化"] = &fcbenchCaseDefine{
-		Title:       "空气质量并发数变化",
+		Title:       "空气质量场景-写入性能-并发数变化",
 		Document:    "测试空气质量（5个tag，8个field），并发数对写入性能的影响",
 		TableTags:   []string{"场景", "Series", "并发数", "Batch Size", "采样时间"},
 		TableFeilds: []string{"写入(point/s)"},
@@ -111,15 +120,31 @@ func init() {
 		PicXAxisTag: "并发数",
 	}
 
+	performances["空气质量Gzip变化"] = &fcbenchCaseDefine{
+		Title:       "空气质量场景-写入性能-Gzip等级变化",
+		Document:    "测试空气质量（5个tag，8个field），Gzip是否开启对写入性能的影响",
+		TableTags:   []string{"场景", "Series", "并发数", "Batch Size", "采样时间", "Gzip"},
+		TableFeilds: []string{"写入(point/s)"},
+		PicType:     "line",
+		PicXAxisTag: "Gzip",
+	}
+
 	performances["空气质量查询性能"] = &fcbenchCaseDefine{
-		Title:       "空气质量查询性能",
+		Title:       "空气质量场景-查询性能",
 		Document:    "测试空气质量（5个tag，8个field），不同查询语句的性能",
 		TableTags:   []string{"场景", "并发数", "Sql"},
 		TableFeilds: []string{"查询(query/s)"},
 	}
 
+	performances["车载查询性能"] = &fcbenchCaseDefine{
+		Title:       "车载场景-查询性能",
+		Document:    "测试车载场景（5个tag，8个field），不同查询语句的性能",
+		TableTags:   []string{"场景", "并发数", "Sql"},
+		TableFeilds: []string{"查询(query/s)"},
+	}
+
 	performances["空气质量混合比例"] = &fcbenchCaseDefine{
-		Title: "空气质量混合比例（固定并发总数）",
+		Title: "空气质量场景-混合性能-固定并发总数",
 		Document: "测试空气质量（5个tag，8个field），查询和写入比例对性能的影响。\n" +
 			"测试语句: " + query_generator.AirQuality.Types[1].RawSql + "\n" +
 			"本用例固定并发总数，变化混合比例。",
@@ -130,7 +155,7 @@ func init() {
 	}
 
 	performances["空气质量混合方式1"] = &fcbenchCaseDefine{
-		Title: "空气质量混合方式（固定写入并发数）",
+		Title: "空气质量场景-混合性能-固定写入并发数",
 		Document: "测试空气质量（5个tag，8个field），查询和写入比例对性能的影响。\n" +
 			"测试语句: " + query_generator.AirQuality.Types[1].RawSql + "\n" +
 			"本用例固定写入并发数24个，增加查询并发数来改变混合比例。",
@@ -141,7 +166,7 @@ func init() {
 	}
 
 	performances["空气质量混合方式2"] = &fcbenchCaseDefine{
-		Title: "空气质量混合方式（固定查询并发数）",
+		Title: "空气质量场景-混合性能-固定查询并发数",
 		Document: "测试空气质量（5个tag，8个field），查询和写入比例对性能的影响。\n" +
 			"测试语句: " + query_generator.AirQuality.Types[1].RawSql + "\n" +
 			"本用例固定查询并发数24个，增加写入并发数来改变混合比例。",
@@ -151,11 +176,33 @@ func init() {
 		PicXAxisTag: "查询百分比",
 	}
 
-	performances["空气质量混合比例-语句2"] = &fcbenchCaseDefine{
-		Title: "空气质量混合比例-查询语句2",
-		Document: "测试空气质量（5个tag，8个field），查询和写入比例对性能的影响。\n" +
-			"测试语句: " + query_generator.AirQuality.Types[5].RawSql + "\n" +
+	performances["车载混合比例"] = &fcbenchCaseDefine{
+		Title: "车载场景-混合性能-固定并发总数",
+		Document: "测试车载（5个tag，8个field），查询和写入比例对性能的影响。\n" +
+			"测试语句: " + query_generator.Vehicle.Types[1].RawSql + "\n" +
 			"本用例固定并发总数，变化混合比例。",
+		TableTags:   []string{"场景", "Series", "并发数", "查询百分比", "Batch Size", "采样时间"},
+		TableFeilds: []string{"查询(query/s)", "写入(point/s)"},
+		PicType:     "line",
+		PicXAxisTag: "查询百分比",
+	}
+
+	performances["车载混合方式1"] = &fcbenchCaseDefine{
+		Title: "车载场景-混合性能-固定写入并发数",
+		Document: "测试车载（5个tag，8个field），查询和写入比例对性能的影响。\n" +
+			"测试语句: " + query_generator.Vehicle.Types[1].RawSql + "\n" +
+			"本用例固定写入并发数24个，增加查询并发数来改变混合比例。",
+		TableTags:   []string{"场景", "Series", "并发数", "查询百分比", "Batch Size", "采样时间"},
+		TableFeilds: []string{"查询(query/s)", "写入(point/s)"},
+		PicType:     "line",
+		PicXAxisTag: "查询百分比",
+	}
+
+	performances["车载混合方式2"] = &fcbenchCaseDefine{
+		Title: "车载场景-混合性能-固定查询并发数",
+		Document: "测试车载（5个tag，8个field），查询和写入比例对性能的影响。\n" +
+			"测试语句: " + query_generator.Vehicle.Types[1].RawSql + "\n" +
+			"本用例固定查询并发数24个，增加写入并发数来改变混合比例。",
 		TableTags:   []string{"场景", "Series", "并发数", "查询百分比", "Batch Size", "采样时间"},
 		TableFeilds: []string{"查询(query/s)", "写入(point/s)"},
 		PicType:     "line",
@@ -282,4 +329,5 @@ func CreateReport(fileNames ...string) {
 	f, _ := os.Create(fileNames[len(fileNames)-1] + ".html")
 	defer f.Close()
 	report.ToHtmlOneFile(f)
+	// report.ToMarkDown(f)
 }

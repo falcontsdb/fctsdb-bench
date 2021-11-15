@@ -77,9 +77,9 @@ func TestCharts(t *testing.T) {
 	// fmt.Println(buf.String())
 
 	testcase := PerformanceTestCase{
-		Name:     "aaa",
+		name:     "aaa",
 		Document: "ddddd",
-		Picture:  line,
+		// Picture:  line,
 	}
 
 	fmt.Println(testcase.ToHtml())
@@ -102,10 +102,10 @@ func TestPage(t *testing.T) {
 	table.AddRows("1", "2", "3", "5", "6", "7", "8")
 
 	testcase := &PerformanceTestCase{
-		Name:     "aaa",
+		name:     "aaa",
 		Document: "ddddd",
-		Picture:  line,
-		Table:    table,
+		// Picture:  line,
+		Table: table,
 	}
 
 	page := &Page{

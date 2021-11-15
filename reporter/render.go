@@ -13,6 +13,7 @@ import (
 type TestCase interface {
 	GetName() string
 	ToHtml() string
+	ToMarkDown() string
 }
 
 type PerformanceTestCase struct {
@@ -36,7 +37,7 @@ func (t *PerformanceTestCase) GetName() string {
 func (t *PerformanceTestCase) ToHtml() string {
 	var htm string
 	var md string
-	md += ("## " + t.name + "\n\n")
+	md += ("## " + t.Title + "\n\n")
 	md += (strings.ReplaceAll(t.Document, "\n", "\n\n") + "\n\n")
 	if t.Table != nil {
 		md += (t.Table.ToMarkDown() + "\n\n")
@@ -49,6 +50,16 @@ func (t *PerformanceTestCase) ToHtml() string {
 		htm += t.Picture.ToHtml()
 	}
 	return htm
+}
+
+func (t *PerformanceTestCase) ToMarkDown() string {
+	var md string
+	md += ("## " + t.Title + "\n\n")
+	md += (strings.ReplaceAll(t.Document, "\n", "\n\n") + "\n\n")
+	if t.Table != nil {
+		md += (t.Table.ToMarkDown() + "\n\n")
+	}
+	return md
 }
 
 type Page struct {
@@ -106,6 +117,17 @@ func (p *Page) ToHtmlOneFile(w io.Writer) error {
 	pageEnd := "</div>\n</body>\n</html>"
 	w.Write([]byte(pageEnd))
 	return nil
+}
+
+func (p *Page) ToMarkDown(w io.Writer) error {
+	var md string
+	md += ("# " + p.Title + "\n\n")
+	md += (strings.ReplaceAll(p.Document, "\n", "\n\n") + "\n\n")
+	for _, tcase := range p.TestCases {
+		md += tcase.ToMarkDown()
+	}
+	_, err := w.Write([]byte(md))
+	return err
 }
 
 func getTestCaseIndex(name string, slice []TestCase) int {
