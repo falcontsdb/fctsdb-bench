@@ -5,10 +5,12 @@ import (
 	"bytes"
 	"encoding/csv"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -117,16 +119,12 @@ func (s *Scheduler) runBenchTaskByConfig(index int, fileName string, config *bui
 	if s.agentEndpoint != "" {
 		var err error
 		if config.Clean {
-			err = CleanRemoteFalconTSDB(s.agentEndpoint)
+			err = CleanRemoteDatabase(s.agentEndpoint)
 			log.Println("Clean the fctsdb")
 		} else {
-			err = StopRemoteFalconTSDB(s.agentEndpoint)
+			err = RestartRemoteDatabase(s.agentEndpoint)
 			log.Println("Restart the fctsdb")
 		}
-		if err != nil {
-			log.Println("request agent error:", err.Error())
-		}
-		err = StartRemoteFalconTSDB(s.agentEndpoint)
 		if err != nil {
 			log.Println("request agent error:", err.Error())
 		}
@@ -250,3 +248,96 @@ func (s *Scheduler) NewBasicBenchTask(conf *buildin_testcase.BasicBenchTaskConfi
 		password:          s.password,
 	}, nil
 }
+
+func ParseDuration(s string) (time.Duration, error) {
+	// Return an error if the string is blank or one character
+	if len(s) < 2 {
+		return 0, errors.New("invalid duration")
+	}
+
+	// Split string into individual runes.
+	a := []rune(s)
+
+	// Start with a zero duration.
+	var d time.Duration
+	i := 0
+
+	// Check for a negative.
+	isNegative := false
+	if a[i] == '-' {
+		isNegative = true
+		i++
+	}
+
+	var measure int64
+	var unit string
+
+	// Parsing loop.
+	for i < len(a) {
+		// Find the number portion.
+		start := i
+		for ; i < len(a) && isDigit(a[i]); i++ {
+			// Scan for the digits.
+		}
+
+		// Check if we reached the end of the string prematurely.
+		if i >= len(a) || i == start {
+			return 0, errors.New("invalid duration")
+		}
+
+		// Parse the numeric part.
+		n, err := strconv.ParseInt(string(a[start:i]), 10, 64)
+		if err != nil {
+			return 0, errors.New("invalid duration")
+		}
+		measure = n
+
+		// Extract the unit of measure.
+		// If the last two characters are "ms" then parse as milliseconds.
+		// Otherwise just use the last character as the unit of measure.
+		unit = string(a[i])
+		switch a[i] {
+		case 'n':
+			if i+1 < len(a) && a[i+1] == 's' {
+				unit = string(a[i : i+2])
+				d += time.Duration(n)
+				i += 2
+				continue
+			}
+			return 0, errors.New("invalid duration")
+		case 'u', 'µ':
+			d += time.Duration(n) * time.Microsecond
+		case 'm':
+			if i+1 < len(a) && a[i+1] == 's' {
+				unit = string(a[i : i+2])
+				d += time.Duration(n) * time.Millisecond
+				i += 2
+				continue
+			}
+			d += time.Duration(n) * time.Minute
+		case 's':
+			d += time.Duration(n) * time.Second
+		case 'h':
+			d += time.Duration(n) * time.Hour
+		case 'd':
+			d += time.Duration(n) * 24 * time.Hour
+		case 'w':
+			d += time.Duration(n) * 7 * 24 * time.Hour
+		default:
+			return 0, errors.New("invalid duration")
+		}
+		i++
+	}
+
+	// Check to see if we overflowed a duration
+	if d < 0 && !isNegative {
+		return 0, fmt.Errorf("overflowed duration %d%s: choose a smaller duration or INF", measure, unit)
+	}
+
+	if isNegative {
+		d = -d
+	}
+	return d, nil
+}
+
+func isDigit(ch rune) bool { return (ch >= '0' && ch <= '9') }
