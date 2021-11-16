@@ -6,17 +6,7 @@ import (
 	"math/rand"
 	"strings"
 	"unsafe"
-
-	"github.com/go-echarts/go-echarts/v2/charts"
-	"github.com/go-echarts/go-echarts/v2/opts"
 )
-
-type Charter interface {
-	Type() string
-	GetAssets() opts.Assets
-	Validate()
-	SetGlobalOptions(options ...charts.GlobalOpts) *charts.RectChart
-}
 
 type Line struct {
 	name   string
@@ -154,14 +144,6 @@ func (l *Line) ToHtml() string {
 	yAxisLabelFormatter := "function(value,index){if (value < 1000) {return value;}else{return value/1000+'k';}}"
 	htm = strings.ReplaceAll(htm, `"{{ yAxisLabelFormatter }}"`, yAxisLabelFormatter)
 	return htm
-}
-
-type JsonFunction struct {
-	Func string
-}
-
-func (jf JsonFunction) MarshalJSON() ([]byte, error) {
-	return []byte("\"aa\""), nil
 }
 
 func generateUniqueID(n int) string {
