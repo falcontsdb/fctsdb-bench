@@ -257,37 +257,46 @@ func CreateReport(out string, fileNames ...string) {
 	}
 
 	report := reporter.NewPage("性能测试")
-	report.Document = "测试海东青数据库的性能\n" + "使用工具：fcbench\n"
-	// testcaseIndex := make(map[string]int)
-	// testcaseContain := make([]*reporter.PerformanceTestCase, 0)
+	// 整体思路：
+	// 如果是单个文件，只记录简单的数据并进行画图
+	// 如果是多个文件，说明要对不同文件中相同的内容进行数据比较，计算提升百分比
 	var currentTestCase *reporter.PerformanceTestCase
-	for rowIndex, row := range allCsvRecords[fileNames[0]] { //取第一个cse文件开始遍历
-		if rowIndex == 0 { //跳过第一行
+
+	// 取第一个cse文件开始遍历
+	for rowIndex, row := range allCsvRecords[fileNames[0]] {
+
+		// 跳过第一行
+		if rowIndex == 0 {
 			continue
 		}
 		if caseDefine, ok := performances[row[0]]; ok {
 			tableHeaders := caseDefine.TableTags
+
+			// 步骤1：处理表头
 			if len(fileNames) > 1 {
-				// 记录所有csv的相同field值
+				// 多个文件需要进行以下步骤：
+				// 步骤1.1：记录所有csv的相同field值
 				for _, field := range caseDefine.TableFeilds {
 					for _, fileName := range fileNames {
 						tableHeaders = append(tableHeaders, field+": "+fileName)
 					}
 				}
-				// 比较第一个csv和最后一个csv的差值
+				// 步骤1.2：比较第一个csv和最后一个csv的差值
 				for _, field := range caseDefine.TableFeilds {
 					keywords := strings.Split(field, "(")[0]
 					tableHeaders = append(tableHeaders, "比较"+keywords+": "+fileNames[0]+"与"+fileNames[len(fileNames)-1])
 				}
+				// 步骤1.3：添加监控列
 				for _, fileName := range fileNames {
 					tableHeaders = append(tableHeaders, "监控: "+fileName)
 				}
 			} else {
+				// 单个文件仅记录数据
 				tableHeaders = append(tableHeaders, caseDefine.TableFeilds...)
 				tableHeaders = append(tableHeaders, "监控")
 			}
 
-			// 判断是否需要创建表格
+			// 步骤2：判断是否需要创建表格
 			if report.HasTestCase(row[0]) {
 				currentTestCase = report.GetTestCase(row[0]).(*reporter.PerformanceTestCase)
 			} else {
@@ -298,13 +307,12 @@ func CreateReport(out string, fileNames ...string) {
 				report.AddTestCase(currentTestCase)
 			}
 
-			// 记录数据
+			// 步骤3：记录数据
 			var rowData []interface{}
 			if len(fileNames) > 1 {
 
-				// 先记录tag
+				// 步骤3.1：先记录tag
 				for _, header := range caseDefine.TableTags {
-
 					// 替换场景的英文单词为中文单词，方便显示美观
 					data := row[csvHeaderMap[header]]
 					switch data {
@@ -315,13 +323,13 @@ func CreateReport(out string, fileNames ...string) {
 					}
 					rowData = append(rowData, data)
 				}
-				// 记录所有csv的相同field值
+				// 步骤3.2：记录所有csv的相同field值
 				for _, field := range caseDefine.TableFeilds {
 					for _, fileName := range fileNames {
 						rowData = append(rowData, allCsvRecords[fileName][rowIndex][csvHeaderMap[field]])
 					}
 				}
-				// 比较第一个csv和最后一个csv的差值
+				// 步骤3.3：比较第一个csv和最后一个csv的差值
 				for _, field := range caseDefine.TableFeilds {
 					oldData, err := strconv.ParseFloat(allCsvRecords[fileNames[0]][rowIndex][csvHeaderMap[field]], 64)
 					if err != nil {
@@ -336,7 +344,7 @@ func CreateReport(out string, fileNames ...string) {
 					rowData = append(rowData, fmt.Sprintf("%.2f%%", (newData-oldData)/oldData*100))
 				}
 
-				// 监控列
+				// 步骤3.4：监控列
 				for _, fileName := range fileNames {
 					rowData = append(rowData, "[地址]("+allCsvRecords[fileName][rowIndex][csvHeaderMap["监控"]]+")")
 				}
@@ -362,7 +370,7 @@ func CreateReport(out string, fileNames ...string) {
 		}
 	}
 
-	// 设置图片
+	// 步骤4：设置图片
 	for _, testcase := range report.TestCases {
 		performanceTestCase := testcase.(*reporter.PerformanceTestCase)
 		if caseDefine, ok := performances[performanceTestCase.GetName()]; ok {
