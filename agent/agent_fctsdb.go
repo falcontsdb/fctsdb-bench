@@ -1,22 +1,23 @@
-package main
+package agent
 
 import (
 	"errors"
-	"fmt"
-	"io/ioutil"
+	"github.com/BurntSushi/toml"
+	"github.com/shirou/gopsutil/process"
 	"log"
-	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"os/exec"
 	"strconv"
 	"syscall"
 	"time"
+)
 
-	"github.com/BurntSushi/toml"
-	"github.com/shirou/gopsutil/process"
-	"github.com/spf13/cobra"
+const (
+	CLEANPATH   = "/clean"
+	STARTPATH   = "/start"
+	STOPPATH    = "/stop"
+	RESTARTPATH = "/restart"
 )
 
 type DbConfig struct {
@@ -134,107 +135,18 @@ func DecodeFromConfigFile(configFile string) (*DbConfig, error) {
 }
 
 type FctsdbAgent struct {
-	port       string
-	fctsdbPath string
-	configPath string
+	Port       string
+	FctsdbPath string
+	ConfigPath string
 
 	//run var
-	dbConfig *DbConfig
-}
-
-var (
-	dataWriteAgentCmd = &cobra.Command{
-		Use:   "agent",
-		Short: "代理程序，和数据库运行在一起，支持被远程调用开启关闭数据库（开发团队内部使用）",
-		Run: func(cmd *cobra.Command, args []string) {
-			RunAsAgent()
-			// GetPidOnLinux("fctsdb")
-		},
-		Hidden: !FullFunction, // 隐藏此命令，不对外使用，内部测试使用
-	}
-
-	fctsdbWriteAgent = FctsdbAgent{}
-	cleanPath        = "/clean"
-	startPath        = "/start"
-	stopPath         = "/stop"
-)
-
-func init() {
-	fctsdbWriteAgent.Init(dataWriteAgentCmd)
-	rootCmd.AddCommand(dataWriteAgentCmd)
-}
-func StartRemoteFalconTSDB(endpoint string) error {
-	_, err := httpGet(endpoint, startPath)
-	return err
-}
-func StopRemoteFalconTSDB(endpoint string) error {
-	_, err := httpGet(endpoint, stopPath)
-	return err
-}
-func CleanRemoteFalconTSDB(endpoint string) error {
-	_, err := httpGet(endpoint, cleanPath)
-	return err
-}
-func httpGet(endpoint, path string) ([]byte, error) {
-
-	u, err := url.Parse(endpoint)
-	if err != nil {
-		log.Fatal("Invalid agent address:", endpoint, ", error:", err.Error())
-	}
-	if u.Scheme == "" {
-		log.Fatal("Invalid agent address:", endpoint)
-	}
-	u.Path = path
-
-	resp, err := http.Get(u.String())
-	if err != nil {
-		return nil, err
-	}
-	rData, err := ioutil.ReadAll(resp.Body)
-	return rData, err
-}
-
-func RunAsAgent() {
-	fctsdbWriteAgent.Validate()
-	fctsdbWriteAgent.ListenAndServe()
-}
-
-func (f *FctsdbAgent) Init(cmd *cobra.Command) {
-	flags := cmd.Flags()
-	flags.StringVar(&f.port, "port", "8966", "监听端口")
-	flags.StringVar(&f.fctsdbPath, "fctsdb-path", "./fctsdb", "数据库二进制文件地址")
-	flags.StringVar(&f.configPath, "fctsdb-config", "./config", "数据库config文件地址")
-}
-
-func (f *FctsdbAgent) Validate() {
-	f.ParseConfig()
-	f.StartFalconTSDB()
-}
-
-func (f *FctsdbAgent) ParseConfig() {
-	var err error
-	f.dbConfig, err = DecodeFromConfigFile(f.configPath)
-	if err != nil {
-		log.Fatal("Decode fctsdb config failed, error:", err.Error())
-	}
-}
-
-func (f *FctsdbAgent) ListenAndServe() {
-
-	http.HandleFunc(cleanPath, f.CleanHandler)
-	http.HandleFunc(startPath, f.StartDBHandler)
-	http.HandleFunc(stopPath, f.StopDBHandler)
-	log.Println("Start service 0.0.0.0:" + f.port)
-	err := http.ListenAndServe("0.0.0.0:"+f.port, nil)
-	if err != nil {
-		log.Fatal(err.Error())
-	}
+	DbConfig *DbConfig
 }
 
 func (f *FctsdbAgent) StartDBHandler(w http.ResponseWriter, r *http.Request) {
 	log.Println(r.Host)
 	if r.Method == "GET" {
-		err := f.StartFalconTSDB()
+		err := f.StartDB()
 		if err != nil {
 			log.Println("HTTP: " + err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
@@ -249,7 +161,7 @@ func (f *FctsdbAgent) StartDBHandler(w http.ResponseWriter, r *http.Request) {
 
 func (f *FctsdbAgent) CleanHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
-		err := f.CleanFalconTSDB(true)
+		err := f.RestartDB(true)
 		if err != nil {
 			log.Println("HTTP: " + err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
@@ -264,7 +176,7 @@ func (f *FctsdbAgent) CleanHandler(w http.ResponseWriter, r *http.Request) {
 
 func (f *FctsdbAgent) StopDBHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
-		err := f.CleanFalconTSDB(false)
+		err := f.StopDB()
 		if err != nil {
 			log.Println("HTTP: " + err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
@@ -277,7 +189,22 @@ func (f *FctsdbAgent) StopDBHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (f *FctsdbAgent) CleanFalconTSDB(deleteData bool) error {
+func (f *FctsdbAgent) RestartDBHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "GET" {
+		err := f.RestartDB(false)
+		if err != nil {
+			log.Println("HTTP: " + err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(err.Error()))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+		log.Println("HTTP: stop falconTSDB successful")
+	}
+}
+
+func (f *FctsdbAgent) RestartDB(deleteData bool) error {
 	pid, err := GetPidOnLinux("fctsdb")
 	if err != nil {
 		log.Println("Get fctsdb failed, error: " + err.Error())
@@ -296,14 +223,14 @@ func (f *FctsdbAgent) CleanFalconTSDB(deleteData bool) error {
 			log.Println("Stop falconTSDB succeed")
 			if deleteData {
 				//clear data directory of database
-				for _, dir := range []string{f.dbConfig.Meta.Dir, f.dbConfig.Data.Dir, f.dbConfig.Data.SnapshotDir, f.dbConfig.Data.WalDir} {
+				for _, dir := range []string{f.DbConfig.Meta.Dir, f.DbConfig.Data.Dir, f.DbConfig.Data.SnapshotDir, f.DbConfig.Data.WalDir} {
 					err := os.RemoveAll(dir)
 					if err != nil {
 						return err
 					}
 				}
 			}
-			return nil
+			return f.StartDB()
 		}
 	}
 
@@ -312,7 +239,7 @@ func (f *FctsdbAgent) CleanFalconTSDB(deleteData bool) error {
 	return err
 }
 
-func (f *FctsdbAgent) StartFalconTSDB() error {
+func (f *FctsdbAgent) StartDB() error {
 	pid, err := GetPidOnLinux("fctsdb")
 	if err != nil {
 		log.Println("Start db failed, error: " + err.Error())
@@ -323,7 +250,7 @@ func (f *FctsdbAgent) StartFalconTSDB() error {
 		log.Println("Start db failed, error: " + err.Error())
 		return err
 	} else {
-		cmd := `nohup ` + f.fctsdbPath + ` -config ` + f.configPath + ` 1>/dev/null 2>&1 &`
+		cmd := `nohup ` + f.FctsdbPath + ` -config ` + f.ConfigPath + ` 1>/dev/null 2>&1 &`
 		log.Println(cmd)
 		execCmd := exec.Command("bash", "-c", cmd)
 		execCmd.SysProcAttr = &syscall.SysProcAttr{
@@ -340,19 +267,32 @@ func (f *FctsdbAgent) StartFalconTSDB() error {
 	return nil
 }
 
-func CheckFalconTSDB(addr string) error {
-	for i := 0; i < 12; i++ {
-		conn, err := net.DialTimeout("tcp", addr, 5*time.Second)
-		time.Sleep(5 * time.Second)
-		if err != nil {
-			log.Println("FalconTSDB is not started, error: " + err.Error())
-		} else {
-			log.Println("FalconTSDB is started")
-			conn.Close()
-			return nil
-		}
+func (f *FctsdbAgent) StopDB() error {
+	pid, err := GetPidOnLinux("fctsdb")
+	if err != nil {
+		log.Println("stop db failed, error: " + err.Error())
+		return err
 	}
-	return errors.New("FalconTSDB is not started in 60s")
+	if pid == "" {
+		err = errors.New("no fctsdb database running,please make a check")
+		log.Println("stop db failed, error: " + err.Error())
+		return err
+	}
+	err = KillOnLinux(pid)
+	if err != nil {
+		return err
+	}
+	log.Println("Stop falconTSDB succeed")
+	return nil
+
+}
+
+func (f *FctsdbAgent) ParseConfig() {
+	var err error
+	f.DbConfig, err = DecodeFromConfigFile(f.ConfigPath)
+	if err != nil {
+		log.Fatal("Decode fctsdb config failed, error:", err.Error())
+	}
 }
 
 func KillOnLinux(pid string) error {
@@ -381,113 +321,4 @@ func GetPidOnLinux(serverName string) (string, error) {
 	// 	return "", err
 	// }
 	return "", err
-}
-
-func RemoveFolder(folder string) error {
-	cmd := `rm ` + folder + ` -rf`
-
-	_, err := exec.Command("bash", "-c", cmd).Output()
-	if err != nil {
-		log.Printf("Remove folder(%s) failed, error: %s\n", folder, err.Error())
-		return err
-	}
-	log.Printf("Remove folder(%s) succeed\n", folder)
-	return nil
-}
-
-func isDigit(ch rune) bool { return (ch >= '0' && ch <= '9') }
-
-// ParseDuration parses a time duration from a string.
-// This is needed instead of time.ParseDuration because this will support
-// the full syntax that fql supports for specifying durations
-// including weeks and days.
-func ParseDuration(s string) (time.Duration, error) {
-	// Return an error if the string is blank or one character
-	if len(s) < 2 {
-		return 0, errors.New("invalid duration")
-	}
-
-	// Split string into individual runes.
-	a := []rune(s)
-
-	// Start with a zero duration.
-	var d time.Duration
-	i := 0
-
-	// Check for a negative.
-	isNegative := false
-	if a[i] == '-' {
-		isNegative = true
-		i++
-	}
-
-	var measure int64
-	var unit string
-
-	// Parsing loop.
-	for i < len(a) {
-		// Find the number portion.
-		start := i
-		for ; i < len(a) && isDigit(a[i]); i++ {
-			// Scan for the digits.
-		}
-
-		// Check if we reached the end of the string prematurely.
-		if i >= len(a) || i == start {
-			return 0, errors.New("invalid duration")
-		}
-
-		// Parse the numeric part.
-		n, err := strconv.ParseInt(string(a[start:i]), 10, 64)
-		if err != nil {
-			return 0, errors.New("invalid duration")
-		}
-		measure = n
-
-		// Extract the unit of measure.
-		// If the last two characters are "ms" then parse as milliseconds.
-		// Otherwise just use the last character as the unit of measure.
-		unit = string(a[i])
-		switch a[i] {
-		case 'n':
-			if i+1 < len(a) && a[i+1] == 's' {
-				unit = string(a[i : i+2])
-				d += time.Duration(n)
-				i += 2
-				continue
-			}
-			return 0, errors.New("invalid duration")
-		case 'u', 'µ':
-			d += time.Duration(n) * time.Microsecond
-		case 'm':
-			if i+1 < len(a) && a[i+1] == 's' {
-				unit = string(a[i : i+2])
-				d += time.Duration(n) * time.Millisecond
-				i += 2
-				continue
-			}
-			d += time.Duration(n) * time.Minute
-		case 's':
-			d += time.Duration(n) * time.Second
-		case 'h':
-			d += time.Duration(n) * time.Hour
-		case 'd':
-			d += time.Duration(n) * 24 * time.Hour
-		case 'w':
-			d += time.Duration(n) * 7 * 24 * time.Hour
-		default:
-			return 0, errors.New("invalid duration")
-		}
-		i++
-	}
-
-	// Check to see if we overflowed a duration
-	if d < 0 && !isNegative {
-		return 0, fmt.Errorf("overflowed duration %d%s: choose a smaller duration or INF", measure, unit)
-	}
-
-	if isNegative {
-		d = -d
-	}
-	return d, nil
 }
