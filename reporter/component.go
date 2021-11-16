@@ -144,7 +144,41 @@ func (l *Line) ToHtml() string {
 		}
 		cline = cline.AddSeries(key, lineDatas, charts.WithLabelOpts(opts.Label{Show: true})) //, charts.WithLineChartOpts(opts.LineChart{YAxisIndex: 1}))
 	}
+	return renderCharter(l.name, cline)
+}
 
+type Bar struct {
+	name   string
+	xAxis  []string
+	series map[string][]string
+}
+
+func NewBar(name string) *Bar {
+	return &Bar{
+		name:   name,
+		xAxis:  make([]string, 0),
+		series: make(map[string][]string),
+	}
+}
+
+func (l *Bar) AddSeries(name string, series []string) {
+	l.series[name] = series
+}
+
+func (l *Bar) SetXAxis(xAxis []string) {
+	l.xAxis = xAxis
+}
+
+func (l *Bar) ToHtml() string {
+	cline := charts.NewBar()
+	cline = cline.SetXAxis(l.xAxis)
+	for key, datas := range l.series {
+		barDatas := make([]opts.BarData, len(datas))
+		for i, data := range datas {
+			barDatas[i] = opts.BarData{Value: data}
+		}
+		cline = cline.AddSeries(key, barDatas, charts.WithLabelOpts(opts.Label{Show: true})) //, charts.WithLineChartOpts(opts.LineChart{YAxisIndex: 1}))
+	}
 	return renderCharter(l.name, cline)
 }
 
@@ -152,12 +186,11 @@ func renderCharter(name string, charter Charter) string {
 	htm := ""
 	var err error
 	charter.SetGlobalOptions(
-		charts.WithTitleOpts(opts.Title{Title: "图-" + name, Top: "0px", TitleStyle: &opts.TextStyle{FontSize: 14}}),
-		charts.WithInitializationOpts(opts.Initialization{Width: "800px", Height: "320px"}),
-		charts.WithLegendOpts(opts.Legend{Show: true, Top: "20px"}),
-		charts.WithTooltipOpts(opts.Tooltip{Show: true, Trigger: "axis"}),
-		charts.WithToolboxOpts(opts.Toolbox{Show: true, Right: "20px", Feature: &opts.ToolBoxFeature{SaveAsImage: &opts.ToolBoxFeatureSaveAsImage{Show: true}}}),
-		// charts.WithYAxisOpts(opts.YAxis{Name: "写入", Type: "value"}, 0),
+		charts.WithTitleOpts(opts.Title{Title: "图-" + name, Top: "0px", TitleStyle: &opts.TextStyle{FontSize: 14}}),                                              // 图注
+		charts.WithInitializationOpts(opts.Initialization{Width: "800px", Height: "320px"}),                                                                      // 全局大小
+		charts.WithLegendOpts(opts.Legend{Show: true, Top: "20px"}),                                                                                              // 图例
+		charts.WithTooltipOpts(opts.Tooltip{Show: true, Trigger: "axis"}),                                                                                        // tip标签
+		charts.WithToolboxOpts(opts.Toolbox{Show: true, Right: "20px", Feature: &opts.ToolBoxFeature{SaveAsImage: &opts.ToolBoxFeatureSaveAsImage{Show: true}}}), // 下载图
 	)
 
 	buf := bytes.NewBuffer(make([]byte, 0, 4*1024))
