@@ -18,8 +18,13 @@ type fcbenchCaseDefine struct {
 	Document    string   //case说明
 	TableTags   []string //记录非数据列，类似于海东青数据库的tag
 	TableFeilds []string //记录数据列，类似于海东青数据库的feild
-	PicType     string   //图片类型，line折线图，bar柱状图
-	PicXAxisTag string   //图片的x坐标取至table的哪一个列
+	Pictures    []PictureDefine
+}
+
+type PictureDefine struct {
+	Type         string   //图片类型，line折线图，bar柱状图
+	XAxisColumn  string   //图片的x坐标取至table的哪一个列
+	SeriesColumn []string //图片的series取至table的哪一个列
 }
 
 var (
@@ -45,8 +50,9 @@ func init() {
 		Document:    "测试车载场景（1个tag，60个field），series个数对写入性能的影响。",
 		TableTags:   []string{"场景", "Series", "并发数", "Batch Size", "采样时间"},
 		TableFeilds: []string{"写入(point/s)"},
-		PicType:     "line",
-		PicXAxisTag: "Series",
+		Pictures: []PictureDefine{
+			{Type: "line", XAxisColumn: "Series", SeriesColumn: []string{"写入(point/s)"}},
+		},
 	}
 
 	performances["车载batchsize变化"] = &fcbenchCaseDefine{
@@ -54,8 +60,9 @@ func init() {
 		Document:    "测试车载场景（1个tag，60个field），每个http携带数据量（batchsize）对写入性能的影响",
 		TableTags:   []string{"场景", "Series", "并发数", "Batch Size", "采样时间"},
 		TableFeilds: []string{"写入(point/s)"},
-		PicType:     "line",
-		PicXAxisTag: "Batch Size",
+		Pictures: []PictureDefine{
+			{Type: "line", XAxisColumn: "Batch Size", SeriesColumn: []string{"写入(point/s)"}},
+		},
 	}
 
 	performances["车载采样时间变化"] = &fcbenchCaseDefine{
@@ -63,8 +70,9 @@ func init() {
 		Document:    "测试车载场景（1个tag，60个field），采样时间（每个series两条数据timestamp间隔）对写入性能的影响",
 		TableTags:   []string{"场景", "Series", "并发数", "Batch Size", "采样时间"},
 		TableFeilds: []string{"写入(point/s)"},
-		PicType:     "line",
-		PicXAxisTag: "采样时间",
+		Pictures: []PictureDefine{
+			{Type: "line", XAxisColumn: "采样时间", SeriesColumn: []string{"写入(point/s)"}},
+		},
 	}
 
 	performances["车载并发数变化"] = &fcbenchCaseDefine{
@@ -72,8 +80,9 @@ func init() {
 		Document:    "测试车载场景（1个tag，60个field），并发数对写入性能的影响",
 		TableTags:   []string{"场景", "Series", "并发数", "Batch Size", "采样时间"},
 		TableFeilds: []string{"写入(point/s)"},
-		PicType:     "line",
-		PicXAxisTag: "并发数",
+		Pictures: []PictureDefine{
+			{Type: "line", XAxisColumn: "并发数", SeriesColumn: []string{"写入(point/s)"}},
+		},
 	}
 
 	performances["车载Gzip变化"] = &fcbenchCaseDefine{
@@ -81,8 +90,9 @@ func init() {
 		Document:    "测试车载场景（1个tag，60个field），Gzip是否开启及等级对写入性能的影响",
 		TableTags:   []string{"场景", "Series", "并发数", "Batch Size", "采样时间", "Gzip"},
 		TableFeilds: []string{"写入(point/s)"},
-		PicType:     "line",
-		PicXAxisTag: "Gzip",
+		Pictures: []PictureDefine{
+			{Type: "line", XAxisColumn: "Gzip", SeriesColumn: []string{"写入(point/s)"}},
+		},
 	}
 
 	performances["空气质量Series变化"] = &fcbenchCaseDefine{
@@ -90,8 +100,9 @@ func init() {
 		Document:    "测试空气质量（5个tag，8个field），series个数对写入性能的影响",
 		TableTags:   []string{"场景", "Series", "并发数", "Batch Size", "采样时间"},
 		TableFeilds: []string{"写入(point/s)"},
-		PicType:     "line",
-		PicXAxisTag: "Series",
+		Pictures: []PictureDefine{
+			{Type: "line", XAxisColumn: "Series", SeriesColumn: []string{"写入(point/s)"}},
+		},
 	}
 
 	performances["空气质量batchsize变化"] = &fcbenchCaseDefine{
@@ -99,8 +110,9 @@ func init() {
 		Document:    "测试空气质量（5个tag，8个field），每个http携带数据量（batchsize）对写入性能的影响",
 		TableTags:   []string{"场景", "Series", "并发数", "Batch Size", "采样时间"},
 		TableFeilds: []string{"写入(point/s)"},
-		PicType:     "line",
-		PicXAxisTag: "Batch Size",
+		Pictures: []PictureDefine{
+			{Type: "line", XAxisColumn: "Batch Size", SeriesColumn: []string{"写入(point/s)"}},
+		},
 	}
 
 	performances["空气质量采样时间变化"] = &fcbenchCaseDefine{
@@ -108,8 +120,9 @@ func init() {
 		Document:    "测试空气质量（5个tag，8个field），采样时间（每个series两条数据timestamp间隔）对写入性能的影响",
 		TableTags:   []string{"场景", "Series", "并发数", "Batch Size", "采样时间"},
 		TableFeilds: []string{"写入(point/s)"},
-		PicType:     "line",
-		PicXAxisTag: "采样时间",
+		Pictures: []PictureDefine{
+			{Type: "line", XAxisColumn: "采样时间", SeriesColumn: []string{"写入(point/s)"}},
+		},
 	}
 
 	performances["空气质量并发数变化"] = &fcbenchCaseDefine{
@@ -117,8 +130,9 @@ func init() {
 		Document:    "测试空气质量（5个tag，8个field），并发数对写入性能的影响",
 		TableTags:   []string{"场景", "Series", "并发数", "Batch Size", "采样时间"},
 		TableFeilds: []string{"写入(point/s)"},
-		PicType:     "line",
-		PicXAxisTag: "并发数",
+		Pictures: []PictureDefine{
+			{Type: "line", XAxisColumn: "并发数", SeriesColumn: []string{"写入(point/s)"}},
+		},
 	}
 
 	performances["空气质量Gzip变化"] = &fcbenchCaseDefine{
@@ -126,8 +140,9 @@ func init() {
 		Document:    "测试空气质量（5个tag，8个field），Gzip是否开启对写入性能的影响",
 		TableTags:   []string{"场景", "Series", "并发数", "Batch Size", "采样时间", "Gzip"},
 		TableFeilds: []string{"写入(point/s)"},
-		PicType:     "line",
-		PicXAxisTag: "Gzip",
+		Pictures: []PictureDefine{
+			{Type: "line", XAxisColumn: "Gzip", SeriesColumn: []string{"写入(point/s)"}},
+		},
 	}
 
 	performances["空气质量查询性能"] = &fcbenchCaseDefine{
@@ -151,8 +166,10 @@ func init() {
 			"本用例固定并发总数，变化混合比例。",
 		TableTags:   []string{"场景", "Series", "并发数", "查询百分比", "Batch Size", "采样时间"},
 		TableFeilds: []string{"查询(query/s)", "写入(point/s)"},
-		PicType:     "line",
-		PicXAxisTag: "查询百分比",
+		Pictures: []PictureDefine{
+			{Type: "line", XAxisColumn: "查询百分比", SeriesColumn: []string{"写入(point/s)"}},
+			{Type: "line", XAxisColumn: "查询百分比", SeriesColumn: []string{"查询(query/s)"}},
+		},
 	}
 
 	performances["空气质量混合方式1"] = &fcbenchCaseDefine{
@@ -162,8 +179,10 @@ func init() {
 			"本用例固定写入并发数24个，增加查询并发数来改变混合比例。",
 		TableTags:   []string{"场景", "Series", "并发数", "查询百分比", "Batch Size", "采样时间"},
 		TableFeilds: []string{"查询(query/s)", "写入(point/s)"},
-		PicType:     "line",
-		PicXAxisTag: "查询百分比",
+		Pictures: []PictureDefine{
+			{Type: "line", XAxisColumn: "查询百分比", SeriesColumn: []string{"写入(point/s)"}},
+			{Type: "line", XAxisColumn: "查询百分比", SeriesColumn: []string{"查询(query/s)"}},
+		},
 	}
 
 	performances["空气质量混合方式2"] = &fcbenchCaseDefine{
@@ -173,8 +192,10 @@ func init() {
 			"本用例固定查询并发数24个，增加写入并发数来改变混合比例。",
 		TableTags:   []string{"场景", "Series", "并发数", "查询百分比", "Batch Size", "采样时间"},
 		TableFeilds: []string{"查询(query/s)", "写入(point/s)"},
-		PicType:     "line",
-		PicXAxisTag: "查询百分比",
+		Pictures: []PictureDefine{
+			{Type: "line", XAxisColumn: "查询百分比", SeriesColumn: []string{"写入(point/s)"}},
+			{Type: "line", XAxisColumn: "查询百分比", SeriesColumn: []string{"查询(query/s)"}},
+		},
 	}
 
 	performances["车载混合比例"] = &fcbenchCaseDefine{
@@ -184,8 +205,10 @@ func init() {
 			"本用例固定并发总数，变化混合比例。",
 		TableTags:   []string{"场景", "Series", "并发数", "查询百分比", "Batch Size", "采样时间"},
 		TableFeilds: []string{"查询(query/s)", "写入(point/s)"},
-		PicType:     "line",
-		PicXAxisTag: "查询百分比",
+		Pictures: []PictureDefine{
+			{Type: "line", XAxisColumn: "查询百分比", SeriesColumn: []string{"写入(point/s)"}},
+			{Type: "line", XAxisColumn: "查询百分比", SeriesColumn: []string{"查询(query/s)"}},
+		},
 	}
 
 	performances["车载混合方式1"] = &fcbenchCaseDefine{
@@ -195,8 +218,10 @@ func init() {
 			"本用例固定写入并发数24个，增加查询并发数来改变混合比例。",
 		TableTags:   []string{"场景", "Series", "并发数", "查询百分比", "Batch Size", "采样时间"},
 		TableFeilds: []string{"查询(query/s)", "写入(point/s)"},
-		PicType:     "line",
-		PicXAxisTag: "查询百分比",
+		Pictures: []PictureDefine{
+			{Type: "line", XAxisColumn: "查询百分比", SeriesColumn: []string{"写入(point/s)"}},
+			{Type: "line", XAxisColumn: "查询百分比", SeriesColumn: []string{"查询(query/s)"}},
+		},
 	}
 
 	performances["车载混合方式2"] = &fcbenchCaseDefine{
@@ -206,8 +231,10 @@ func init() {
 			"本用例固定查询并发数24个，增加写入并发数来改变混合比例。",
 		TableTags:   []string{"场景", "Series", "并发数", "查询百分比", "Batch Size", "采样时间"},
 		TableFeilds: []string{"查询(query/s)", "写入(point/s)"},
-		PicType:     "line",
-		PicXAxisTag: "查询百分比",
+		Pictures: []PictureDefine{
+			{Type: "line", XAxisColumn: "查询百分比", SeriesColumn: []string{"写入(point/s)"}},
+			{Type: "line", XAxisColumn: "查询百分比", SeriesColumn: []string{"查询(query/s)"}},
+		},
 	}
 
 }
@@ -339,23 +366,25 @@ func CreateReport(out string, fileNames ...string) {
 	for _, testcase := range report.TestCases {
 		performanceTestCase := testcase.(*reporter.PerformanceTestCase)
 		if caseDefine, ok := performances[performanceTestCase.GetName()]; ok {
-			switch caseDefine.PicType {
-			case "line":
-				line := reporter.NewLine(performanceTestCase.Title)
-				line.SetXAxis(performanceTestCase.Table.GetColumn(caseDefine.PicXAxisTag))
-
-				if len(fileNames) > 1 {
-					for _, field := range caseDefine.TableFeilds {
-						for _, fileName := range fileNames {
-							line.AddSeries(field+":"+fileName, performanceTestCase.Table.GetColumn(field+": "+fileName))
+			for _, picDefine := range caseDefine.Pictures {
+				switch picDefine.Type {
+				case "line":
+					words := strings.Split(performanceTestCase.Title, "-")
+					line := reporter.NewLine(words[len(words)-1] + picDefine.SeriesColumn[0])
+					line.SetXAxis(performanceTestCase.Table.GetColumn(picDefine.XAxisColumn))
+					if len(fileNames) > 1 {
+						for _, field := range picDefine.SeriesColumn {
+							for _, fileName := range fileNames {
+								line.AddSeries(field+":"+fileName, performanceTestCase.Table.GetColumn(field+": "+fileName))
+							}
+						}
+					} else {
+						for _, field := range picDefine.SeriesColumn {
+							line.AddSeries(field, performanceTestCase.Table.GetColumn(field))
 						}
 					}
-				} else {
-					for _, field := range caseDefine.TableFeilds {
-						line.AddSeries(field, performanceTestCase.Table.GetColumn(field))
-					}
+					performanceTestCase.Pictures = append(performanceTestCase.Pictures, line)
 				}
-				performanceTestCase.Picture = line
 			}
 		}
 	}

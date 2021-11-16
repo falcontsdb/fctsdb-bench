@@ -22,7 +22,7 @@ type PerformanceTestCase struct {
 	Title    string
 	Document string
 	Table    *Table
-	Picture  Picture
+	Pictures []Picture
 }
 
 func NewPerformanceTestCase(name string) *PerformanceTestCase {
@@ -47,8 +47,10 @@ func (t *PerformanceTestCase) ToHtml(index string) string {
 	mdOpts := html.RendererOptions{Flags: htmlFlags}
 	renderer := html.NewRenderer(mdOpts)
 	htm += string(markdown.ToHTML([]byte(md), nil, renderer))
-	if t.Picture != nil {
-		htm += t.Picture.ToHtml()
+	if len(t.Pictures) != 0 {
+		for _, pic := range t.Pictures {
+			htm += pic.ToHtml()
+		}
 	}
 	return htm
 }
