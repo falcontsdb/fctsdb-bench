@@ -11,6 +11,13 @@ import (
 	"github.com/gomarkdown/markdown/html"
 )
 
+type Picture interface {
+	SetXAxis([]string)
+	AddSeries(string, []string)
+	SetSmallSize(bool)
+	ToHtml() string
+}
+
 type TestCase interface {
 	GetName() string
 	ToHtml(string) string
@@ -47,11 +54,16 @@ func (t *PerformanceTestCase) ToHtml(index string) string {
 	mdOpts := html.RendererOptions{Flags: htmlFlags}
 	renderer := html.NewRenderer(mdOpts)
 	htm += string(markdown.ToHTML([]byte(md), nil, renderer))
-	if len(t.Pictures) != 0 {
-		for _, pic := range t.Pictures {
+
+	for _, pic := range t.Pictures {
+		if len(t.Pictures) == 1 {
+			htm += pic.ToHtml()
+		} else {
+			pic.SetSmallSize(true)
 			htm += pic.ToHtml()
 		}
 	}
+
 	return htm
 }
 

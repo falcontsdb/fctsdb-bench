@@ -256,10 +256,11 @@ func CreateReport(out string, fileNames ...string) {
 		}
 	}
 
-	report := reporter.NewPage("性能测试")
-	// 整体思路：
+	// 整体完成效果：
 	// 如果是单个文件，只记录简单的数据并进行画图
 	// 如果是多个文件，说明要对不同文件中相同的内容进行数据比较，计算提升百分比
+	report := reporter.NewPage("性能测试")
+	report.Document = "测试海东青数据库的性能\n" + "使用工具：fcbench\n"
 	var currentTestCase *reporter.PerformanceTestCase
 
 	// 取第一个cse文件开始遍历
@@ -313,13 +314,13 @@ func CreateReport(out string, fileNames ...string) {
 
 				// 步骤3.1：先记录tag
 				for _, header := range caseDefine.TableTags {
-					// 替换场景的英文单词为中文单词，方便显示美观
+					// 替换场景的单词，方便显示美观
 					data := row[csvHeaderMap[header]]
 					switch data {
 					case "vehicle":
 						data = "车载"
 					case "air-quality":
-						data = "空气质量"
+						data = "AirQ"
 					}
 					rowData = append(rowData, data)
 				}
