@@ -5,7 +5,6 @@ go 1.15
 require (
 	github.com/BurntSushi/toml v0.3.1
 	github.com/StackExchange/wmi v1.2.1 // indirect
-	github.com/go-echarts/go-echarts/v2 v2.2.4
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/gomarkdown/markdown v0.0.0-20211105120026-16f708f914c3
 	github.com/google/flatbuffers v1.12.0
