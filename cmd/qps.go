@@ -148,22 +148,13 @@ func Round(f float64, bit int) float64 {
 	return v
 }
 
-func stringComplement(src string, bit int, sep string) string {
-	sepb := []byte(sep)
-	srcb := []byte(src)
-	for i := 0; i < bit; i++ {
-		srcb = append(srcb, sepb...)
-	}
-	return string(srcb)
-}
-
 func (r RespTimeResult) Show() {
 	// 利用反射
 	t := reflect.TypeOf(r)
 	v := reflect.ValueOf(r)
 	keys := make([]string, t.NumField())
 	values := make([]string, t.NumField())
-
+	maxLengths := make([]int, t.NumField())
 	// 下面3步核心思想是，取key和value两个的长度，key更长，就将value长度补位空字符和key一样长，value更长，就补位key
 	// 最终需要得到以下格式：
 	// P50(ms) P90(ms) P95(ms) P99(ms) Min(ms) Max(ms) Avg(ms) Qps Fail Total RunSec(s)
@@ -174,33 +165,28 @@ func (r RespTimeResult) Show() {
 		// 合入单位
 		switch t.Field(k).Name {
 		case "Qps", "Fail", "Total", "Label":
-			keys[k] = fmt.Sprintf("%v ", t.Field(k).Name)
+			keys[k] = fmt.Sprintf("%v", t.Field(k).Name)
 		case "RunSec":
-			keys[k] = fmt.Sprintf("%v(s) ", t.Field(k).Name)
+			keys[k] = fmt.Sprintf("%v(s)", t.Field(k).Name)
 		case "Start", "End":
 			continue
 		default:
-			keys[k] = fmt.Sprintf("%v(ms) ", t.Field(k).Name)
+			keys[k] = fmt.Sprintf("%v(ms)", t.Field(k).Name)
 		}
 
-		// key长度大于value，将value补位；key长度小于value，则保持value
-		value := fmt.Sprintf("%v", v.Field(k).Interface())
-		if len(keys[k]) > len(value) {
-			values[k] = stringComplement(fmt.Sprintf("%v", value), len(keys[k])-len(value), " ")
-		} else {
-			values[k] = value + " "
-		}
+		values[k] = fmt.Sprintf("%v", v.Field(k).Interface())
+		maxLengths[k] = max(len(keys[k]), len(values[k]))
 	}
 
 	// 第2步：按value长度打印key，不足补位空字符串
 	for k := 0; k < len(keys); k++ {
-		fmt.Print(stringComplement(keys[k], len(values[k])-len(keys[k]), " "))
+		fmt.Print(left(keys[k], maxLengths[k]+1, " "))
 	}
 	fmt.Print("\n")
 
 	// 第3步：输出value
 	for k := 0; k < len(keys); k++ {
-		fmt.Print(values[k], "")
+		fmt.Print(left(values[k], maxLengths[k]+1, " "))
 	}
 	fmt.Print("\n")
 }
@@ -232,6 +218,7 @@ func (g GroupResult) Show() {
 	// 利用反射
 	var keys []string
 	var groupValues [][]string
+	var maxLengths []int
 	for i, r := range g {
 		t := reflect.TypeOf(r)
 		v := reflect.ValueOf(r)
@@ -244,27 +231,24 @@ func (g GroupResult) Show() {
 		// 第1步：先遍历一变，按照key的长度，格式化value并记录下来
 		if i == 0 {
 			keys = make([]string, t.NumField())
+			maxLengths = make([]int, t.NumField())
 			for k := 0; k < t.NumField(); k++ {
 				// 合入单位
 				switch t.Field(k).Name {
 				case "Qps", "Fail", "Total", "Label":
-					keys[k] = fmt.Sprintf("%v ", t.Field(k).Name)
+					keys[k] = fmt.Sprintf("%v", t.Field(k).Name)
 				case "RunSec":
-					keys[k] = fmt.Sprintf("%v(s) ", t.Field(k).Name)
+					keys[k] = fmt.Sprintf("%v(s)", t.Field(k).Name)
 				case "Start", "End":
 					continue
 					// keys[k] = fmt.Sprintf("%v ", t.Field(k).Name)
 				default:
-					keys[k] = fmt.Sprintf("%v(ms) ", t.Field(k).Name)
+					keys[k] = fmt.Sprintf("%v(ms)", t.Field(k).Name)
 				}
 
 				// key长度大于value，将value补位；key长度小于value，则保持value
-				value := fmt.Sprintf("%v", v.Field(k).Interface())
-				if len(keys[k]) > len(value) {
-					values[k] = stringComplement(fmt.Sprintf("%v", value), len(keys[k])-len(value), " ")
-				} else {
-					values[k] = value + " "
-				}
+				values[k] = fmt.Sprintf("%v", v.Field(k).Interface())
+				maxLengths[k] = max(len(keys[k]), len(values[k]))
 			}
 		} else {
 			for k := 0; k < t.NumField(); k++ {
@@ -273,32 +257,23 @@ func (g GroupResult) Show() {
 					continue
 				}
 				// key长度大于value，将value补位；key长度小于value，则保持value
-				value := fmt.Sprintf("%v", v.Field(k).Interface())
-				if len(keys[k]) > len(value) {
-					values[k] = stringComplement(fmt.Sprintf("%v", value), len(keys[k])-len(value), " ")
-				} else {
-					values[k] = value + " "
-				}
+				values[k] = fmt.Sprintf("%v", v.Field(k).Interface())
+				maxLengths[k] = max(maxLengths[k], len(values[k]))
 			}
 		}
 		groupValues = append(groupValues, values)
 	}
-	// 第2步：按value长度打印key，不足补位空字符串
+
+	// 第2步：按max length长度打印key，不足补位空字符串
 	for k := 0; k < len(keys); k++ {
-		valueMaxLen := 0
-		for _, values := range groupValues {
-			if len(values[k]) > valueMaxLen {
-				valueMaxLen = len(values[k])
-			}
-		}
-		fmt.Print(stringComplement(keys[k], valueMaxLen-len(keys[k]), " "))
+		fmt.Print(left(keys[k], maxLengths[k]+1, " "))
 	}
 	fmt.Print("\n")
 
 	// 第3步：输出value
 	for _, values := range groupValues {
 		for k := 0; k < len(keys); k++ {
-			fmt.Print(values[k], "")
+			fmt.Print(left(values[k], maxLengths[k]+1, " "))
 		}
 		fmt.Print("\n")
 	}
@@ -364,4 +339,19 @@ func AvgInt64(list []int64) int64 {
 	}
 	avg += total / count
 	return avg
+}
+
+func left(word string, length int, fillchar string) string {
+	words := word
+	for i := 0; i < length-len(word); i++ {
+		words += fillchar
+	}
+	return words
+}
+
+func max(x, y int) int {
+	if x >= y {
+		return x
+	}
+	return y
 }

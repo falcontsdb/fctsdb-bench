@@ -49,7 +49,7 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 			RunQueryLoad()
 		},
-		Hidden: !FullFunction,
+		Hidden: true,
 	}
 )
 

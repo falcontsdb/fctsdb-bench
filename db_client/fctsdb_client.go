@@ -51,11 +51,23 @@ func NewFctsdbClient(c common.ClientConfig) *FctsdbClient {
 	writeUrl = append(writeUrl, host...)
 	writeUrl = append(writeUrl, "/write?db="...)
 	writeUrl = fasthttp.AppendQuotedArg(writeUrl, []byte(c.Database))
+	if c.User != "" {
+		writeUrl = append(writeUrl, "&u="...)
+		writeUrl = fasthttp.AppendQuotedArg(writeUrl, []byte(c.User))
+		writeUrl = append(writeUrl, "&p="...)
+		writeUrl = fasthttp.AppendQuotedArg(writeUrl, []byte(c.Password))
+	}
 
 	queryUrl := make([]byte, 0)
 	queryUrl = append(queryUrl, c.Host...)
 	queryUrl = append(queryUrl, "/query?db="...)
 	queryUrl = fasthttp.AppendQuotedArg(queryUrl, []byte(c.Database))
+	if c.User != "" {
+		writeUrl = append(writeUrl, "&u="...)
+		writeUrl = fasthttp.AppendQuotedArg(writeUrl, []byte(c.User))
+		writeUrl = append(writeUrl, "&p="...)
+		writeUrl = fasthttp.AppendQuotedArg(writeUrl, []byte(c.Password))
+	}
 	queryUrl = append(queryUrl, "&q="...)
 
 	return &FctsdbClient{

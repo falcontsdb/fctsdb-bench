@@ -82,7 +82,7 @@ func init() {
 	scheduleCmd.PersistentFlags().StringVar(&scheduler.grafanaEndpoint, "grafana", "", "grafana的dashboard地址，例如: http://124.71.230.36:4000/sources/1/dashboards/4")
 	scheduleCmd.PersistentFlags().StringVar(&scheduler.format, "format", "fctsdb", "目标数据库类型，当前仅支持fctsdb和mysql")
 	scheduleCmd.PersistentFlags().StringVar(&scheduler.username, "username", "", "用户名")
-	scheduleCmd.PersistentFlags().StringVar(&scheduler.password, "password", "\"i94QNN$6T2DNJ:ecF8z", "密码")
+	scheduleCmd.PersistentFlags().StringVar(&scheduler.password, "password", "", "密码")
 	scheduleCmd.PersistentFlags().BoolVar(&scheduler.debug, "debug", false, "是否打印详细日志(default false).")
 	rootCmd.AddCommand(scheduleCmd)
 	scheduleCmd.AddCommand(showCmd)

@@ -63,6 +63,8 @@ func InitMixed(task *BasicBenchTask, cmd *cobra.Command) {
 	cmdFlags.StringVar(&task.timestampStartStr, "timestamp-start", common.DefaultDateTimeStart, "*开始测试前准备数据的开始时间 (RFC3339)")
 	cmdFlags.StringVar(&task.timestampEndStr, "timestamp-prepare", "2018-01-01T00:10:00Z", "*开始测试前准备数据的结束时间 (RFC3339)")
 	cmdFlags.Int64Var(&task.seed, "seed", 12345678, "*全局随机数种子(设置为0是使用当前时间作为随机数种子)")
+	cmdFlags.StringVar(&task.username, "username", "", "数据库用户名")
+	cmdFlags.StringVar(&task.password, "password", "", "数据库密码")
 
 	// 运行参数
 	cmdFlags.IntVar(&task.batchSize, "batch-size", 100, "1个http请求中携带Point个数")
@@ -70,10 +72,11 @@ func InitMixed(task *BasicBenchTask, cmd *cobra.Command) {
 	cmdFlags.IntVar(&task.workers, "workers", 1, "并发的http个数")
 	cmdFlags.StringVar(&task.mixMode, "mix-mode", "parallel", "混合模式，支持parallel(按线程比例混合)、request(按请求比例混合)")
 	cmdFlags.IntVar(&task.queryType, "query-type", 1, "查询类型")
-	cmdFlags.IntVar(&task.queryPercent, "query-percent", 0, "查询请求所占百分比 (default 0)")
+	cmdFlags.IntVar(&task.queryPercent, "query-percent", 50, "查询请求所占百分比")
 	cmdFlags.Int64Var(&task.queryCount, "query-count", 1000, "生成的查询语句数量")
 	cmdFlags.DurationVar(&task.timeLimit, "time-limit", -1, "最大测试时间(-1表示不生效)，>0会使参数timestamp-end失效")
 	cmdFlags.BoolVar(&task.debug, "debug", false, "是否打印详细日志(default false).")
+	cmdFlags.StringVar(&task.format, "format", "fctsdb", "目标数据库类型，当前仅支持fctsdb和mysql")
 
 	// 高级参数
 	cmdFlags.StringVar(&task.cpuProfile, "cpu-profile", "", "将cpu-profile信息写入文件的地址，用于自测此工具")
@@ -94,6 +97,8 @@ func InitWrite(task *BasicBenchTask, cmd *cobra.Command) {
 	cmdFlags.StringVar(&task.timestampStartStr, "timestamp-start", common.DefaultDateTimeStart, "*模拟机开始采样的时间 (RFC3339)")
 	cmdFlags.StringVar(&task.timestampEndStr, "timestamp-end", common.DefaultDateTimeEnd, "*模拟机采样结束数据 (RFC3339)")
 	cmdFlags.Int64Var(&task.seed, "seed", 12345678, "*全局随机数种子(设置为0是使用当前时间作为随机数种子)")
+	cmdFlags.StringVar(&task.username, "username", "", "数据库用户名")
+	cmdFlags.StringVar(&task.password, "password", "", "数据库密码")
 
 	// 运行参数
 	cmdFlags.IntVar(&task.batchSize, "batch-size", 100, "1个http请求中携带Point个数")
@@ -101,6 +106,7 @@ func InitWrite(task *BasicBenchTask, cmd *cobra.Command) {
 	cmdFlags.IntVar(&task.workers, "workers", 1, "并发的http个数")
 	cmdFlags.DurationVar(&task.timeLimit, "time-limit", 300*time.Second, "最大测试时间")
 	cmdFlags.BoolVar(&task.debug, "debug", false, "是否打印详细日志(default false).")
+	cmdFlags.StringVar(&task.format, "format", "fctsdb", "目标数据库类型，当前仅支持fctsdb和mysql")
 
 	// 高级参数
 	cmdFlags.StringVar(&task.cpuProfile, "cpu-profile", "", "将cpu-profile信息写入文件的地址，用于自测此工具")
@@ -122,6 +128,8 @@ func InitQuery(task *BasicBenchTask, cmd *cobra.Command) {
 	cmdFlags.StringVar(&task.timestampStartStr, "timestamp-start", common.DefaultDateTimeStart, "*模拟机开始采样的时间 (RFC3339)")
 	cmdFlags.StringVar(&task.timestampEndStr, "timestamp-end", common.DefaultDateTimeEnd, "*模拟机采样结束数据 (RFC3339)")
 	cmdFlags.Int64Var(&task.seed, "seed", 12345678, "*全局随机数种子(设置为0是使用当前时间作为随机数种子)")
+	cmdFlags.StringVar(&task.username, "username", "", "数据库用户名")
+	cmdFlags.StringVar(&task.password, "password", "", "数据库密码")
 
 	// 运行参数
 	cmdFlags.IntVar(&task.batchSize, "batch-size", 1, "1个http请求中携带查询语句个数")
@@ -131,6 +139,7 @@ func InitQuery(task *BasicBenchTask, cmd *cobra.Command) {
 	cmdFlags.Int64Var(&task.queryCount, "query-count", 1000, "生成的查询语句数量")
 	cmdFlags.DurationVar(&task.timeLimit, "time-limit", -1, "最大测试时间(-1表示不生效)，>0会使query-count参数失效")
 	cmdFlags.BoolVar(&task.debug, "debug", false, "是否打印详细日志(default false).")
+	cmdFlags.StringVar(&task.format, "format", "fctsdb", "目标数据库类型，当前仅支持fctsdb和mysql")
 
 	// 高级参数
 	cmdFlags.StringVar(&task.cpuProfile, "cpu-profile", "", "将cpu-profile信息写入文件的地址，用于自测此工具")

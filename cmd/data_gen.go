@@ -63,7 +63,7 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 			DataGen()
 		},
-		Hidden: !FullFunction,
+		Hidden: true,
 	}
 	dataGenerator = DataGenerator{}
 )
