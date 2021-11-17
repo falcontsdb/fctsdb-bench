@@ -4,10 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"git.querycap.com/falcontsdb/fctsdb-bench/common"
-	_ "github.com/go-sql-driver/mysql"
 	"net"
 	"time"
+
+	"git.querycap.com/falcontsdb/fctsdb-bench/common"
+	_ "github.com/go-sql-driver/mysql"
 )
 
 // MysqlWrite is a Writer that writes to a mysql server.
@@ -38,10 +39,10 @@ func (c *MysqlClient) Close() {
 
 func (c *MysqlClient) Write(body []byte) (int64, error) {
 	conn, err := c.DB.Conn(context.Background())
-	defer conn.Close()
 	if err != nil {
 		return 0, err
 	}
+	defer conn.Close()
 	sql := string(body)
 	startTime := time.Now()
 	_, err = conn.ExecContext(context.Background(), sql)
@@ -51,10 +52,10 @@ func (c *MysqlClient) Write(body []byte) (int64, error) {
 
 func (c *MysqlClient) Query(lines []byte) (int64, error) {
 	conn, err := c.DB.Conn(context.Background())
-	defer conn.Close()
 	if err != nil {
 		return 0, err
 	}
+	defer conn.Close()
 	sql := string(lines)
 	startTime := time.Now()
 	rows, err := conn.QueryContext(context.Background(), sql)
@@ -84,10 +85,10 @@ func (c *MysqlClient) ListDatabases() ([]string, error) {
 	defer db.Close()
 	showDatabaseSql := "show databases;"
 	rows, err := db.Query(showDatabaseSql)
-	defer rows.Close()
 	if err != nil {
 		return []string{}, err
 	}
+	defer rows.Close()
 	databases := make([]string, 0)
 	for rows.Next() {
 		var database string

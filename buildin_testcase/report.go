@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 
@@ -244,13 +245,14 @@ func CreateReport(out string, fileNames ...string) {
 	// filesOrder := make([]string, 0)
 
 	allCsvRecords := make(map[string][][]string)
-	for _, fileName := range fileNames {
-		csvFile, err := os.OpenFile(fileName+".csv", os.O_RDONLY, 0666)
+	for index := range fileNames {
+		csvFile, err := os.OpenFile(fileNames[index]+".csv", os.O_RDONLY, 0666)
 		if err != nil {
 			log.Fatalln("open result csv failed, error:", err.Error())
 		}
 		csvReader := csv.NewReader(csvFile)
-		allCsvRecords[fileName], err = csvReader.ReadAll()
+		_, fileNames[index] = path.Split(fileNames[index]) //只取文件名字，去掉路径
+		allCsvRecords[fileNames[index]], err = csvReader.ReadAll()
 		if err != nil {
 			log.Fatalln("read csv error:", err.Error())
 		}
@@ -355,13 +357,13 @@ func CreateReport(out string, fileNames ...string) {
 					if header == "监控" { // 监控特例化
 						rowData = append(rowData, "[地址]("+row[csvHeaderMap[header]]+")")
 					} else {
-						// 替换场景的英文单词为中文单词，方便显示美观
+						// 替换场景的单词，方便显示美观
 						data := row[csvHeaderMap[header]]
 						switch data {
 						case "vehicle":
 							data = "车载"
 						case "air-quality":
-							data = "空气质量"
+							data = "AirQ"
 						}
 						rowData = append(rowData, data)
 					}
@@ -379,7 +381,7 @@ func CreateReport(out string, fileNames ...string) {
 				switch picDefine.Type {
 				case "line":
 					words := strings.Split(performanceTestCase.Title, "-")
-					line := reporter.NewLine(words[len(words)-1] + picDefine.SeriesColumn[0])
+					line := reporter.NewLine(words[len(words)-1] + "-" + picDefine.SeriesColumn[0])
 					line.SetXAxis(performanceTestCase.Table.GetColumn(picDefine.XAxisColumn))
 					if len(fileNames) > 1 {
 						for _, field := range picDefine.SeriesColumn {

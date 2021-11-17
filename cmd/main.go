@@ -99,4 +99,5 @@ func main() {
 	rootCmd.AddCommand(mockCmd)
 	rootCmd.SetHelpCommand(&cobra.Command{})
 	rootCmd.Execute()
+
 }
