@@ -2,15 +2,19 @@ package agent
 
 import (
 	"errors"
-	"github.com/BurntSushi/toml"
-	"github.com/shirou/gopsutil/process"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"os/exec"
+	"runtime"
 	"strconv"
 	"syscall"
 	"time"
+
+	"github.com/BurntSushi/toml"
+	"github.com/shirou/gopsutil/mem"
+	"github.com/shirou/gopsutil/process"
 )
 
 const (
@@ -18,6 +22,7 @@ const (
 	STARTPATH   = "/start"
 	STOPPATH    = "/stop"
 	RESTARTPATH = "/restart"
+	GETENVPATH  = "/env"
 )
 
 type DbConfig struct {
@@ -176,7 +181,7 @@ func (f *FctsdbAgent) CleanHandler(w http.ResponseWriter, r *http.Request) {
 
 func (f *FctsdbAgent) StopDBHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
-		err := f.StopDB()
+		err := f.RestartDB(false)
 		if err != nil {
 			log.Println("HTTP: " + err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
@@ -201,6 +206,13 @@ func (f *FctsdbAgent) RestartDBHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
 		log.Println("HTTP: stop falconTSDB successful")
+	}
+}
+
+func (f *FctsdbAgent) GetEnvHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "GET" {
+		w.Write(getEnv())
+		w.WriteHeader(http.StatusOK)
 	}
 }
 
@@ -230,7 +242,7 @@ func (f *FctsdbAgent) RestartDB(deleteData bool) error {
 					}
 				}
 			}
-			return f.StartDB()
+			return nil
 		}
 	}
 
@@ -321,4 +333,23 @@ func GetPidOnLinux(serverName string) (string, error) {
 	// 	return "", err
 	// }
 	return "", err
+}
+
+type Env struct {
+	CPU  string
+	OS   string
+	ARCH string
+	MEN  string
+}
+
+func getEnv() []byte {
+	env := Env{}
+	env.CPU = fmt.Sprintf("%d核", runtime.NumCPU())
+	env.OS = runtime.GOOS
+	env.ARCH = runtime.GOARCH
+	memory, err := mem.VirtualMemory()
+	if err == nil {
+		env.MEN = fmt.Sprintf("%.fG", float64(memory.Total)/1024/1024/1024)
+	}
+	return []byte(fmt.Sprintf("CPU: %s; CPU架构: %s; 内存: %s; 操作系统: %s;", env.CPU, env.ARCH, env.MEN, env.OS))
 }

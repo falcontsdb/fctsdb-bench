@@ -240,7 +240,7 @@ func init() {
 
 }
 
-func CreateReport(out string, fileNames ...string) {
+func CreateReport(fileNames ...string) *reporter.Page {
 
 	// filesOrder := make([]string, 0)
 
@@ -272,91 +272,54 @@ func CreateReport(out string, fileNames ...string) {
 		if rowIndex == 0 {
 			continue
 		}
-		if caseDefine, ok := performances[row[0]]; ok {
-			tableHeaders := caseDefine.TableTags
+		// 处理尾行
+		if row[0] == "test-env" {
+			report.Document += strings.ReplaceAll(row[1], ";", "\n")
+		} else {
+			if caseDefine, ok := performances[row[0]]; ok {
+				tableHeaders := caseDefine.TableTags
 
-			// 步骤1：处理表头
-			if len(fileNames) > 1 {
-				// 多个文件需要进行以下步骤：
-				// 步骤1.1：记录所有csv的相同field值
-				for _, field := range caseDefine.TableFeilds {
+				// 步骤1：处理表头
+				if len(fileNames) > 1 {
+					// 多个文件需要进行以下步骤：
+					// 步骤1.1：记录所有csv的相同field值
+					for _, field := range caseDefine.TableFeilds {
+						for _, fileName := range fileNames {
+							tableHeaders = append(tableHeaders, field+": "+fileName)
+						}
+					}
+					// 步骤1.2：比较第一个csv和最后一个csv的差值
+					for _, field := range caseDefine.TableFeilds {
+						keywords := strings.Split(field, "(")[0]
+						tableHeaders = append(tableHeaders, "比较"+keywords+": "+fileNames[0]+"与"+fileNames[len(fileNames)-1])
+					}
+					// 步骤1.3：添加监控列
 					for _, fileName := range fileNames {
-						tableHeaders = append(tableHeaders, field+": "+fileName)
+						tableHeaders = append(tableHeaders, "监控: "+fileName)
 					}
-				}
-				// 步骤1.2：比较第一个csv和最后一个csv的差值
-				for _, field := range caseDefine.TableFeilds {
-					keywords := strings.Split(field, "(")[0]
-					tableHeaders = append(tableHeaders, "比较"+keywords+": "+fileNames[0]+"与"+fileNames[len(fileNames)-1])
-				}
-				// 步骤1.3：添加监控列
-				for _, fileName := range fileNames {
-					tableHeaders = append(tableHeaders, "监控: "+fileName)
-				}
-			} else {
-				// 单个文件仅记录数据
-				tableHeaders = append(tableHeaders, caseDefine.TableFeilds...)
-				tableHeaders = append(tableHeaders, "监控")
-			}
-
-			// 步骤2：判断是否需要创建表格
-			if report.HasTestCase(row[0]) {
-				currentTestCase = report.GetTestCase(row[0]).(*reporter.PerformanceTestCase)
-			} else {
-				currentTestCase = reporter.NewPerformanceTestCase(row[0])
-				currentTestCase.Title = caseDefine.Title
-				currentTestCase.Document = caseDefine.Document
-				currentTestCase.Table = reporter.CreateTable(tableHeaders...)
-				report.AddTestCase(currentTestCase)
-			}
-
-			// 步骤3：记录数据
-			var rowData []interface{}
-			if len(fileNames) > 1 {
-
-				// 步骤3.1：先记录tag
-				for _, header := range caseDefine.TableTags {
-					// 替换场景的单词，方便显示美观
-					data := row[csvHeaderMap[header]]
-					switch data {
-					case "vehicle":
-						data = "车载"
-					case "air-quality":
-						data = "AirQ"
-					}
-					rowData = append(rowData, data)
-				}
-				// 步骤3.2：记录所有csv的相同field值
-				for _, field := range caseDefine.TableFeilds {
-					for _, fileName := range fileNames {
-						rowData = append(rowData, allCsvRecords[fileName][rowIndex][csvHeaderMap[field]])
-					}
-				}
-				// 步骤3.3：比较第一个csv和最后一个csv的差值
-				for _, field := range caseDefine.TableFeilds {
-					oldData, err := strconv.ParseFloat(allCsvRecords[fileNames[0]][rowIndex][csvHeaderMap[field]], 64)
-					if err != nil {
-						rowData = append(rowData, "error")
-						continue
-					}
-					newData, err := strconv.ParseFloat(allCsvRecords[fileNames[len(fileNames)-1]][rowIndex][csvHeaderMap[field]], 64)
-					if err != nil {
-						rowData = append(rowData, "error")
-						continue
-					}
-					rowData = append(rowData, fmt.Sprintf("%.2f%%", (newData-oldData)/oldData*100))
+				} else {
+					// 单个文件仅记录数据
+					tableHeaders = append(tableHeaders, caseDefine.TableFeilds...)
+					tableHeaders = append(tableHeaders, "监控")
 				}
 
-				// 步骤3.4：监控列
-				for _, fileName := range fileNames {
-					rowData = append(rowData, "[地址]("+allCsvRecords[fileName][rowIndex][csvHeaderMap["监控"]]+")")
+				// 步骤2：判断是否需要创建表格
+				if report.HasTestCase(row[0]) {
+					currentTestCase = report.GetTestCase(row[0]).(*reporter.PerformanceTestCase)
+				} else {
+					currentTestCase = reporter.NewPerformanceTestCase(row[0])
+					currentTestCase.Title = caseDefine.Title
+					currentTestCase.Document = caseDefine.Document
+					currentTestCase.Table = reporter.CreateTable(tableHeaders...)
+					report.AddTestCase(currentTestCase)
 				}
 
-			} else {
-				for _, header := range tableHeaders {
-					if header == "监控" { // 监控特例化
-						rowData = append(rowData, "[地址]("+row[csvHeaderMap[header]]+")")
-					} else {
+				// 步骤3：记录数据
+				var rowData []interface{}
+				if len(fileNames) > 1 {
+
+					// 步骤3.1：先记录tag
+					for _, header := range caseDefine.TableTags {
 						// 替换场景的单词，方便显示美观
 						data := row[csvHeaderMap[header]]
 						switch data {
@@ -367,9 +330,51 @@ func CreateReport(out string, fileNames ...string) {
 						}
 						rowData = append(rowData, data)
 					}
+					// 步骤3.2：记录所有csv的相同field值
+					for _, field := range caseDefine.TableFeilds {
+						for _, fileName := range fileNames {
+							rowData = append(rowData, allCsvRecords[fileName][rowIndex][csvHeaderMap[field]])
+						}
+					}
+					// 步骤3.3：比较第一个csv和最后一个csv的差值
+					for _, field := range caseDefine.TableFeilds {
+						oldData, err := strconv.ParseFloat(allCsvRecords[fileNames[0]][rowIndex][csvHeaderMap[field]], 64)
+						if err != nil {
+							rowData = append(rowData, "error")
+							continue
+						}
+						newData, err := strconv.ParseFloat(allCsvRecords[fileNames[len(fileNames)-1]][rowIndex][csvHeaderMap[field]], 64)
+						if err != nil {
+							rowData = append(rowData, "error")
+							continue
+						}
+						rowData = append(rowData, fmt.Sprintf("%.2f%%", (newData-oldData)/oldData*100))
+					}
+
+					// 步骤3.4：监控列
+					for _, fileName := range fileNames {
+						rowData = append(rowData, "[地址]("+allCsvRecords[fileName][rowIndex][csvHeaderMap["监控"]]+")")
+					}
+
+				} else {
+					for _, header := range tableHeaders {
+						if header == "监控" { // 监控特例化
+							rowData = append(rowData, "[地址]("+row[csvHeaderMap[header]]+")")
+						} else {
+							// 替换场景的单词，方便显示美观
+							data := row[csvHeaderMap[header]]
+							switch data {
+							case "vehicle":
+								data = "车载"
+							case "air-quality":
+								data = "AirQ"
+							}
+							rowData = append(rowData, data)
+						}
+					}
 				}
+				currentTestCase.Table.AddRows(rowData...)
 			}
-			currentTestCase.Table.AddRows(rowData...)
 		}
 	}
 
@@ -400,13 +405,5 @@ func CreateReport(out string, fileNames ...string) {
 		}
 	}
 
-	if out == "html" {
-		f, _ := os.Create(fileNames[len(fileNames)-1] + ".html")
-		defer f.Close()
-		report.ToHtmlOneFile(f)
-	} else {
-		f, _ := os.Create(fileNames[len(fileNames)-1] + ".md")
-		defer f.Close()
-		report.ToMarkDown(f)
-	}
+	return report
 }

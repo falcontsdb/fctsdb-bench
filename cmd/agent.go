@@ -2,13 +2,14 @@ package main
 
 import (
 	"errors"
-	"git.querycap.com/falcontsdb/fctsdb-bench/agent"
-	"git.querycap.com/falcontsdb/fctsdb-bench/common"
-	"github.com/spf13/cobra"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
+
+	"git.querycap.com/falcontsdb/fctsdb-bench/agent"
+	"git.querycap.com/falcontsdb/fctsdb-bench/common"
+	"github.com/spf13/cobra"
 )
 
 type AgentConfig struct {
@@ -55,6 +56,9 @@ func CleanRemoteDatabase(endpoint string) error {
 func RestartRemoteDatabase(endpoint string) error {
 	_, err := httpGet(endpoint, agent.RESTARTPATH)
 	return err
+}
+func GetEnvironment(endpoint string) ([]byte, error) {
+	return httpGet(endpoint, agent.GETENVPATH)
 }
 func httpGet(endpoint, path string) ([]byte, error) {
 	u, err := url.Parse(endpoint)
@@ -121,6 +125,7 @@ func ListenAndServe() {
 	http.HandleFunc(agent.STARTPATH, a.StartDBHandler)
 	http.HandleFunc(agent.STOPPATH, a.StopDBHandler)
 	http.HandleFunc(agent.RESTARTPATH, a.RestartDBHandler)
+	http.HandleFunc(agent.GETENVPATH, a.GetEnvHandler)
 	log.Println("Start service 0.0.0.0:" + agentConfig.port)
 	err := http.ListenAndServe("0.0.0.0:"+agentConfig.port, nil)
 	if err != nil {

@@ -20,6 +20,11 @@ import (
 )
 
 var (
+	heads = []string{"Group", "Mod", "UseCase", "Cardinality", "Workers", "BatchSize", "QueryPercent", "SamplingTime",
+		"P50(r)", "P90(r)", "P95(r)", "P99(r)", "Min(r)", "Max(r)", "Avg(r)", "Fail(r)", "Total(r)", "Qps(r)",
+		"P50(w)", "P90(w)", "P95(w)", "P99(w)", "Min(w)", "Max(w)", "Avg(w)", "Fail(w)", "Total(w)", "Qps(w)", "PointRate(p/s)", "ValueRate(v/s)", "TotalPoints",
+		"RunSec", "Gzip", "Sql", "Monitor"}
+
 	scheduleCmd = &cobra.Command{
 		Use:   "schedule",
 		Short: "从配置文件中读取执行任务并顺序执行",
@@ -59,7 +64,10 @@ var (
 			for _, arg := range args {
 				fileNames = append(fileNames, strings.TrimSuffix(arg, ".csv"))
 			}
-			buildin_testcase.CreateReport("html", fileNames...)
+			report := buildin_testcase.CreateReport(fileNames...)
+			f, _ := os.Create(fileNames[len(fileNames)-1] + ".html")
+			defer f.Close()
+			report.ToHtmlOneFile(f)
 		},
 	}
 )
@@ -123,7 +131,27 @@ func (s *Scheduler) ScheduleBenchTask() {
 				continue
 			}
 		}
-		buildin_testcase.CreateReport("html", fileName)
+		if s.agentEndpoint != "" {
+			envBytes, err := GetEnvironment(s.agentEndpoint)
+			log.Println(string(envBytes))
+			if err == nil {
+				csvFile, err := os.OpenFile(fileName+".csv", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0666)
+				if err != nil {
+					log.Println("open result csv failed, error:", err.Error())
+				}
+				defer csvFile.Close()
+				csvWriter := csv.NewWriter(csvFile)
+				oneLine := make([]string, len(heads))
+				oneLine[0] = "test-env"
+				oneLine[1] = string(envBytes)
+				csvWriter.Write(oneLine)
+				csvWriter.Flush()
+			}
+		}
+		report := buildin_testcase.CreateReport(fileName)
+		f, _ := os.Create(fileName + ".html")
+		defer f.Close()
+		report.ToHtmlOneFile(f)
 	}
 }
 
@@ -138,6 +166,10 @@ func (s *Scheduler) runBenchTaskByConfig(index int, fileName string, config *bui
 			err = RestartRemoteDatabase(s.agentEndpoint)
 			log.Println("Restart the fctsdb")
 		}
+		if err != nil {
+			log.Println("request agent error:", err.Error())
+		}
+		err = StartRemoteDatabase(s.agentEndpoint)
 		if err != nil {
 			log.Println("request agent error:", err.Error())
 		}
@@ -165,11 +197,6 @@ func (s *Scheduler) writeResultToCsv(fileName string, info map[string]string, wr
 	}
 	defer csvFile.Close()
 	csvWriter := csv.NewWriter(csvFile)
-
-	heads := []string{"Group", "Mod", "UseCase", "Cardinality", "Workers", "BatchSize", "QueryPercent", "SamplingTime",
-		"P50(r)", "P90(r)", "P95(r)", "P99(r)", "Min(r)", "Max(r)", "Avg(r)", "Fail(r)", "Total(r)", "Qps(r)",
-		"P50(w)", "P90(w)", "P95(w)", "P99(w)", "Min(w)", "Max(w)", "Avg(w)", "Fail(w)", "Total(w)", "Qps(w)", "PointRate(p/s)", "ValueRate(v/s)", "TotalPoints",
-		"RunSec", "Gzip", "Sql", "Monitor"}
 
 	if writeHead {
 		err := csvWriter.Write(heads)

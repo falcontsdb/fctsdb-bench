@@ -41,7 +41,7 @@ func (m MysqlAgent) CleanHandler(w http.ResponseWriter, r *http.Request) {
 
 func (m MysqlAgent) StopDBHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
-		err := m.StopDB()
+		err := m.RestartDB(false)
 		if err != nil {
 			log.Println("HTTP: " + err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
@@ -69,10 +69,14 @@ func (m MysqlAgent) RestartDBHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (m MysqlAgent) RestartDB(deleteData bool) error {
-	if deleteData {
-
+func (m MysqlAgent) GetEnvHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "GET" {
+		w.Write(getEnv())
+		w.WriteHeader(http.StatusOK)
 	}
+}
+
+func (m MysqlAgent) RestartDB(deleteData bool) error {
 	return nil
 }
 
