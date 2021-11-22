@@ -1,4 +1,4 @@
-package reporter
+package picture
 
 // "git.querycap.com/falcontsdb/fctsdb-bench/reporter/templates"
 

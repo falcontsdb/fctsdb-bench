@@ -1,4 +1,4 @@
-package reporter
+package picture
 
 import (
 	"encoding/json"

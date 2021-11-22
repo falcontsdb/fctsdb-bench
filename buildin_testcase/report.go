@@ -10,7 +10,9 @@ import (
 	"strings"
 
 	"git.querycap.com/falcontsdb/fctsdb-bench/query_generator"
-	"git.querycap.com/falcontsdb/fctsdb-bench/reporter"
+	"git.querycap.com/falcontsdb/fctsdb-bench/report"
+	"git.querycap.com/falcontsdb/fctsdb-bench/report/picture"
+	"git.querycap.com/falcontsdb/fctsdb-bench/report/table"
 )
 
 // fcbenchCaseDefine 是一个更简化版的报告输出定义
@@ -240,7 +242,7 @@ func init() {
 
 }
 
-func CreateReport(fileNames ...string) *reporter.Page {
+func CreateReport(fileNames ...string) *report.Page {
 
 	// filesOrder := make([]string, 0)
 
@@ -261,9 +263,9 @@ func CreateReport(fileNames ...string) *reporter.Page {
 	// 整体完成效果：
 	// 如果是单个文件，只记录简单的数据并进行画图
 	// 如果是多个文件，说明要对不同文件中相同的内容进行数据比较，计算提升百分比
-	report := reporter.NewPage("性能测试")
-	report.Document = "测试海东青数据库的性能\n" + "使用工具：fcbench\n"
-	var currentTestCase *reporter.PerformanceTestCase
+	benchReport := report.NewPage("性能测试")
+	benchReport.Document = "测试海东青数据库的性能\n" + "使用工具：fcbench\n"
+	var currentTestCase *report.PerformanceTestCase
 
 	// 取第一个cse文件开始遍历
 	for rowIndex, row := range allCsvRecords[fileNames[0]] {
@@ -274,7 +276,7 @@ func CreateReport(fileNames ...string) *reporter.Page {
 		}
 		// 处理尾行
 		if row[0] == "test-env" {
-			report.Document += strings.ReplaceAll(row[1], ";", "\n")
+			benchReport.Document += strings.ReplaceAll(row[1], ";", "\n")
 		} else {
 			if caseDefine, ok := performances[row[0]]; ok {
 				tableHeaders := caseDefine.TableTags
@@ -304,14 +306,14 @@ func CreateReport(fileNames ...string) *reporter.Page {
 				}
 
 				// 步骤2：判断是否需要创建表格
-				if report.HasTestCase(row[0]) {
-					currentTestCase = report.GetTestCase(row[0]).(*reporter.PerformanceTestCase)
+				if benchReport.HasTestCase(row[0]) {
+					currentTestCase = benchReport.GetTestCase(row[0]).(*report.PerformanceTestCase)
 				} else {
-					currentTestCase = reporter.NewPerformanceTestCase(row[0])
+					currentTestCase = report.NewPerformanceTestCase(row[0])
 					currentTestCase.Title = caseDefine.Title
 					currentTestCase.Document = caseDefine.Document
-					currentTestCase.Table = reporter.CreateTable(tableHeaders...)
-					report.AddTestCase(currentTestCase)
+					currentTestCase.Table = table.CreateTable(tableHeaders...)
+					benchReport.AddTestCase(currentTestCase)
 				}
 
 				// 步骤3：记录数据
@@ -348,18 +350,30 @@ func CreateReport(fileNames ...string) *reporter.Page {
 							rowData = append(rowData, "error")
 							continue
 						}
-						rowData = append(rowData, fmt.Sprintf("%.2f%%", (newData-oldData)/oldData*100))
+
+						rate := (newData - oldData) / oldData * 100
+						if rate > 5 {
+							rowData = append(rowData, table.Cell{Text: fmt.Sprintf("%.2f%%", rate), Color: "limegreen"})
+						} else if rate < -5 {
+							rowData = append(rowData, table.Cell{Text: fmt.Sprintf("%.2f%%", rate), Color: "orangered"})
+						} else {
+							rowData = append(rowData, fmt.Sprintf("%.2f%%", rate))
+						}
+
 					}
 
 					// 步骤3.4：监控列
 					for _, fileName := range fileNames {
-						rowData = append(rowData, "[地址]("+allCsvRecords[fileName][rowIndex][csvHeaderMap["监控"]]+")")
+
+						// rowData = append(rowData, "[地址]("+allCsvRecords[fileName][rowIndex][csvHeaderMap["监控"]]+")")
+						rowData = append(rowData, table.Cell{Text: "地址", Href: allCsvRecords[fileName][rowIndex][csvHeaderMap["监控"]]})
 					}
 
 				} else {
 					for _, header := range tableHeaders {
 						if header == "监控" { // 监控特例化
-							rowData = append(rowData, "[地址]("+row[csvHeaderMap[header]]+")")
+							// rowData = append(rowData, "[地址]("+row[csvHeaderMap[header]]+")")
+							rowData = append(rowData, table.Cell{Text: "地址", Href: row[csvHeaderMap[header]]})
 						} else {
 							// 替换场景的单词，方便显示美观
 							data := row[csvHeaderMap[header]]
@@ -379,31 +393,31 @@ func CreateReport(fileNames ...string) *reporter.Page {
 	}
 
 	// 步骤4：设置图片
-	for _, testcase := range report.TestCases {
-		performanceTestCase := testcase.(*reporter.PerformanceTestCase)
-		if caseDefine, ok := performances[performanceTestCase.GetName()]; ok {
+	for _, testcase := range benchReport.TestCases {
+		testcase := testcase.(*report.PerformanceTestCase)
+		if caseDefine, ok := performances[testcase.GetName()]; ok {
 			for _, picDefine := range caseDefine.Pictures {
 				switch picDefine.Type {
 				case "line":
-					words := strings.Split(performanceTestCase.Title, "-")
-					line := reporter.NewLine(words[len(words)-1] + "-" + picDefine.SeriesColumn[0])
-					line.SetXAxis(performanceTestCase.Table.GetColumn(picDefine.XAxisColumn))
+					words := strings.Split(testcase.Title, "-")
+					line := picture.NewLine(words[len(words)-1] + "-" + picDefine.SeriesColumn[0])
+					line.SetXAxis(testcase.Table.GetColumn(picDefine.XAxisColumn))
 					if len(fileNames) > 1 {
 						for _, field := range picDefine.SeriesColumn {
 							for _, fileName := range fileNames {
-								line.AddSeries(field+":"+fileName, performanceTestCase.Table.GetColumn(field+": "+fileName))
+								line.AddSeries(field+":"+fileName, testcase.Table.GetColumn(field+": "+fileName))
 							}
 						}
 					} else {
 						for _, field := range picDefine.SeriesColumn {
-							line.AddSeries(field, performanceTestCase.Table.GetColumn(field))
+							line.AddSeries(field, testcase.Table.GetColumn(field))
 						}
 					}
-					performanceTestCase.Pictures = append(performanceTestCase.Pictures, line)
+					testcase.Pictures = append(testcase.Pictures, line)
 				}
 			}
 		}
 	}
 
-	return report
+	return benchReport
 }

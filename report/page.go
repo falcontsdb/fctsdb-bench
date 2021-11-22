@@ -1,4 +1,4 @@
-package reporter
+package report
 
 import (
 	"fmt"
@@ -6,9 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"git.querycap.com/falcontsdb/fctsdb-bench/reporter/src"
-	"github.com/gomarkdown/markdown"
-	"github.com/gomarkdown/markdown/html"
+	"git.querycap.com/falcontsdb/fctsdb-bench/report/src"
+	"git.querycap.com/falcontsdb/fctsdb-bench/report/table"
 )
 
 type Picture interface {
@@ -28,7 +27,7 @@ type PerformanceTestCase struct {
 	name     string
 	Title    string
 	Document string
-	Table    *Table
+	Table    *table.Table
 	Pictures []Picture
 }
 
@@ -43,18 +42,23 @@ func (t *PerformanceTestCase) GetName() string {
 }
 
 func (t *PerformanceTestCase) ToHtml(index string) string {
-	var htm string
-	var md string
-	md += ("## " + index + t.Title + "\n\n")
-	md += (strings.ReplaceAll(t.Document, "\n", "\n\n") + "\n\n")
-	if t.Table != nil {
-		md += (t.Table.ToMarkDown() + "\n\n")
-	}
-	htmlFlags := html.CommonFlags | html.HrefTargetBlank
-	mdOpts := html.RendererOptions{Flags: htmlFlags}
-	renderer := html.NewRenderer(mdOpts)
-	htm += string(markdown.ToHTML([]byte(md), nil, renderer))
 
+	// title 是二级目录
+	htm := ("<h2>" + index + t.Title + "</h2>\n")
+
+	// 对document进行分行渲染
+	for _, line := range strings.Split(t.Document, "\n") {
+		if line != "" {
+			htm += ("<p>" + line + "</p>\n")
+		}
+	}
+
+	// 添加table
+	if t.Table != nil {
+		htm += t.Table.ToHtml()
+	}
+
+	// 添加picture
 	for _, pic := range t.Pictures {
 		if len(t.Pictures) == 1 {
 			htm += pic.ToHtml()
