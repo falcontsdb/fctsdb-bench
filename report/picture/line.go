@@ -52,7 +52,7 @@ func (l *Line) ToHtml() string {
 	if l.small {
 		htm = strings.ReplaceAll(htm, "{{ Style }}", "width:495px;height:300px;display:inline-block;")
 	} else {
-		htm = strings.ReplaceAll(htm, "{{ Style }}", "width:800px;height:320px;")
+		htm = strings.ReplaceAll(htm, "{{ Style }}", "width:800px;height:320px;display:inline-block;")
 	}
 
 	options := make(map[string]interface{})
@@ -98,19 +98,19 @@ func (l *Line) ToHtml() string {
 	}
 
 	options["tooltip"] = map[string]interface{}{
-		"show":    true,
+		// "show":    true,
 		"trigger": "axis",
 	}
 	options["legend"] = map[string]interface{}{
-		"show": true,
-		"top":  "20px",
+		// "show": true,
+		"top": "20px",
 	}
 	options["toolbox"] = map[string]interface{}{
-		"show":  true,
+		// "show":  true,
 		"right": "20px",
 		"feature": map[string]interface{}{
 			"saveAsImage": map[string]interface{}{
-				"show": true,
+				// "show": true, dd
 			},
 		},
 	}
@@ -122,17 +122,17 @@ func (l *Line) ToHtml() string {
 		"containLabel": true,
 	}
 
-	options["color"] = []string{
-		"#5470c6",
-		"#91cc75",
-		"#fac858",
-		"#ee6666",
-		"#73c0de",
-		"#3ba272",
-		"#fc8452",
-		"#9a60b4",
-		"#ea7ccc",
-	}
+	// options["color"] = []string{
+	// 	"#ee6666",
+	// 	"#73c0de",
+	// 	"#fac858",
+	// 	"#ea7ccc",
+	// 	"#91cc75",
+	// 	"#3ba272",
+	// 	"#fc8452",
+	// 	"#9a60b4",
+	// 	"#5470c6",
+	// }
 
 	js, err := json.Marshal(options)
 	if err != nil {

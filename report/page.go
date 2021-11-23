@@ -1,14 +1,20 @@
 package report
 
 import (
+	_ "embed"
 	"fmt"
 	"io"
 	"strconv"
 	"strings"
 
-	"git.querycap.com/falcontsdb/fctsdb-bench/report/src"
 	"git.querycap.com/falcontsdb/fctsdb-bench/report/table"
 )
+
+//go:embed src/echarts.min.js
+var EchartsJs string
+
+//go:embed src/page.css
+var PageCss string
 
 type Picture interface {
 	SetXAxis([]string)
@@ -92,8 +98,8 @@ type Page struct {
 func NewPage(title string) *Page {
 	return &Page{
 		Title:     title,
-		Css:       src.Css,
-		Js:        src.EchartsJs,
+		Css:       PageCss,
+		Js:        EchartsJs,
 		TestCases: make([]TestCase, 0),
 	}
 }

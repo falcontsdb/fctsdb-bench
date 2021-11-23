@@ -1,6 +1,3 @@
-package src
-
-const Css = `.markdown-here-wrapper{}
 .container{width:1000px;justify-content:center;align-items:center}
 .item{border: 1px solid #ccc}
 pre,code{font-size:0.85em;font-family:Consolas,Inconsolata,Courier,monospace}
@@ -24,7 +21,7 @@ dl dd{margin:0 0 1em;padding:0 1em}
 blockquote,q{border-left:4px solid #DDD;padding:0 1em;color:#777;quotes:none}
 blockquote::before,blockquote::after,q::before,q::after{content:none}
 h1,h2,h3,h4,h5,h6{margin:20px 0 10px;padding:0;font-weight:bold;color:#000000}
-h1{font-size:26px;border-bottom:1px solid #777}
+h1{font-size:32px;border-bottom:1px solid #777}
 h2{font-size:22px;border-bottom:1px solid #AAA}
 h3{font-size:20px}
 h4{font-size:18px}
@@ -33,9 +30,9 @@ h6{font-size:16px;color:#777}
 table{padding:0;border-collapse:collapse;border-spacing:0;font-size:1em;font:inherit;border:0}
 tbody{margin:0;padding:0;border:0}
 table tr{border:0;border-top:1px solid #CCC;background-color:white;margin:0;padding:0}
-table tr:nth-child(2n){background-color:#F8F8F8}
+table tr:nth-child(2n){background-color:#F0F4F4}
 table tr th,table tr td{font-size:14px;border:1px solid #CCC;margin:0;padding:0.5em 0.5em}
-table tr th{font-weight:bold;background-color:#F0F0F0}
+table tr th{font-weight:bold;background-color:#E1E8E8}
 p{font-size:16px;line-height:1.75em;padding-right:0.5em;padding-left:0.5em}
 strong,b{color:#BF360C}
-th {word-break: keep-all}`
+th {word-break: keep-all}
