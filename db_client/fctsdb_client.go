@@ -87,7 +87,7 @@ var (
 	post                = []byte("POST")
 	get                 = []byte("GET")
 	textPlain           = []byte("text/plain")
-	responseMustContain = []byte(`"statement_id"`)
+	responseMustContain = []byte(`"time"`)
 )
 
 // Write writes the given byte slice to the HTTP server described in the Writer's HTTPWriterConfig.
@@ -151,10 +151,10 @@ func (w *FctsdbClient) Query(lines []byte) (int64, error) {
 			body = resp.Body()
 		}
 		if sc != fasthttp.StatusOK {
-			err = fmt.Errorf("[DebugInfo: %s] Invalid query response (status %d): %s", w.c.DebugInfo, sc, body)
+			err = fmt.Errorf("[DebugInfo: %s] Invalid query response (status %d): %s", w.c.DebugInfo, sc, string(body))
 		} else {
 			if !bytes.Contains(body, responseMustContain) {
-				err = fmt.Errorf("[DebugInfo: %s] Invalid query response (status %d): %s", w.c.DebugInfo, sc, body)
+				err = fmt.Errorf("[DebugInfo: %s] Invalid query response (status %d): %s", w.c.DebugInfo, sc, string(body))
 			}
 		}
 		if w.c.Debug {
