@@ -1,12 +1,10 @@
 package vehicle
 
 import (
-	// "math/rand"
-
 	"time"
 
 	"git.querycap.com/falcontsdb/fctsdb-bench/common"
-	rand "git.querycap.com/falcontsdb/fctsdb-bench/util/fastrand"
+	"git.querycap.com/falcontsdb/fctsdb-bench/util/fastrand"
 )
 
 var (
@@ -102,13 +100,13 @@ func (m *EntityMeasurement) Tick(d time.Duration) {
 func (m *EntityMeasurement) ToPoint(p *common.Point) bool {
 	p.SetMeasurementName(EntityByteString)
 	// p.SetTimestamp(&m.timestamp)
-	letterIdxBits := 7                           // 6 bits to represent a letter index
-	letterIdxMask := int64(1<<letterIdxBits - 1) // All 1-bits, as many as letterIdxBits
-	letterIdxMax := 63 / letterIdxBits
+	letterIdxBits := 7                            // 6 bits to represent a letter index
+	letterIdxMask := uint32(1<<letterIdxBits - 1) // All 1-bits, as many as letterIdxBits
+	letterIdxMax := 32 / letterIdxBits
 
-	for i, cache, remain := m.values-1, rand.Int63(), letterIdxMax; i >= 0; {
+	for i, cache, remain := m.values-1, fastrand.Uint32(), letterIdxMax; i >= 0; {
 		if remain == 0 {
-			cache, remain = rand.Int63(), letterIdxMax
+			cache, remain = fastrand.Uint32(), letterIdxMax
 		}
 		if idx := int(cache & letterIdxMask); idx < len(randomNumbers[i]) {
 			// p.AppendField(EntityFieldKeys[i], randomNumbers[i][idx])

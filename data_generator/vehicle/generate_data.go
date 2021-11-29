@@ -3,11 +3,11 @@ package vehicle
 import (
 	"io"
 	"log"
+	"math/rand"
 	"sync/atomic"
 	"time"
 
 	"git.querycap.com/falcontsdb/fctsdb-bench/common"
-	"git.querycap.com/falcontsdb/fctsdb-bench/util/fastrand"
 )
 
 // Type IotSimulatorConfig is used to create a IotSimulator.
@@ -130,7 +130,10 @@ func (g *VehicleSimulator) Next(p *common.Point) int64 {
 func (g *VehicleSimulator) NextSql(wr io.Writer) int64 {
 	madeSql := atomic.AddInt64(&g.madeSql, 1)
 	tmp := g.sqlTemplates[madeSql%int64(len(g.sqlTemplates))]
-	randomHostsIndex := int(fastrand.Uint32n(uint32(len(g.Hosts))))
+
+	// 生成数据点时，用fastrand更快速，生成的数据和seed无关联
+	// 生成sql时，为了保证每次生成sql一致性，采用rand库，使用全局seed
+	randomHostsIndex := rand.Intn(len(g.Hosts))
 	for i := range tmp.Base {
 		wr.Write(tmp.Base[i])
 		if i < len(tmp.KeyWords) {

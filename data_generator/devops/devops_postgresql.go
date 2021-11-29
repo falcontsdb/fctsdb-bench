@@ -5,7 +5,7 @@ import (
 	"time"
 
 	. "git.querycap.com/falcontsdb/fctsdb-bench/common"
-	rand "git.querycap.com/falcontsdb/fctsdb-bench/util/fastrand"
+	"git.querycap.com/falcontsdb/fctsdb-bench/util/fastrand"
 )
 
 var (
@@ -61,17 +61,17 @@ func (m *PostgresqlMeasurement) ToPoint(p *Point) bool {
 	p.SetMeasurementName(PostgresqlByteString)
 	// p.SetTimestamp(&m.timestamp)
 
-	letterIdxBits := 10                          // 6 bits to represent a letter index
-	letterIdxMask := int64(1<<letterIdxBits - 1) // All 1-bits, as many as letterIdxBits
-	letterIdxMax := 63 / letterIdxBits           // # of letter indices fitting in 63 bits
+	letterIdxBits := 10                           // 6 bits to represent a letter index
+	letterIdxMask := uint64(1<<letterIdxBits - 1) // All 1-bits, as many as letterIdxBits
+	letterIdxMax := 64 / letterIdxBits            // # of letter indices fitting in 63 bits
 
-	for i, cache, remain := len(m.fieldValues)-1, rand.Int63(), letterIdxMax; i >= 0; {
+	for i, cache, remain := len(m.fieldValues)-1, fastrand.Uint64(), letterIdxMax; i >= 0; {
 		if remain == 0 {
-			cache, remain = rand.Int63(), letterIdxMax
+			cache, remain = fastrand.Uint64(), letterIdxMax
 		}
 		idx := cache & letterIdxMask
 		// value := atomic.AddInt64(&m.fieldValues[i], idx)
-		p.AppendField(PostgresqlFields[i].Label, idx)
+		p.AppendField(PostgresqlFields[i].Label, idx) // 0~1024之间随机整数
 		i--
 
 		cache >>= letterIdxBits

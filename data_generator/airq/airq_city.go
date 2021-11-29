@@ -2,10 +2,11 @@ package airq
 
 import (
 	// "math/rand"
+
 	"time"
 
 	"git.querycap.com/falcontsdb/fctsdb-bench/common"
-	rand "git.querycap.com/falcontsdb/fctsdb-bench/util/fastrand"
+	"git.querycap.com/falcontsdb/fctsdb-bench/util/fastrand"
 )
 
 var (
@@ -43,45 +44,44 @@ func (m *CityAirQualityMeasurement) Tick(d time.Duration) {
 
 func (m *CityAirQualityMeasurement) ToPoint(p *common.Point) bool {
 	p.SetMeasurementName(CityAirQualityByteString)
-	randNum := rand.Int63() //一个64位随机数可以通过掩码的形式生成其他数字，减少随机数的生成，9+9+9+7+6+8+10 = 58
+	randNum := fastrand.Uint64() //一个64位随机数可以通过掩码的形式生成其他数字，减少随机数的生成，9+9+9+7+6+8+10 = 58
 
 	// aqi占9位，随机范围即10-522，以此类推
-	p.AppendField(CityAirQualityFieldKeys[0], randNum&int64(1<<9-1)+10)
+	p.AppendField(CityAirQualityFieldKeys[0], randNum&uint64(1<<9-1)+10)
 	randNum >>= 9
-	p.AppendField(CityAirQualityFieldKeys[1], randNum&int64(1<<9-1)+10)
+	p.AppendField(CityAirQualityFieldKeys[1], randNum&uint64(1<<9-1)+10)
 	randNum >>= 9
-	p.AppendField(CityAirQualityFieldKeys[2], randNum&int64(1<<9-1)+10)
+	p.AppendField(CityAirQualityFieldKeys[2], randNum&uint64(1<<9-1)+10)
 	randNum >>= 9
-	p.AppendField(CityAirQualityFieldKeys[3], randNum&int64(1<<7-1)+10)
+	p.AppendField(CityAirQualityFieldKeys[3], randNum&uint64(1<<7-1)+10)
 	randNum >>= 7
-	p.AppendField(CityAirQualityFieldKeys[4], randNum&int64(1<<6-1)+2)
+	p.AppendField(CityAirQualityFieldKeys[4], randNum&uint64(1<<6-1)+2)
 	randNum >>= 6
-	p.AppendField(CityAirQualityFieldKeys[5], randNum&int64(1<<8-1)+10)
+	p.AppendField(CityAirQualityFieldKeys[5], randNum&uint64(1<<8-1)+10)
 	randNum >>= 8
-	p.AppendField(CityAirQualityFieldKeys[6], float32(randNum&int64(1<<10-1))/1000.0+0.5)
+	p.AppendField(CityAirQualityFieldKeys[6], float32(randNum&uint64(1<<10-1))/1000.0+0.5)
 	p.AppendField(CityAirQualityFieldKeys[7], m.RandomString(20))
 	return true
 }
 
 func (m *CityAirQualityMeasurement) RandomString(n int) []byte {
 	letterBytes := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	letterIdxBits := 6                           // 6 bits to represent a letter index
-	letterIdxMask := int64(1<<letterIdxBits - 1) // All 1-bits, as many as letterIdxBits
-	letterIdxMax := 63 / letterIdxBits           // # of letter indices fitting in 63 bits
+	letterIdxBits := 6                            // 6 bits to represent a letter index
+	letterIdxMask := uint32(1<<letterIdxBits - 1) // All 1-bits, as many as letterIdxBits
+	letterIdxMax := 32 / letterIdxBits            // # of letter indices fitting in 63 bits
 
 	// sb := strings.Builder{}
 	// sb.Grow(n)
 	buf := make([]byte, n)
 	// A src.Int63() generates 63 random bits, enough for letterIdxMax characters!
-	for i, cache, remain := n-1, rand.Int63(), letterIdxMax; i >= 0; {
+	for i, cache, remain := n-1, fastrand.Uint32(), letterIdxMax; i >= 0; {
 		if remain == 0 {
-			cache, remain = rand.Int63(), letterIdxMax
+			cache, remain = fastrand.Uint32(), letterIdxMax
 		}
-		if idx := int(cache & letterIdxMask); idx < len(letterBytes) {
-			// sb.WriteByte(letterBytes[idx])
-			buf[i] = letterBytes[idx]
-			i--
-		}
+		idx := int(cache&letterIdxMask) % len(letterBytes)
+		buf[i] = letterBytes[idx]
+		i--
+
 		cache >>= letterIdxBits
 		remain--
 	}

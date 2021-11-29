@@ -6,7 +6,6 @@ pre{font-size:1em;line-height:1.2em}
 pre code{white-space:pre;overflow:auto;border-radius:3px;border:1px solid #AAA;padding:0.5em 0.7em;display:block !important}
 .markdown-here-wrapper[data-md-url*="wordpress."] code span{font:inherit}
 .markdown-here-wrapper[data-md-url*="wordpress."] pre{background-color:transparent}
-p{margin:0 0 0.5em 0 !important;text-indent:30px}
 table,pre,dl,blockquote,q,ul,ol{margin:1.2em 0}
 ul,ol{padding-left:2em}
 li{margin:0.5em 0;font-size:16px}
@@ -32,7 +31,7 @@ tbody{margin:0;padding:0;border:0}
 table tr{border:0;border-top:1px solid #CCC;background-color:white;margin:0;padding:0}
 table tr:nth-child(2n){background-color:#F0F4F4}
 table tr th,table tr td{font-size:14px;border:1px solid #CCC;margin:0;padding:0.5em 0.5em}
-table tr th{font-weight:bold;background-color:#E1E8E8}
-p{font-size:16px;line-height:1.75em;padding-right:0.5em;padding-left:0.5em}
+table tr th{font-weight:bold;background-color:#E1E8E8;text-align:left}
+p{font-size:16px;line-height:1.75em;padding-right:0.5em;padding-left:0.5em;margin:0 0 0.5em 0 !important;text-indent:30px}
 strong,b{color:#BF360C}
 th {word-break: keep-all}

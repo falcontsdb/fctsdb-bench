@@ -1,18 +1,17 @@
 package devops
 
 import (
-	// "math/rand"
 	"time"
 
 	. "git.querycap.com/falcontsdb/fctsdb-bench/common"
-	rand "git.querycap.com/falcontsdb/fctsdb-bench/util/fastrand"
+	"git.querycap.com/falcontsdb/fctsdb-bench/util/fastrand"
 )
 
 var (
 	MemoryByteString = []byte("mem") // heap optimization
 
 	// Choices for modeling a host's memory capacity.
-	MemoryMaxBytesChoices = []int64{8 << 30, 12 << 30, 16 << 30}
+	MemoryMaxBytesChoices = []uint64{8 << 30, 12 << 30, 16 << 30}
 
 	// Field keys for 'mem' points.
 	MemoryFieldKeys = [][]byte{
@@ -30,7 +29,7 @@ var (
 
 type MemMeasurement struct {
 	// this doesn't change:
-	bytesTotal int64
+	bytesTotal uint64
 
 	// these change:
 	timestamp time.Time
@@ -39,7 +38,7 @@ type MemMeasurement struct {
 }
 
 func NewMemMeasurement(start time.Time) *MemMeasurement {
-	bytesTotal := MemoryMaxBytesChoices[rand.Intn(len(MemoryMaxBytesChoices))]
+	bytesTotal := MemoryMaxBytesChoices[fastrand.Uint32n(uint32(len(MemoryMaxBytesChoices)))]
 	// bytesUsedDist := &ClampedRandomWalkDistribution{
 	// 	State: rand.Float64() * float64(bytesTotal),
 	// 	Min:   0.0,
@@ -90,9 +89,9 @@ func (m *MemMeasurement) ToPoint(p *Point) bool {
 	// p.SetTimestamp(&m.timestamp)
 
 	total := m.bytesTotal
-	used := rand.Int63n(m.bytesTotal)
-	cached := rand.Int63n(m.bytesTotal)
-	buffered := rand.Int63n(m.bytesTotal)
+	used := fastrand.Uint64n(m.bytesTotal)
+	cached := fastrand.Uint64n(m.bytesTotal)
+	buffered := fastrand.Uint64n(m.bytesTotal)
 
 	p.AppendField(MemoryFieldKeys[0], total)
 	p.AppendField(MemoryFieldKeys[1], total-used)

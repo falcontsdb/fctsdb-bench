@@ -2,12 +2,11 @@ package devops
 
 import (
 	"fmt"
-	// "math/rand"
 	"sync/atomic"
 	"time"
 
 	. "git.querycap.com/falcontsdb/fctsdb-bench/common"
-	rand "git.querycap.com/falcontsdb/fctsdb-bench/util/fastrand"
+	"git.querycap.com/falcontsdb/fctsdb-bench/util/fastrand"
 )
 
 var (
@@ -39,7 +38,7 @@ func NewDiskIOMeasurement(start time.Time) *DiskIOMeasurement {
 		distributions[i] = DiskIOFields[i].DistributionMaker()
 	}
 
-	serial := []byte(fmt.Sprintf("%03d-%03d-%03d", rand.Intn(1000), rand.Intn(1000), rand.Intn(1000)))
+	serial := []byte(fmt.Sprintf("%03d-%03d-%03d", fastrand.Uint32n(1000), fastrand.Uint32n(1000), fastrand.Uint32n(1000)))
 	if Config != nil { // partial override from external config
 		serial = Config.GetTagBytesValue(DiskIOByteString, SerialByteString, true, serial)
 	}
@@ -65,16 +64,16 @@ func (m *DiskIOMeasurement) ToPoint(p *Point) bool {
 	// p.SetTimestamp(&m.timestamp)
 
 	p.AppendTag(SerialByteString, m.serial)
-	letterIdxBits := 5                           // 6 bits to represent a letter index
-	letterIdxMask := int64(1<<letterIdxBits - 1) // All 1-bits, as many as letterIdxBits
-	letterIdxMax := 63 / letterIdxBits           // # of letter indices fitting in 63 bits
+	letterIdxBits := 5                            // 6 bits to represent a letter index
+	letterIdxMask := uint64(1<<letterIdxBits - 1) // All 1-bits, as many as letterIdxBits
+	letterIdxMax := 64 / letterIdxBits            // # of letter indices fitting in 63 bits
 
-	for i, cache, remain := len(m.fieldValues)-1, rand.Int63(), letterIdxMax; i >= 0; {
+	for i, cache, remain := len(m.fieldValues)-1, fastrand.Uint64(), letterIdxMax; i >= 0; {
 		if remain == 0 {
-			cache, remain = rand.Int63(), letterIdxMax
+			cache, remain = fastrand.Uint64(), letterIdxMax
 		}
 		idx := cache & letterIdxMask
-		value := atomic.AddInt64(&m.fieldValues[i], idx)
+		value := atomic.AddInt64(&m.fieldValues[i], int64(idx)) // 0~32的整数
 		p.AppendField(DiskIOFields[i].Label, value)
 		i--
 
