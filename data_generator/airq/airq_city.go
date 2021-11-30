@@ -47,17 +47,17 @@ func (m *CityAirQualityMeasurement) ToPoint(p *common.Point) bool {
 	randNum := fastrand.Uint64() //一个64位随机数可以通过掩码的形式生成其他数字，减少随机数的生成，9+9+9+7+6+8+10 = 58
 
 	// aqi占9位，随机范围即10-522，以此类推
-	p.AppendField(CityAirQualityFieldKeys[0], randNum&uint64(1<<9-1)+10)
+	p.AppendField(CityAirQualityFieldKeys[0], int64(randNum&uint64(1<<9-1)+10))
 	randNum >>= 9
-	p.AppendField(CityAirQualityFieldKeys[1], randNum&uint64(1<<9-1)+10)
+	p.AppendField(CityAirQualityFieldKeys[1], int64(randNum&uint64(1<<9-1)+10))
 	randNum >>= 9
-	p.AppendField(CityAirQualityFieldKeys[2], randNum&uint64(1<<9-1)+10)
+	p.AppendField(CityAirQualityFieldKeys[2], int64(randNum&uint64(1<<9-1)+10))
 	randNum >>= 9
-	p.AppendField(CityAirQualityFieldKeys[3], randNum&uint64(1<<7-1)+10)
+	p.AppendField(CityAirQualityFieldKeys[3], int64(randNum&uint64(1<<7-1)+10))
 	randNum >>= 7
-	p.AppendField(CityAirQualityFieldKeys[4], randNum&uint64(1<<6-1)+2)
+	p.AppendField(CityAirQualityFieldKeys[4], int64(randNum&uint64(1<<6-1)+2))
 	randNum >>= 6
-	p.AppendField(CityAirQualityFieldKeys[5], randNum&uint64(1<<8-1)+10)
+	p.AppendField(CityAirQualityFieldKeys[5], int64(randNum&uint64(1<<8-1)+10))
 	randNum >>= 8
 	p.AppendField(CityAirQualityFieldKeys[6], float32(randNum&uint64(1<<10-1))/1000.0+0.5)
 	p.AppendField(CityAirQualityFieldKeys[7], m.RandomString(20))

@@ -88,10 +88,10 @@ func (m *MemMeasurement) ToPoint(p *Point) bool {
 	p.SetMeasurementName(MemoryByteString)
 	// p.SetTimestamp(&m.timestamp)
 
-	total := m.bytesTotal
-	used := fastrand.Uint64n(m.bytesTotal)
-	cached := fastrand.Uint64n(m.bytesTotal)
-	buffered := fastrand.Uint64n(m.bytesTotal)
+	total := int64(m.bytesTotal)
+	used := int64(fastrand.Uint64n(m.bytesTotal))
+	cached := int64(fastrand.Uint64n(m.bytesTotal))
+	buffered := int64(fastrand.Uint64n(m.bytesTotal))
 
 	p.AppendField(MemoryFieldKeys[0], total)
 	p.AppendField(MemoryFieldKeys[1], total-used)

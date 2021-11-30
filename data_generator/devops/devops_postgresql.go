@@ -71,7 +71,7 @@ func (m *PostgresqlMeasurement) ToPoint(p *Point) bool {
 		}
 		idx := cache & letterIdxMask
 		// value := atomic.AddInt64(&m.fieldValues[i], idx)
-		p.AppendField(PostgresqlFields[i].Label, idx) // 0~1024之间随机整数
+		p.AppendField(PostgresqlFields[i].Label, int64(idx)) // 0~1024之间随机整数
 		i--
 
 		cache >>= letterIdxBits
