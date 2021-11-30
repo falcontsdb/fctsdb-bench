@@ -1,12 +1,11 @@
 package devops
 
 import (
-	// "math/rand"
 	"sync/atomic"
 	"time"
 
 	. "git.querycap.com/falcontsdb/fctsdb-bench/common"
-	rand "git.querycap.com/falcontsdb/fctsdb-bench/util/fastrand"
+	"git.querycap.com/falcontsdb/fctsdb-bench/util/fastrand"
 )
 
 var (
@@ -36,9 +35,9 @@ func NewKernelMeasurement(start time.Time) *KernelMeasurement {
 		distributions[i] = KernelFields[i].DistributionMaker()
 	}
 
-	bootTime := rand.Int63n(240)
+	bootTime := fastrand.Uint32n(240)
 	return &KernelMeasurement{
-		bootTime: bootTime,
+		bootTime: int64(bootTime),
 
 		timestamp: start,
 		// distributions: distributions,
@@ -59,16 +58,16 @@ func (m *KernelMeasurement) ToPoint(p *Point) bool {
 	// p.SetTimestamp(&m.timestamp)
 
 	p.AppendField(BootTimeByteString, m.bootTime)
-	letterIdxBits := 3                           // 6 bits to represent a letter index
-	letterIdxMask := int64(1<<letterIdxBits - 1) // All 1-bits, as many as letterIdxBits
-	letterIdxMax := 63 / letterIdxBits           // # of letter indices fitting in 63 bits
+	letterIdxBits := 3                            // 6 bits to represent a letter index
+	letterIdxMask := uint32(1<<letterIdxBits - 1) // All 1-bits, as many as letterIdxBits
+	letterIdxMax := 32 / letterIdxBits            // # of letter indices fitting in 63 bits
 
-	for i, cache, remain := len(m.fieldValues)-1, rand.Int63(), letterIdxMax; i >= 0; {
+	for i, cache, remain := len(m.fieldValues)-1, fastrand.Uint32(), letterIdxMax; i >= 0; {
 		if remain == 0 {
-			cache, remain = rand.Int63(), letterIdxMax
+			cache, remain = fastrand.Uint32(), letterIdxMax
 		}
 		idx := cache & letterIdxMask
-		value := atomic.AddInt64(&m.fieldValues[i], idx)
+		value := atomic.AddInt64(&m.fieldValues[i], int64(idx)) // 0~8之间的随机数
 		p.AppendField(KernelFields[i].Label, value)
 		i--
 

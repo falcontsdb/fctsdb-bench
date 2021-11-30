@@ -2,12 +2,11 @@ package devops
 
 import (
 	"fmt"
-	// "math/rand"
 	"sync/atomic"
 	"time"
 
 	. "git.querycap.com/falcontsdb/fctsdb-bench/common"
-	rand "git.querycap.com/falcontsdb/fctsdb-bench/util/fastrand"
+	"git.querycap.com/falcontsdb/fctsdb-bench/util/fastrand"
 )
 
 const OneTerabyte int64 = 1 << 40
@@ -44,10 +43,10 @@ type DiskMeasurement struct {
 
 func NewDiskMeasurement(start time.Time, sda int) *DiskMeasurement {
 	if sda == 0 {
-		sda = rand.Intn(10)
+		sda = int(fastrand.Uint32n(10))
 	}
 	path := []byte(fmt.Sprintf("/dev/sda%d", sda))
-	fsType := DiskFSTypeChoices[rand.Intn(len(DiskFSTypeChoices))]
+	fsType := DiskFSTypeChoices[fastrand.Uint32n(uint32(len(DiskFSTypeChoices)))]
 	if Config != nil { // partial override from external config
 		path = Config.GetTagBytesValue(DiskByteString, DiskTags[0], true, path)
 		fsType = Config.GetTagBytesValue(DiskByteString, DiskTags[1], true, fsType)
@@ -77,7 +76,7 @@ func (m *DiskMeasurement) ToPoint(p *Point) bool {
 
 	// the only thing that actually changes is the free byte count:
 	// free := int64(m.freeBytesDist.Get())
-	free := atomic.AddInt64(&m.free, rand.Int63n(50)+1)
+	free := atomic.AddInt64(&m.free, int64(fastrand.Uint32n(50)+1))
 	if free > OneTerabyte {
 		free = OneTerabyte
 	}

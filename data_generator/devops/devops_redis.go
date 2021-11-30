@@ -6,7 +6,7 @@ import (
 	"time"
 
 	. "git.querycap.com/falcontsdb/fctsdb-bench/common"
-	rand "git.querycap.com/falcontsdb/fctsdb-bench/util/fastrand"
+	"git.querycap.com/falcontsdb/fctsdb-bench/util/fastrand"
 )
 
 type LabeledDistributionMaker struct {
@@ -77,8 +77,8 @@ func NewRedisMeasurement(start time.Time) *RedisMeasurement {
 	// 	distributions[i] = RedisFields[i].DistributionMaker()
 	// }
 
-	serverName := []byte(fmt.Sprintf("redis_%d", rand.Intn(100000)))
-	port := []byte(fmt.Sprintf("%d", rand.Intn(20000)+1024))
+	serverName := []byte(fmt.Sprintf("redis_%d", fastrand.Uint32n(100000)))
+	port := []byte(fmt.Sprintf("%d", fastrand.Uint32n(20000)+1024))
 	if Config != nil { // partial override from external config
 		serverName = Config.GetTagBytesValue(RedisByteString, RedisTags[1], true, serverName)
 		port = Config.GetTagBytesValue(RedisByteString, RedisTags[0], true, port)
@@ -112,17 +112,17 @@ func (m *RedisMeasurement) ToPoint(p *Point) bool {
 	m.uptime += EpochDuration
 	p.AppendField(RedisUptime, int64(m.uptime.Seconds()))
 
-	letterIdxBits := 10                          // 6 bits to represent a letter index
-	letterIdxMask := int64(1<<letterIdxBits - 1) // All 1-bits, as many as letterIdxBits
-	letterIdxMax := 63 / letterIdxBits           // # of letter indices fitting in 63 bits
+	letterIdxBits := 10                           // 6 bits to represent a letter index
+	letterIdxMask := uint64(1<<letterIdxBits - 1) // All 1-bits, as many as letterIdxBits
+	letterIdxMax := 64 / letterIdxBits            // # of letter indices fitting in 63 bits
 
-	for i, cache, remain := len(m.fieldValues)-1, rand.Int63(), letterIdxMax; i >= 0; {
+	for i, cache, remain := len(m.fieldValues)-1, fastrand.Uint64(), letterIdxMax; i >= 0; {
 		if remain == 0 {
-			cache, remain = rand.Int63(), letterIdxMax
+			cache, remain = fastrand.Uint64(), letterIdxMax
 		}
 		idx := cache & letterIdxMask
 		// value := atomic.AddInt64(&m.fieldValues[i], idx)
-		p.AppendField(RedisFields[i].Label, idx)
+		p.AppendField(RedisFields[i].Label, int64(idx)) // 0~1024之间随机整数
 		i--
 
 		cache >>= letterIdxBits

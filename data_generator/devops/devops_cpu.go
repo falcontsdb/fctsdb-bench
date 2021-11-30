@@ -1,11 +1,10 @@
 package devops
 
 import (
-	// "math/rand"
 	"time"
 
 	. "git.querycap.com/falcontsdb/fctsdb-bench/common"
-	rand "git.querycap.com/falcontsdb/fctsdb-bench/util/fastrand"
+	"git.querycap.com/falcontsdb/fctsdb-bench/util/fastrand"
 )
 
 var (
@@ -63,16 +62,16 @@ func (m *CPUMeasurement) Tick(d time.Duration) {
 func (m *CPUMeasurement) ToPoint(p *Point) bool {
 	p.SetMeasurementName(CPUByteString)
 	// p.SetTimestamp(&m.timestamp)
-	letterIdxBits := 7                           // 6 bits to represent a letter index
-	letterIdxMask := int64(1<<letterIdxBits - 1) // All 1-bits, as many as letterIdxBits
-	letterIdxMax := 63 / letterIdxBits           // # of letter indices fitting in 63 bits
+	letterIdxBits := 7                            // 6 bits to represent a letter index
+	letterIdxMask := uint64(1<<letterIdxBits - 1) // All 1-bits, as many as letterIdxBits
+	letterIdxMax := 64 / letterIdxBits            // # of letter indices fitting in 63 bits
 
-	for i, cache, remain := len(CPUFieldKeys)-1, rand.Int63(), letterIdxMax; i >= 0; {
+	for i, cache, remain := len(CPUFieldKeys)-1, fastrand.Uint64(), letterIdxMax; i >= 0; {
 		if remain == 0 {
-			cache, remain = rand.Int63(), letterIdxMax
+			cache, remain = fastrand.Uint64(), letterIdxMax
 		}
 		idx := int(cache & letterIdxMask)
-		p.AppendField(CPUFieldKeys[i], float64(idx)/1.27151)
+		p.AppendField(CPUFieldKeys[i], float64(idx)/1.27151) // 0~127/1.27151的随机值
 		i--
 
 		cache >>= letterIdxBits

@@ -57,7 +57,7 @@ func fastFormatAppend(v interface{}, buf []byte, singleQuotesForString bool) []b
 		buf = append(buf, quotationChar...)
 		return buf
 	default:
-		panic(fmt.Sprintf("unknown field type for %#v", v))
+		panic(fmt.Sprintf("unknown field type for %v", v))
 	}
 }
 

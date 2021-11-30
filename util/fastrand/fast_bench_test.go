@@ -7,7 +7,6 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
-	"unsafe"
 )
 
 // BenchSink prevents the compiler from optimizing away benchmark loops.
@@ -33,62 +32,62 @@ func BenchmarkUint32n(b *testing.B) {
 	})
 }
 
-func BenchmarkInt64n(b *testing.B) {
-	b.RunParallel(func(pb *testing.PB) {
-		s := 0
-		for pb.Next() {
-			s += Intn(1e6)
-		}
-		atomic.AddUint64(&BenchSink, uint64(s))
-	})
-}
+// func BenchmarkInt64n(b *testing.B) {
+// 	b.RunParallel(func(pb *testing.PB) {
+// 		s := 0
+// 		for pb.Next() {
+// 			s += Intn(1e6)
+// 		}
+// 		atomic.AddUint64(&BenchSink, uint64(s))
+// 	})
+// }
 
-func BenchmarkRNGUint64n(b *testing.B) {
-	b.RunParallel(func(pb *testing.PB) {
-		var r RNG64
-		s := uint64(0)
-		for pb.Next() {
-			s += r.Uint64n(1e6)
-		}
-		atomic.AddUint64(&BenchSink, s)
-	})
-}
+// func BenchmarkRNGUint64n(b *testing.B) {
+// 	b.RunParallel(func(pb *testing.PB) {
+// 		var r RNG64
+// 		s := uint64(0)
+// 		for pb.Next() {
+// 			s += r.Uint64n(1e6)
+// 		}
+// 		atomic.AddUint64(&BenchSink, s)
+// 	})
+// }
 
-func BenchmarkRNGUint64nWithLock(b *testing.B) {
-	var r RNG64
-	var rMu sync.Mutex
-	b.RunParallel(func(pb *testing.PB) {
-		s := uint64(0)
-		for pb.Next() {
-			rMu.Lock()
-			s += r.Uint64n(1e6)
-			rMu.Unlock()
-		}
-		atomic.AddUint64(&BenchSink, s)
-	})
-}
+// func BenchmarkRNGUint64nWithLock(b *testing.B) {
+// 	var r RNG64
+// 	var rMu sync.Mutex
+// 	b.RunParallel(func(pb *testing.PB) {
+// 		s := uint64(0)
+// 		for pb.Next() {
+// 			rMu.Lock()
+// 			s += r.Uint64n(1e6)
+// 			rMu.Unlock()
+// 		}
+// 		atomic.AddUint64(&BenchSink, s)
+// 	})
+// }
 
-func BenchmarkRNGUint64nArray(b *testing.B) {
-	var rr [64]struct {
-		r  RNG64
-		mu sync.Mutex
+// func BenchmarkRNGUint64nArray(b *testing.B) {
+// 	var rr [64]struct {
+// 		r  RNG64
+// 		mu sync.Mutex
 
-		// pad prevents from false sharing
-		pad [64 - (unsafe.Sizeof(RNG64{})+unsafe.Sizeof(sync.Mutex{}))%64]byte
-	}
-	var n uint64
-	b.RunParallel(func(pb *testing.PB) {
-		s := uint64(0)
-		for pb.Next() {
-			idx := atomic.AddUint64(&n, 1)
-			r := &rr[idx%uint64(len(rr))]
-			r.mu.Lock()
-			s += r.r.Uint64n(1e6)
-			r.mu.Unlock()
-		}
-		atomic.AddUint64(&BenchSink, s)
-	})
-}
+// 		// pad prevents from false sharing
+// 		pad [64 - (unsafe.Sizeof(RNG64{})+unsafe.Sizeof(sync.Mutex{}))%64]byte
+// 	}
+// 	var n uint64
+// 	b.RunParallel(func(pb *testing.PB) {
+// 		s := uint64(0)
+// 		for pb.Next() {
+// 			idx := atomic.AddUint64(&n, 1)
+// 			r := &rr[idx%uint64(len(rr))]
+// 			r.mu.Lock()
+// 			s += r.r.Uint64n(1e6)
+// 			r.mu.Unlock()
+// 		}
+// 		atomic.AddUint64(&BenchSink, s)
+// 	})
+// }
 
 func BenchmarkMathRandInt63n(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
@@ -125,31 +124,31 @@ func BenchmarkMathRandRNGInt63nWithLock(b *testing.B) {
 	})
 }
 
-func BenchmarkMathRandRNGInt63nArray(b *testing.B) {
-	var rr [64]struct {
-		r  *rand.Rand
-		mu sync.Mutex
+// func BenchmarkMathRandRNGInt63nArray(b *testing.B) {
+// 	var rr [64]struct {
+// 		r  *rand.Rand
+// 		mu sync.Mutex
 
-		// pad prevents from false sharing
-		pad [64 - (unsafe.Sizeof(RNG64{})+unsafe.Sizeof(sync.Mutex{}))%64]byte
-	}
-	for i := range rr {
-		rr[i].r = rand.New(rand.NewSource(int64(i)))
-	}
+// 		// pad prevents from false sharing
+// 		pad [64 - (unsafe.Sizeof(RNG64{})+unsafe.Sizeof(sync.Mutex{}))%64]byte
+// 	}
+// 	for i := range rr {
+// 		rr[i].r = rand.New(rand.NewSource(int64(i)))
+// 	}
 
-	var n uint64
-	b.RunParallel(func(pb *testing.PB) {
-		s := uint64(0)
-		for pb.Next() {
-			idx := atomic.AddUint64(&n, 1)
-			r := &rr[idx%uint64(len(rr))]
-			r.mu.Lock()
-			s += uint64(r.r.Int63n(1e6))
-			r.mu.Unlock()
-		}
-		atomic.AddUint64(&BenchSink, s)
-	})
-}
+// 	var n uint64
+// 	b.RunParallel(func(pb *testing.PB) {
+// 		s := uint64(0)
+// 		for pb.Next() {
+// 			idx := atomic.AddUint64(&n, 1)
+// 			r := &rr[idx%uint64(len(rr))]
+// 			r.mu.Lock()
+// 			s += uint64(r.r.Int63n(1e6))
+// 			r.mu.Unlock()
+// 		}
+// 		atomic.AddUint64(&BenchSink, s)
+// 	})
+// }
 
 func Int64_2() int64 {
 	var num int64
@@ -166,14 +165,14 @@ func BenchmarkFastRandInt64(b *testing.B) {
 	})
 }
 
-func BenchmarkRandInt64(b *testing.B) {
-	rng := &RNG64{}
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			rng.Int63()
-		}
-	})
-}
+// func BenchmarkRandInt64(b *testing.B) {
+// 	rng := &RNG64{}
+// 	b.RunParallel(func(pb *testing.PB) {
+// 		for pb.Next() {
+// 			rng.Int63()
+// 		}
+// 	})
+// }
 
 func TestRand(t *testing.T) {
 	// rng := &RNG64{}
@@ -183,4 +182,15 @@ func TestRand(t *testing.T) {
 		// runtime.FuncForPC()
 	}
 	time.Sleep(time.Second)
+}
+
+func TestUint64n(t *testing.T) {
+	// rng := &RNG64{}
+	// Seed(12345678)
+	for i := 0; i < 100; i++ {
+		// fmt.Println(Uint64n(10))
+		fmt.Println(Uint64())
+		// runtime.FuncForPC()
+	}
+	// time.Sleep(time.Second)
 }

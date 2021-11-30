@@ -56,6 +56,7 @@ var (
 		},
 	}
 
+	outFile        string
 	creatReportCmd = &cobra.Command{
 		Use:   "create",
 		Short: "根据csv文件生成测试报告",
@@ -65,8 +66,13 @@ var (
 				fileNames = append(fileNames, strings.TrimSuffix(arg, ".csv"))
 			}
 			report := buildin_testcase.CreateReport(fileNames...)
-			f, _ := os.Create(fileNames[len(fileNames)-1] + ".html")
-			defer f.Close()
+			var f *os.File
+			if outFile == "" {
+				f, _ = os.Create(fileNames[len(fileNames)-1] + ".html")
+				defer f.Close()
+			} else {
+				f, _ = os.Create(outFile)
+			}
 			report.ToHtmlOneFile(f)
 		},
 	}
@@ -84,16 +90,18 @@ type Scheduler struct {
 }
 
 func init() {
-	scheduleCmd.PersistentFlags().StringVar(&scheduler.csvDaemonUrls, "urls", "http://localhost:8086", "被测数据库的地址")
-	scheduleCmd.PersistentFlags().StringVar(&scheduler.configsPath, "config-file", "", "调度器配置文件地址 (默认不使用)")
-	scheduleCmd.PersistentFlags().StringVar(&scheduler.agentEndpoint, "agent", "", "数据库代理服务地址，为空表示不使用 (默认不使用)")
-	scheduleCmd.PersistentFlags().StringVar(&scheduler.grafanaEndpoint, "grafana", "", "grafana的dashboard地址，例如: http://124.71.230.36:4000/sources/1/dashboards/4")
-	scheduleCmd.PersistentFlags().StringVar(&scheduler.format, "format", "fctsdb", "目标数据库类型，当前仅支持fctsdb和mysql")
-	scheduleCmd.PersistentFlags().StringVar(&scheduler.username, "username", "", "用户名")
-	scheduleCmd.PersistentFlags().StringVar(&scheduler.password, "password", "", "密码")
-	scheduleCmd.PersistentFlags().BoolVar(&scheduler.debug, "debug", false, "是否打印详细日志(default false).")
+	scheduleCmd.Flags().StringVar(&scheduler.csvDaemonUrls, "urls", "http://localhost:8086", "被测数据库的地址")
+	scheduleCmd.Flags().StringVar(&scheduler.configsPath, "config-file", "", "调度器配置文件地址 (默认不使用)")
+	scheduleCmd.Flags().StringVar(&scheduler.agentEndpoint, "agent", "", "数据库代理服务地址，为空表示不使用 (默认不使用)")
+	scheduleCmd.Flags().StringVar(&scheduler.grafanaEndpoint, "grafana", "", "grafana的dashboard地址，例如: http://124.71.230.36:4000/sources/1/dashboards/4")
+	scheduleCmd.Flags().StringVar(&scheduler.format, "format", "fctsdb", "目标数据库类型，当前仅支持fctsdb和mysql")
+	scheduleCmd.Flags().StringVar(&scheduler.username, "username", "", "用户名")
+	scheduleCmd.Flags().StringVar(&scheduler.password, "password", "", "密码")
+	scheduleCmd.Flags().BoolVar(&scheduler.debug, "debug", false, "是否打印详细日志(default false).")
 	rootCmd.AddCommand(scheduleCmd)
 	scheduleCmd.AddCommand(showCmd)
+
+	creatReportCmd.Flags().StringVar(&outFile, "out", "", "生成的目标文件名字")
 	scheduleCmd.AddCommand(creatReportCmd)
 }
 

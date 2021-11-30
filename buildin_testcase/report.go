@@ -32,8 +32,8 @@ type PictureDefine struct {
 
 var (
 	csvHeaders = []string{"Group", "Mod", "场景", "Series", "并发数", "Batch Size", "查询百分比", "采样时间",
-		"P50(r)", "P90(r)", "P95(r)", "P99(r)", "Min(r)", "Max(r)", "Avg(r)", "Fail(r)", "Total(r)", "查询(query/s)",
-		"P50(w)", "P90(w)", "P95(w)", "P99(w)", "Min(w)", "Max(w)", "Avg(w)", "Fail(w)", "Total(w)", "Qps(w)", "写入(point/s)", "写入(value/s)", "TotalPoints",
+		"P50(r)", "P90(r)", "P95(r)", "P99(r)", "Min(r)", "Max(r)", "Avg(r)", "Fail(r)", "Total(r)", "查询(q/s)",
+		"P50(w)", "P90(w)", "P95(w)", "P99(w)", "Min(w)", "Max(w)", "Avg(w)", "Fail(w)", "Total(w)", "Qps(w)", "写入(p/s)", "写入(value/s)", "TotalPoints",
 		"RunSec", "Gzip", "Sql", "监控"}
 	csvHeaderMap = make(map[string]int)
 
@@ -52,9 +52,9 @@ func init() {
 		Title:       "车载场景-写入性能-Series变化",
 		Document:    "测试车载场景（1个tag，60个field），series个数对写入性能的影响。",
 		TableTags:   []string{"场景", "Series", "并发数", "Batch Size", "采样时间"},
-		TableFeilds: []string{"写入(point/s)"},
+		TableFeilds: []string{"写入(p/s)"},
 		Pictures: []PictureDefine{
-			{Type: "line", XAxisColumn: "Series", SeriesColumn: []string{"写入(point/s)"}},
+			{Type: "line", XAxisColumn: "Series", SeriesColumn: []string{"写入(p/s)"}},
 		},
 	}
 
@@ -62,9 +62,9 @@ func init() {
 		Title:       "车载场景-写入性能-batchsize变化",
 		Document:    "测试车载场景（1个tag，60个field），每个http携带数据量（batchsize）对写入性能的影响",
 		TableTags:   []string{"场景", "Series", "并发数", "Batch Size", "采样时间"},
-		TableFeilds: []string{"写入(point/s)"},
+		TableFeilds: []string{"写入(p/s)"},
 		Pictures: []PictureDefine{
-			{Type: "line", XAxisColumn: "Batch Size", SeriesColumn: []string{"写入(point/s)"}},
+			{Type: "line", XAxisColumn: "Batch Size", SeriesColumn: []string{"写入(p/s)"}},
 		},
 	}
 
@@ -72,9 +72,9 @@ func init() {
 		Title:       "车载场景-写入性能-采样时间变化",
 		Document:    "测试车载场景（1个tag，60个field），采样时间（每个series两条数据timestamp间隔）对写入性能的影响",
 		TableTags:   []string{"场景", "Series", "并发数", "Batch Size", "采样时间"},
-		TableFeilds: []string{"写入(point/s)"},
+		TableFeilds: []string{"写入(p/s)"},
 		Pictures: []PictureDefine{
-			{Type: "line", XAxisColumn: "采样时间", SeriesColumn: []string{"写入(point/s)"}},
+			{Type: "line", XAxisColumn: "采样时间", SeriesColumn: []string{"写入(p/s)"}},
 		},
 	}
 
@@ -82,9 +82,9 @@ func init() {
 		Title:       "车载场景-写入性能-并发数变化",
 		Document:    "测试车载场景（1个tag，60个field），并发数对写入性能的影响",
 		TableTags:   []string{"场景", "Series", "并发数", "Batch Size", "采样时间"},
-		TableFeilds: []string{"写入(point/s)"},
+		TableFeilds: []string{"写入(p/s)"},
 		Pictures: []PictureDefine{
-			{Type: "line", XAxisColumn: "并发数", SeriesColumn: []string{"写入(point/s)"}},
+			{Type: "line", XAxisColumn: "并发数", SeriesColumn: []string{"写入(p/s)"}},
 		},
 	}
 
@@ -92,9 +92,9 @@ func init() {
 		Title:       "车载场景-写入性能-Gzip等级变化",
 		Document:    "测试车载场景（1个tag，60个field），Gzip是否开启及等级对写入性能的影响",
 		TableTags:   []string{"场景", "Series", "并发数", "Batch Size", "采样时间", "Gzip"},
-		TableFeilds: []string{"写入(point/s)"},
+		TableFeilds: []string{"写入(p/s)"},
 		Pictures: []PictureDefine{
-			{Type: "line", XAxisColumn: "Gzip", SeriesColumn: []string{"写入(point/s)"}},
+			{Type: "line", XAxisColumn: "Gzip", SeriesColumn: []string{"写入(p/s)"}},
 		},
 	}
 
@@ -102,9 +102,9 @@ func init() {
 		Title:       "空气质量场景-写入性能-Series变化",
 		Document:    "测试空气质量（5个tag，8个field），series个数对写入性能的影响",
 		TableTags:   []string{"场景", "Series", "并发数", "Batch Size", "采样时间"},
-		TableFeilds: []string{"写入(point/s)"},
+		TableFeilds: []string{"写入(p/s)"},
 		Pictures: []PictureDefine{
-			{Type: "line", XAxisColumn: "Series", SeriesColumn: []string{"写入(point/s)"}},
+			{Type: "line", XAxisColumn: "Series", SeriesColumn: []string{"写入(p/s)"}},
 		},
 	}
 
@@ -112,9 +112,9 @@ func init() {
 		Title:       "空气质量场景-写入性能-batchsize变化",
 		Document:    "测试空气质量（5个tag，8个field），每个http携带数据量（batchsize）对写入性能的影响",
 		TableTags:   []string{"场景", "Series", "并发数", "Batch Size", "采样时间"},
-		TableFeilds: []string{"写入(point/s)"},
+		TableFeilds: []string{"写入(p/s)"},
 		Pictures: []PictureDefine{
-			{Type: "line", XAxisColumn: "Batch Size", SeriesColumn: []string{"写入(point/s)"}},
+			{Type: "line", XAxisColumn: "Batch Size", SeriesColumn: []string{"写入(p/s)"}},
 		},
 	}
 
@@ -122,9 +122,9 @@ func init() {
 		Title:       "空气质量场景-写入性能-采样时间变化",
 		Document:    "测试空气质量（5个tag，8个field），采样时间（每个series两条数据timestamp间隔）对写入性能的影响",
 		TableTags:   []string{"场景", "Series", "并发数", "Batch Size", "采样时间"},
-		TableFeilds: []string{"写入(point/s)"},
+		TableFeilds: []string{"写入(p/s)"},
 		Pictures: []PictureDefine{
-			{Type: "line", XAxisColumn: "采样时间", SeriesColumn: []string{"写入(point/s)"}},
+			{Type: "line", XAxisColumn: "采样时间", SeriesColumn: []string{"写入(p/s)"}},
 		},
 	}
 
@@ -132,9 +132,9 @@ func init() {
 		Title:       "空气质量场景-写入性能-并发数变化",
 		Document:    "测试空气质量（5个tag，8个field），并发数对写入性能的影响",
 		TableTags:   []string{"场景", "Series", "并发数", "Batch Size", "采样时间"},
-		TableFeilds: []string{"写入(point/s)"},
+		TableFeilds: []string{"写入(p/s)"},
 		Pictures: []PictureDefine{
-			{Type: "line", XAxisColumn: "并发数", SeriesColumn: []string{"写入(point/s)"}},
+			{Type: "line", XAxisColumn: "并发数", SeriesColumn: []string{"写入(p/s)"}},
 		},
 	}
 
@@ -142,9 +142,9 @@ func init() {
 		Title:       "空气质量场景-写入性能-Gzip等级变化",
 		Document:    "测试空气质量（5个tag，8个field），Gzip是否开启对写入性能的影响",
 		TableTags:   []string{"场景", "Series", "并发数", "Batch Size", "采样时间", "Gzip"},
-		TableFeilds: []string{"写入(point/s)"},
+		TableFeilds: []string{"写入(p/s)"},
 		Pictures: []PictureDefine{
-			{Type: "line", XAxisColumn: "Gzip", SeriesColumn: []string{"写入(point/s)"}},
+			{Type: "line", XAxisColumn: "Gzip", SeriesColumn: []string{"写入(p/s)"}},
 		},
 	}
 
@@ -152,14 +152,14 @@ func init() {
 		Title:       "空气质量场景-查询性能",
 		Document:    "测试空气质量（5个tag，8个field），不同查询语句的性能",
 		TableTags:   []string{"场景", "并发数", "Sql"},
-		TableFeilds: []string{"查询(query/s)"},
+		TableFeilds: []string{"查询(q/s)"},
 	}
 
 	performances["车载查询性能"] = &fcbenchCaseDefine{
 		Title:       "车载场景-查询性能",
-		Document:    "测试车载场景（5个tag，8个field），不同查询语句的性能",
+		Document:    "测试车载场景（1个tag，60个field），不同查询语句的性能",
 		TableTags:   []string{"场景", "并发数", "Sql"},
-		TableFeilds: []string{"查询(query/s)"},
+		TableFeilds: []string{"查询(q/s)"},
 	}
 
 	performances["空气质量混合比例"] = &fcbenchCaseDefine{
@@ -168,10 +168,10 @@ func init() {
 			"测试语句: " + query_generator.AirQuality.Types[1].RawSql + "\n" +
 			"本用例固定并发总数，变化混合比例。",
 		TableTags:   []string{"场景", "Series", "并发数", "查询百分比", "Batch Size", "采样时间"},
-		TableFeilds: []string{"查询(query/s)", "写入(point/s)"},
+		TableFeilds: []string{"查询(q/s)", "写入(p/s)"},
 		Pictures: []PictureDefine{
-			{Type: "line", XAxisColumn: "查询百分比", SeriesColumn: []string{"写入(point/s)"}},
-			{Type: "line", XAxisColumn: "查询百分比", SeriesColumn: []string{"查询(query/s)"}},
+			{Type: "line", XAxisColumn: "查询百分比", SeriesColumn: []string{"写入(p/s)"}},
+			{Type: "line", XAxisColumn: "查询百分比", SeriesColumn: []string{"查询(q/s)"}},
 		},
 	}
 
@@ -181,10 +181,10 @@ func init() {
 			"测试语句: " + query_generator.AirQuality.Types[1].RawSql + "\n" +
 			"本用例固定写入并发数24个，增加查询并发数来改变混合比例。",
 		TableTags:   []string{"场景", "Series", "并发数", "查询百分比", "Batch Size", "采样时间"},
-		TableFeilds: []string{"查询(query/s)", "写入(point/s)"},
+		TableFeilds: []string{"查询(q/s)", "写入(p/s)"},
 		Pictures: []PictureDefine{
-			{Type: "line", XAxisColumn: "查询百分比", SeriesColumn: []string{"写入(point/s)"}},
-			{Type: "line", XAxisColumn: "查询百分比", SeriesColumn: []string{"查询(query/s)"}},
+			{Type: "line", XAxisColumn: "查询百分比", SeriesColumn: []string{"写入(p/s)"}},
+			{Type: "line", XAxisColumn: "查询百分比", SeriesColumn: []string{"查询(q/s)"}},
 		},
 	}
 
@@ -194,49 +194,49 @@ func init() {
 			"测试语句: " + query_generator.AirQuality.Types[1].RawSql + "\n" +
 			"本用例固定查询并发数24个，增加写入并发数来改变混合比例。",
 		TableTags:   []string{"场景", "Series", "并发数", "查询百分比", "Batch Size", "采样时间"},
-		TableFeilds: []string{"查询(query/s)", "写入(point/s)"},
+		TableFeilds: []string{"查询(q/s)", "写入(p/s)"},
 		Pictures: []PictureDefine{
-			{Type: "line", XAxisColumn: "查询百分比", SeriesColumn: []string{"写入(point/s)"}},
-			{Type: "line", XAxisColumn: "查询百分比", SeriesColumn: []string{"查询(query/s)"}},
+			{Type: "line", XAxisColumn: "查询百分比", SeriesColumn: []string{"写入(p/s)"}},
+			{Type: "line", XAxisColumn: "查询百分比", SeriesColumn: []string{"查询(q/s)"}},
 		},
 	}
 
 	performances["车载混合比例"] = &fcbenchCaseDefine{
 		Title: "车载场景-混合性能-固定并发总数",
-		Document: "测试车载（5个tag，8个field），查询和写入比例对性能的影响。\n" +
+		Document: "测试车载（1个tag，60个field），查询和写入比例对性能的影响。\n" +
 			"测试语句: " + query_generator.Vehicle.Types[1].RawSql + "\n" +
 			"本用例固定并发总数，变化混合比例。",
 		TableTags:   []string{"场景", "Series", "并发数", "查询百分比", "Batch Size", "采样时间"},
-		TableFeilds: []string{"查询(query/s)", "写入(point/s)"},
+		TableFeilds: []string{"查询(q/s)", "写入(p/s)"},
 		Pictures: []PictureDefine{
-			{Type: "line", XAxisColumn: "查询百分比", SeriesColumn: []string{"写入(point/s)"}},
-			{Type: "line", XAxisColumn: "查询百分比", SeriesColumn: []string{"查询(query/s)"}},
+			{Type: "line", XAxisColumn: "查询百分比", SeriesColumn: []string{"写入(p/s)"}},
+			{Type: "line", XAxisColumn: "查询百分比", SeriesColumn: []string{"查询(q/s)"}},
 		},
 	}
 
 	performances["车载混合方式1"] = &fcbenchCaseDefine{
 		Title: "车载场景-混合性能-固定写入并发数",
-		Document: "测试车载（5个tag，8个field），查询和写入比例对性能的影响。\n" +
+		Document: "测试车载（1个tag，60个field），查询和写入比例对性能的影响。\n" +
 			"测试语句: " + query_generator.Vehicle.Types[1].RawSql + "\n" +
 			"本用例固定写入并发数24个，增加查询并发数来改变混合比例。",
 		TableTags:   []string{"场景", "Series", "并发数", "查询百分比", "Batch Size", "采样时间"},
-		TableFeilds: []string{"查询(query/s)", "写入(point/s)"},
+		TableFeilds: []string{"查询(q/s)", "写入(p/s)"},
 		Pictures: []PictureDefine{
-			{Type: "line", XAxisColumn: "查询百分比", SeriesColumn: []string{"写入(point/s)"}},
-			{Type: "line", XAxisColumn: "查询百分比", SeriesColumn: []string{"查询(query/s)"}},
+			{Type: "line", XAxisColumn: "查询百分比", SeriesColumn: []string{"写入(p/s)"}},
+			{Type: "line", XAxisColumn: "查询百分比", SeriesColumn: []string{"查询(q/s)"}},
 		},
 	}
 
 	performances["车载混合方式2"] = &fcbenchCaseDefine{
 		Title: "车载场景-混合性能-固定查询并发数",
-		Document: "测试车载（5个tag，8个field），查询和写入比例对性能的影响。\n" +
+		Document: "测试车载（1个tag，60个field），查询和写入比例对性能的影响。\n" +
 			"测试语句: " + query_generator.Vehicle.Types[1].RawSql + "\n" +
 			"本用例固定查询并发数24个，增加写入并发数来改变混合比例。",
 		TableTags:   []string{"场景", "Series", "并发数", "查询百分比", "Batch Size", "采样时间"},
-		TableFeilds: []string{"查询(query/s)", "写入(point/s)"},
+		TableFeilds: []string{"查询(q/s)", "写入(p/s)"},
 		Pictures: []PictureDefine{
-			{Type: "line", XAxisColumn: "查询百分比", SeriesColumn: []string{"写入(point/s)"}},
-			{Type: "line", XAxisColumn: "查询百分比", SeriesColumn: []string{"查询(query/s)"}},
+			{Type: "line", XAxisColumn: "查询百分比", SeriesColumn: []string{"写入(p/s)"}},
+			{Type: "line", XAxisColumn: "查询百分比", SeriesColumn: []string{"查询(q/s)"}},
 		},
 	}
 
@@ -266,6 +266,7 @@ func CreateReport(fileNames ...string) *report.Page {
 	benchReport := report.NewPage("性能测试")
 	benchReport.Document = "测试海东青数据库的性能\n" + "使用工具：fcbench\n"
 	var currentTestCase *report.PerformanceTestCase
+	var tableSep string = "<br>" //表中分隔符
 
 	// 取第一个cse文件开始遍历
 	for rowIndex, row := range allCsvRecords[fileNames[0]] {
@@ -287,17 +288,17 @@ func CreateReport(fileNames ...string) *report.Page {
 					// 步骤1.1：记录所有csv的相同field值
 					for _, field := range caseDefine.TableFeilds {
 						for _, fileName := range fileNames {
-							tableHeaders = append(tableHeaders, field+": "+fileName)
+							tableHeaders = append(tableHeaders, field+tableSep+fileName)
 						}
 					}
 					// 步骤1.2：比较第一个csv和最后一个csv的差值
 					for _, field := range caseDefine.TableFeilds {
 						keywords := strings.Split(field, "(")[0]
-						tableHeaders = append(tableHeaders, "比较"+keywords+": "+fileNames[0]+"与"+fileNames[len(fileNames)-1])
+						tableHeaders = append(tableHeaders, "比较"+keywords+tableSep+fileNames[0]+"与"+fileNames[len(fileNames)-1])
 					}
 					// 步骤1.3：添加监控列
 					for _, fileName := range fileNames {
-						tableHeaders = append(tableHeaders, "监控: "+fileName)
+						tableHeaders = append(tableHeaders, "监控"+tableSep+fileName)
 					}
 				} else {
 					// 单个文件仅记录数据
@@ -311,7 +312,7 @@ func CreateReport(fileNames ...string) *report.Page {
 				} else {
 					currentTestCase = report.NewPerformanceTestCase(row[0])
 					currentTestCase.Title = caseDefine.Title
-					currentTestCase.Document = caseDefine.Document
+					currentTestCase.Document = caseDefine.Document + "\n单位解释：p/s - points/秒 、q/s - queries/秒"
 					currentTestCase.Table = table.CreateTable(tableHeaders...)
 					benchReport.AddTestCase(currentTestCase)
 				}
@@ -405,7 +406,7 @@ func CreateReport(fileNames ...string) *report.Page {
 					if len(fileNames) > 1 {
 						for _, field := range picDefine.SeriesColumn {
 							for _, fileName := range fileNames {
-								line.AddSeries(field+":"+fileName, testcase.Table.GetColumn(field+": "+fileName))
+								line.AddSeries(field+":"+fileName, testcase.Table.GetColumn(field+tableSep+fileName))
 							}
 						}
 					} else {

@@ -797,6 +797,38 @@ func TestNewPointAirqEasy(t *testing.T) {
 	fmt.Println(sim.SeenPoints())
 }
 
+func TestNewPointDevposEasy(t *testing.T) {
+
+	now := time.Now()
+
+	cfg := &devops.DevopsSimulatorConfig{
+		Start: now.Add(time.Second * -10),
+		End:   now,
+		// SamplingInterval: time.Second,
+		HostCount:  1,
+		HostOffset: 0,
+	}
+	devops.EpochDuration = time.Second
+	sim := cfg.ToSimulator()
+	ser := serializers.NewSerializerInflux()
+	point := common.MakeUsablePoint()
+	out := Printer{}
+	// for i := 0; i < 10; i++ {
+	i := 0
+
+	// for sim.Next(point) {
+	for !sim.Finished() {
+		// host := sim.Hosts[i%len(sim.Hosts)]
+		// _ = string(host.SiteID)
+		sim.Next(point)
+		ser.SerializePoint(out, point)
+		point.Reset()
+		i += 1
+	}
+	fmt.Println(i)
+	fmt.Println(sim.SeenPoints())
+}
+
 type Printer struct {
 }
 

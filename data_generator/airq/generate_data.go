@@ -3,11 +3,11 @@ package airq
 import (
 	"io"
 	"log"
+	"math/rand"
 	"sync/atomic"
 	"time"
 
 	"git.querycap.com/falcontsdb/fctsdb-bench/common"
-	"git.querycap.com/falcontsdb/fctsdb-bench/util/fastrand"
 )
 
 // Type AirqSimulatorConfig is used to create a AirqSimulator.
@@ -132,7 +132,10 @@ func (s *AirqSimulator) Next(p *common.Point) int64 {
 func (s *AirqSimulator) NextSql(wr io.Writer) int64 {
 	madeSql := atomic.AddInt64(&s.madeSql, 1)
 	tmp := s.sqlTemplates[madeSql%int64(len(s.sqlTemplates))]
-	randomHostsIndex := int(fastrand.Uint32n(uint32(len(s.Hosts))))
+
+	// 生成数据点时，用fastrand更快速，生成的数据和seed无关联
+	// 生成sql时，为了保证每次生成sql一致性，采用rand库，使用全局seed
+	randomHostsIndex := rand.Intn(len(s.Hosts))
 	for i := range tmp.Base {
 		wr.Write(tmp.Base[i])
 		if i < len(tmp.KeyWords) {
