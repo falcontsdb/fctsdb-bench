@@ -98,7 +98,7 @@ func init() {
 	scheduleCmd.Flags().StringVar(&scheduler.username, "username", "", "用户名")
 	scheduleCmd.Flags().StringVar(&scheduler.password, "password", "", "密码")
 	scheduleCmd.Flags().BoolVar(&scheduler.debug, "debug", false, "是否打印详细日志(default false).")
-	rootCmd.AddCommand(scheduleCmd)
+
 	scheduleCmd.AddCommand(showCmd)
 
 	creatReportCmd.Flags().StringVar(&outFile, "out", "", "生成的目标文件名字")

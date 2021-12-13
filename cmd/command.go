@@ -44,9 +44,6 @@ func init() {
 	InitMixed(mixReadWrite, mixedCmd)
 	InitWrite(writeTask, writeCmd)
 	InitQuery(queryTask, queryCmd)
-	rootCmd.AddCommand(mixedCmd)
-	rootCmd.AddCommand(writeCmd)
-	rootCmd.AddCommand(queryCmd)
 }
 
 func InitMixed(task *BasicBenchTask, cmd *cobra.Command) {

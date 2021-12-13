@@ -55,7 +55,7 @@ var (
 
 func init() {
 	queryLoad.Init(queryLoadCmd)
-	rootCmd.AddCommand(queryLoadCmd)
+
 }
 
 func RunQueryLoad() {
