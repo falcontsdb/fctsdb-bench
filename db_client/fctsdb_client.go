@@ -182,13 +182,17 @@ func (w *FctsdbClient) Query(lines []byte) (int64, error) {
 	return lat, err
 }
 
-func (d *FctsdbClient) CreateDb() error {
+func (d *FctsdbClient) CreateDb(withEncryption bool) error {
 	u, _ := url.Parse(string(d.host))
 
 	// serialize params the right way:
 	u.Path = "query"
 	v := u.Query()
-	v.Set("q", fmt.Sprintf("CREATE DATABASE %s", d.c.Database))
+	if withEncryption {
+		v.Set("q", fmt.Sprintf("CREATE DATABASE %s with encryption on", d.c.Database))
+	} else {
+		v.Set("q", fmt.Sprintf("CREATE DATABASE %s", d.c.Database))
+	}
 	u.RawQuery = v.Encode()
 
 	req, err := http.NewRequest("GET", u.String(), nil)

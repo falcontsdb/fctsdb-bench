@@ -30,7 +30,7 @@ type DBClient interface {
 	Write([]byte) (int64, error)
 	Query([]byte) (int64, error)
 	ListDatabases() ([]string, error)
-	CreateDb() error
+	CreateDb(withEncryption bool) error
 	Ping() error
 }
 

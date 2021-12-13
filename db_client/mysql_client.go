@@ -3,6 +3,7 @@ package db_client
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"net"
 	"time"
@@ -64,13 +65,16 @@ func (c *MysqlClient) Query(lines []byte) (int64, error) {
 	return executeTime, err
 }
 
-func (c *MysqlClient) CreateDb() error {
+func (c *MysqlClient) CreateDb(withEncryption bool) error {
 	dsn := fmt.Sprintf("%s:%s@%s(%s)/", c.c.User, c.c.Password, "tcp", c.c.Host)
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
 		return err
 	}
 	defer db.Close()
+	if withEncryption {
+		return errors.New("mysql version do not support the encryption option")
+	}
 	createDbSql := fmt.Sprintf("create database %s;", c.c.Database)
 	_, err = db.Exec(createDbSql)
 	return err
