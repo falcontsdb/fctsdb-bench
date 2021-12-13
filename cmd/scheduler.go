@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"git.querycap.com/falcontsdb/fctsdb-bench/agent"
 	"git.querycap.com/falcontsdb/fctsdb-bench/buildin_testcase"
 	"git.querycap.com/falcontsdb/fctsdb-bench/common"
 	"github.com/spf13/cobra"
@@ -108,6 +109,7 @@ func init() {
 func (s *Scheduler) ScheduleBenchTask() {
 
 	fileName := time.Now().Format("benchmark_0102_150405")
+	// 根据配置文件执行测试
 	if s.configsPath != "" {
 		configsFile, err := os.Open(s.configsPath)
 		if err != nil {
@@ -119,19 +121,33 @@ func (s *Scheduler) ScheduleBenchTask() {
 
 		for scanner.Scan() {
 			line := scanner.Bytes()
-			lindID++
-			err := json.Unmarshal(line, &config)
-			if err != nil {
-				log.Println("cannot unmarshal the config line:", lindID, "error:", err.Error())
-				continue
-			}
-			err = s.runBenchTaskByConfig(lindID, fileName, &config)
-			if err != nil {
-				log.Println(err)
-				continue
+			if bytes.HasPrefix(line, []byte("$Set")) {
+				param := make(map[string]string)
+				line := bytes.TrimSpace(line[4:])
+				err := json.Unmarshal(line, &param)
+				if err != nil {
+					log.Println("cannot unmarshal the $Set line:", string(line), err.Error())
+					continue
+				}
+				err = agent.SetAgent(s.agentEndpoint, param)
+				if err != nil {
+					log.Fatalln("set agent failed:", err.Error())
+				}
+			} else {
+				lindID++
+				err := json.Unmarshal(line, &config)
+				if err != nil {
+					log.Println("cannot unmarshal the config line:", lindID, "error:", err.Error())
+					continue
+				}
+				err = s.runBenchTaskByConfig(lindID, fileName, &config)
+				if err != nil {
+					log.Println(err)
+					continue
+				}
 			}
 		}
-	} else {
+	} else { // 执行内置测试
 		for i, config := range buildin_testcase.BuildinConfigs {
 			err := s.runBenchTaskByConfig(i+1, fileName, &config)
 			if err != nil {
@@ -139,48 +155,56 @@ func (s *Scheduler) ScheduleBenchTask() {
 				continue
 			}
 		}
-		if s.agentEndpoint != "" {
-			envBytes, err := GetEnvironment(s.agentEndpoint)
-			log.Println(string(envBytes))
-			if err == nil {
-				csvFile, err := os.OpenFile(fileName+".csv", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0666)
-				if err != nil {
-					log.Println("open result csv failed, error:", err.Error())
-				}
-				defer csvFile.Close()
-				csvWriter := csv.NewWriter(csvFile)
-				oneLine := make([]string, len(heads))
-				oneLine[0] = "test-env"
-				oneLine[1] = string(envBytes)
-				csvWriter.Write(oneLine)
-				csvWriter.Flush()
+	}
+	// 记录环境信息到最后一行
+	if s.agentEndpoint != "" {
+		envBytes, err := agent.GetEnvironment(s.agentEndpoint)
+		log.Println(string(envBytes))
+		if err == nil {
+			csvFile, err := os.OpenFile(fileName+".csv", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0666)
+			if err != nil {
+				log.Println("open result csv failed, error:", err.Error())
 			}
+			defer csvFile.Close()
+			csvWriter := csv.NewWriter(csvFile)
+			oneLine := make([]string, len(heads))
+			oneLine[0] = "test-env"
+			oneLine[1] = string(envBytes)
+			csvWriter.Write(oneLine)
+			csvWriter.Flush()
 		}
+	}
+	// 如果是执行内置测试，生成测试报告，根据配置文件执行的测试，需要手动生成测试报告
+	if s.configsPath == "" {
 		report := buildin_testcase.CreateReport(fileName)
 		f, _ := os.Create(fileName + ".html")
 		defer f.Close()
 		report.ToHtmlOneFile(f)
 	}
+
 }
 
 func (s *Scheduler) runBenchTaskByConfig(index int, fileName string, config *buildin_testcase.BasicBenchTaskConfig) error {
 	log.Printf("---index %d ------------------------------------------------------------\n", index)
 	if s.agentEndpoint != "" {
 		var err error
+		err = agent.StopRemoteDatabase(s.agentEndpoint)
+		if err != nil {
+			log.Println("request agent error:", err.Error())
+		}
+		log.Println("Stop the fctsdb")
 		if config.Clean {
-			err = CleanRemoteDatabase(s.agentEndpoint)
-			log.Println("Clean the fctsdb")
-		} else {
-			err = RestartRemoteDatabase(s.agentEndpoint)
-			log.Println("Restart the fctsdb")
+			err = agent.CleanRemoteDatabase(s.agentEndpoint)
+			if err != nil {
+				log.Println("request agent error:", err.Error())
+			}
+			log.Println("Clean the fctsdb data")
 		}
+		err = agent.StartRemoteDatabase(s.agentEndpoint)
 		if err != nil {
 			log.Println("request agent error:", err.Error())
 		}
-		err = StartRemoteDatabase(s.agentEndpoint)
-		if err != nil {
-			log.Println("request agent error:", err.Error())
-		}
+		log.Println("Start the fctsdb")
 	}
 
 	basicBenchTask, err := s.NewBasicBenchTask(config)

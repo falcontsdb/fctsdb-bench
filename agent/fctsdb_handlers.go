@@ -17,14 +17,6 @@ import (
 	"github.com/shirou/gopsutil/process"
 )
 
-const (
-	CLEANPATH   = "/clean"
-	STARTPATH   = "/start"
-	STOPPATH    = "/stop"
-	RESTARTPATH = "/restart"
-	GETENVPATH  = "/env"
-)
-
 type DbConfig struct {
 	BindAddress  string             `toml:"bind-address"`
 	Meta         MetaConfig         `toml:"meta"`
@@ -140,18 +132,51 @@ func DecodeFromConfigFile(configFile string) (*DbConfig, error) {
 }
 
 type FctsdbAgent struct {
-	Port       string
-	FctsdbPath string
+	BinPath    string
 	ConfigPath string
 
 	//run var
-	DbConfig *DbConfig
+	dbConfig *DbConfig
+}
+
+func NewFctsdbAgent(binPath, configPath string) *FctsdbAgent {
+	fa := &FctsdbAgent{}
+	err := fa.setBinaryPath(binPath)
+	if err != nil {
+		log.Fatalln(err.Error())
+	}
+	err = fa.setConifgPath(configPath)
+	if err != nil {
+		log.Fatalln(err.Error())
+	}
+	return fa
+}
+
+func (f *FctsdbAgent) setBinaryPath(binPath string) error {
+	cmd := binPath + ` version`
+	log.Println("Running linux cmd :" + cmd)
+	_, err := exec.Command("bash", "-c", cmd).Output()
+	if err != nil {
+		return fmt.Errorf("can't run fctsdb binary, error: %s", err.Error())
+	}
+	f.BinPath = binPath
+	return nil
+}
+
+func (f *FctsdbAgent) setConifgPath(configPath string) error {
+	dbConfig, err := DecodeFromConfigFile(configPath)
+	if err != nil {
+		return fmt.Errorf("decode fctsdb config failed, error: %s", err.Error())
+	}
+	f.ConfigPath = configPath
+	f.dbConfig = dbConfig
+	return nil
 }
 
 func (f *FctsdbAgent) StartDBHandler(w http.ResponseWriter, r *http.Request) {
 	log.Println(r.Host)
 	if r.Method == "GET" {
-		err := f.StartDB()
+		err := f.startDB()
 		if err != nil {
 			log.Println("HTTP: " + err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
@@ -166,7 +191,7 @@ func (f *FctsdbAgent) StartDBHandler(w http.ResponseWriter, r *http.Request) {
 
 func (f *FctsdbAgent) CleanHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
-		err := f.RestartDB(true)
+		err := f.cleanData()
 		if err != nil {
 			log.Println("HTTP: " + err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
@@ -181,7 +206,7 @@ func (f *FctsdbAgent) CleanHandler(w http.ResponseWriter, r *http.Request) {
 
 func (f *FctsdbAgent) StopDBHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
-		err := f.RestartDB(false)
+		err := f.stopDB()
 		if err != nil {
 			log.Println("HTTP: " + err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
@@ -194,18 +219,28 @@ func (f *FctsdbAgent) StopDBHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (f *FctsdbAgent) RestartDBHandler(w http.ResponseWriter, r *http.Request) {
+func (f *FctsdbAgent) SetHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
-		err := f.RestartDB(false)
-		if err != nil {
-			log.Println("HTTP: " + err.Error())
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(err.Error()))
-			return
+		if r.URL.Query().Has("BinPath") {
+			binPath := r.URL.Query().Get("BinPath")
+			err := f.setBinaryPath(binPath)
+			if err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				w.Write([]byte(err.Error()))
+				return
+			}
+		}
+		if r.URL.Query().Has("ConfigPath") {
+			configPath := r.URL.Query().Get("ConfigPath")
+			err := f.setConifgPath(configPath)
+			if err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				w.Write([]byte(err.Error()))
+				return
+			}
 		}
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
-		log.Println("HTTP: stop falconTSDB successful")
 	}
 }
 
@@ -216,7 +251,7 @@ func (f *FctsdbAgent) GetEnvHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (f *FctsdbAgent) RestartDB(deleteData bool) error {
+func (f *FctsdbAgent) stopDB() error {
 	pid, err := GetPidOnLinux("fctsdb")
 	if err != nil {
 		log.Println("Get fctsdb failed, error: " + err.Error())
@@ -233,15 +268,6 @@ func (f *FctsdbAgent) RestartDB(deleteData bool) error {
 		pid, _ = GetPidOnLinux("fctsdb")
 		if pid == "" {
 			log.Println("Stop falconTSDB succeed")
-			if deleteData {
-				//clear data directory of database
-				for _, dir := range []string{f.DbConfig.Meta.Dir, f.DbConfig.Data.Dir, f.DbConfig.Data.SnapshotDir, f.DbConfig.Data.WalDir} {
-					err := os.RemoveAll(dir)
-					if err != nil {
-						return err
-					}
-				}
-			}
 			return nil
 		}
 	}
@@ -251,7 +277,18 @@ func (f *FctsdbAgent) RestartDB(deleteData bool) error {
 	return err
 }
 
-func (f *FctsdbAgent) StartDB() error {
+func (f *FctsdbAgent) cleanData() error {
+	//clear data directory of database
+	for _, dir := range []string{f.dbConfig.Meta.Dir, f.dbConfig.Data.Dir, f.dbConfig.Data.SnapshotDir, f.dbConfig.Data.WalDir} {
+		err := os.RemoveAll(dir)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (f *FctsdbAgent) startDB() error {
 	pid, err := GetPidOnLinux("fctsdb")
 	if err != nil {
 		log.Println("Start db failed, error: " + err.Error())
@@ -262,7 +299,7 @@ func (f *FctsdbAgent) StartDB() error {
 		log.Println("Start db failed, error: " + err.Error())
 		return err
 	} else {
-		cmd := `nohup ` + f.FctsdbPath + ` -config ` + f.ConfigPath + ` 1>/dev/null 2>&1 &`
+		cmd := `nohup ` + f.BinPath + ` -config ` + f.ConfigPath + ` 1>/dev/null 2>&1 &`
 		log.Println(cmd)
 		execCmd := exec.Command("bash", "-c", cmd)
 		execCmd.SysProcAttr = &syscall.SysProcAttr{
@@ -279,32 +316,8 @@ func (f *FctsdbAgent) StartDB() error {
 	return nil
 }
 
-func (f *FctsdbAgent) StopDB() error {
-	pid, err := GetPidOnLinux("fctsdb")
-	if err != nil {
-		log.Println("stop db failed, error: " + err.Error())
-		return err
-	}
-	if pid == "" {
-		err = errors.New("no fctsdb database running,please make a check")
-		log.Println("stop db failed, error: " + err.Error())
-		return err
-	}
-	err = KillOnLinux(pid)
-	if err != nil {
-		return err
-	}
-	log.Println("Stop falconTSDB succeed")
-	return nil
+func (f *FctsdbAgent) parseConfig() {
 
-}
-
-func (f *FctsdbAgent) ParseConfig() {
-	var err error
-	f.DbConfig, err = DecodeFromConfigFile(f.ConfigPath)
-	if err != nil {
-		log.Fatal("Decode fctsdb config failed, error:", err.Error())
-	}
 }
 
 func KillOnLinux(pid string) error {
