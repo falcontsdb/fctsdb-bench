@@ -53,8 +53,7 @@ var (
 )
 
 func init() {
-	rootCmd.AddCommand(queryGenCmd)
-	rootCmd.AddCommand(listQueryCmd)
+
 	// queryCmd.AddCommand(showQueryCmd)
 	listQueryCmd.Flags().BoolVar(&listQueryWithDetail, "detail", false, "show the detail of query-types")
 	// rootCmd.AddCommand(queryCmd)

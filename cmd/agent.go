@@ -39,7 +39,7 @@ var (
 
 func init() {
 	Init(agentCmd)
-	rootCmd.AddCommand(agentCmd)
+
 }
 func StartRemoteDatabase(endpoint string) error {
 	_, err := httpGet(endpoint, agent.STARTPATH)
