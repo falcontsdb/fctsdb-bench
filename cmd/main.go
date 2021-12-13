@@ -93,10 +93,23 @@ func mockFctsdb() {
 }
 
 func main() {
-
+	cobra.EnableCommandSorting = false
 	rootCmd.Flags().BoolP("version", "v", false, "查看版本信息")
 	rootCmd.PersistentFlags().BoolP("help", "h", false, "查看帮助信息")
+
+	rootCmd.AddCommand(listQueryCmd)
+	rootCmd.AddCommand(writeCmd)
+	rootCmd.AddCommand(queryCmd)
+	rootCmd.AddCommand(mixedCmd)
 	rootCmd.AddCommand(mockCmd)
+	rootCmd.AddCommand(agentCmd)
+	rootCmd.AddCommand(scheduleCmd)
+	// 隐藏命令
+	rootCmd.AddCommand(dataGenCmd)
+	rootCmd.AddCommand(dataLoadCmd)
+	rootCmd.AddCommand(queryGenCmd)
+	rootCmd.AddCommand(queryLoadCmd)
+
 	rootCmd.SetHelpCommand(&cobra.Command{})
 	rootCmd.Execute()
 

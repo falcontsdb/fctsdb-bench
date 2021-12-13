@@ -77,7 +77,7 @@ var (
 
 func init() {
 	dataLoad.Init(dataLoadCmd)
-	rootCmd.AddCommand(dataLoadCmd)
+
 }
 
 func RunLoad() int {

@@ -16,23 +16,24 @@ fcbench-amd64是amd64处理器的linux系统可执行文件
 
 fcbench-arm64是arm64处理器的linux系统可执行文件
 
-其他influxdb-comparisons原生自带的工具仍然可以编译，详情见influxdb-comparisons的文档，此处不再累述。
-
 ## 2 工具使用手册
 
 使用fcbench -h可以查看所有支持的子命令，如下：
 ```
 Available Commands:
-  data-gen    生成不同场景（case）的数据，输出到stdout，搭配data-load使用
-  data-load   从文件或者stdin载入数据，并发送数据到数据库，需要先使用data-gen命令
+ 
+  agent       代理程序，和数据库运行在一起，支持被远程调用开启关闭数据库（开发团队内部使用）
   list        展示所有场景（case）和对应的查询语句类型（query-type）
   mixed       混合读写测试
   mock        模仿海东青数据库，测试本工具能力上限
   query       生成查询语句并直接发送至数据库
-  query-gen   生成数据库查询语句，输出到stdout，搭配query-load使用
-  query-load  从文件或者stdin载入查询语句，并发送查询到数据库，需要先使用query-gen命令
   schedule    从配置文件中读取执行任务并顺序执行
   write       生成数据并直接发送至数据库
+
+  query-gen(隐藏命令)   生成数据库查询语句，输出到stdout，搭配query-load使用
+  query-load(隐藏命令)  从文件或者stdin载入查询语句，并发送查询到数据库，需要先使用query-gen命令
+  data-gen(隐藏命令)    生成不同场景（case）的数据，输出到stdout，搭配data-load使用
+  data-load(隐藏命令)   从文件或者stdin载入数据，并发送数据到数据库，需要先使用data-gen命令
 ```
 ###  2.1 数据测试
 使用fcbench write命令可以进行数据写入测试

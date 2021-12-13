@@ -72,7 +72,7 @@ func init() {
 
 	dataGenerator.Init(dataGenCmd)
 	// dataCmd.AddCommand(dataGenCmd)
-	rootCmd.AddCommand(dataGenCmd)
+
 }
 
 func DataGen() {
