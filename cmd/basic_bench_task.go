@@ -50,6 +50,7 @@ type BasicBenchTask struct {
 	needPrePare       bool
 	username          string
 	password          string
+	withEncryption    bool
 
 	//runtime vars
 	timestampStart time.Time
@@ -61,7 +62,7 @@ type BasicBenchTask struct {
 	valuesRead     int64
 	itemsRead      int64
 	bytesRead      int64
-	qureyRead      int64
+	queryRead      int64
 	simulator      common.Simulator
 	respCollector  ResponseCollector
 	sqlTemplate    []string
@@ -281,7 +282,7 @@ func (d *BasicBenchTask) PrepareWorkers() int {
 	d.itemsRead = 0
 	d.valuesRead = 0
 	d.bytesRead = 0
-	d.qureyRead = 0
+	d.queryRead = 0
 	d.respCollector = ResponseCollector{}
 
 	return d.workers
@@ -344,7 +345,7 @@ func (d *BasicBenchTask) RunSyncTask() {
 	go func() {
 		defer ticker.Stop()
 		lastTime := time.Now()
-		lastItems, lastValues, lastBytes, lastQuery := d.itemsRead, d.valuesRead, d.bytesRead, d.qureyRead
+		lastItems, lastValues, lastBytes, lastQuery := d.itemsRead, d.valuesRead, d.bytesRead, d.queryRead
 		for {
 			select {
 			case <-ticker.C:
@@ -354,8 +355,8 @@ func (d *BasicBenchTask) RunSyncTask() {
 				itemsRate := float64(d.itemsRead-lastItems) / took.Seconds()
 				bytesRate := float64(d.bytesRead-lastBytes) / took.Seconds()
 				valuesRate := float64(d.valuesRead-lastValues) / took.Seconds()
-				queryRate := float64(d.qureyRead-lastQuery) / took.Seconds()
-				lastItems, lastValues, lastBytes, lastQuery = d.itemsRead, d.valuesRead, d.bytesRead, d.qureyRead
+				queryRate := float64(d.queryRead-lastQuery) / took.Seconds()
+				lastItems, lastValues, lastBytes, lastQuery = d.itemsRead, d.valuesRead, d.bytesRead, d.queryRead
 				switch d.mixMode {
 				case "write_only":
 					log.Printf("Has writen %d point, %.2fMB (mean point rate %.2f/sec, value rate %.2f/s, %.2fMB/sec in this %0.2f sec)",
@@ -381,7 +382,7 @@ func (d *BasicBenchTask) SyncEnd() {
 
 func (d *BasicBenchTask) Report(start, end time.Time) map[string]string {
 	took := end.Sub(start)
-	itemsRead, bytesRead, valuesRead, queryRead := d.itemsRead, d.bytesRead, d.valuesRead, d.qureyRead
+	itemsRead, bytesRead, valuesRead, queryRead := d.itemsRead, d.bytesRead, d.valuesRead, d.queryRead
 	itemsRate := float64(itemsRead) / took.Seconds()
 	bytesRate := float64(bytesRead) / took.Seconds()
 	valuesRate := float64(valuesRead) / took.Seconds()
@@ -500,7 +501,7 @@ func (d *BasicBenchTask) processQuery(w common.DBClient, batchSize int, useCount
 	}
 
 	if batchItemCount > 0 {
-		atomic.AddInt64(&d.qureyRead, int64(batchItemCount))
+		atomic.AddInt64(&d.queryRead, int64(batchItemCount))
 		lat, err = w.Query(buf.Bytes())
 		if err != nil {
 			d.respCollector.AddOne("query", lat, false)
@@ -543,7 +544,7 @@ func (d *BasicBenchTask) processQueryOnly(i int) {
 			}
 		}
 	} else {
-		for d.qureyRead < d.queryCount {
+		for d.queryRead < d.queryCount {
 			err := d.processQuery(d.writers[i], d.batchSize, true)
 			if err != nil && d.debug {
 				log.Println(err.Error())
@@ -597,7 +598,7 @@ func (d *BasicBenchTask) createDb(writer common.DBClient) {
 			return
 		}
 	}
-	err = writer.CreateDb()
+	err = writer.CreateDb(d.withEncryption)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -606,7 +607,7 @@ func (d *BasicBenchTask) createDb(writer common.DBClient) {
 }
 
 func (d *BasicBenchTask) checkDbConnection(w common.DBClient) error {
-	for i := 0; i < 12; i++ {
+	for i := 0; i < 30; i++ {
 		err := w.Ping()
 		if err != nil {
 			log.Println("Ping DB error:", err.Error())
