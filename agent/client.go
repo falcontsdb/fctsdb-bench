@@ -37,6 +37,10 @@ func httpGet(endpoint, path string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	if resp.StatusCode != http.StatusOK {
+		body, _ := ioutil.ReadAll(resp.Body)
+		return []byte{}, fmt.Errorf(string(body))
+	}
 	rData, err := ioutil.ReadAll(resp.Body)
 	return rData, err
 }
@@ -64,4 +68,9 @@ func SetAgent(endpoint string, param map[string]string) error {
 		return fmt.Errorf(string(body))
 	}
 	return nil
+}
+
+func ResetAgent(endpoint string) error {
+	_, err := httpGet(endpoint, AGENT_CLEAN_PATH)
+	return err
 }

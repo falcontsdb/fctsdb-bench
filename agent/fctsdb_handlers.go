@@ -136,7 +136,9 @@ type FctsdbAgent struct {
 	ConfigPath string
 
 	//run var
-	dbConfig *DbConfig
+	dbConfig          *DbConfig
+	defaultBinPath    string
+	defaultConfigPath string
 }
 
 func NewFctsdbAgent(binPath, configPath string) *FctsdbAgent {
@@ -145,10 +147,12 @@ func NewFctsdbAgent(binPath, configPath string) *FctsdbAgent {
 	if err != nil {
 		log.Fatalln(err.Error())
 	}
+	fa.defaultBinPath = binPath
 	err = fa.setConifgPath(configPath)
 	if err != nil {
 		log.Fatalln(err.Error())
 	}
+	fa.defaultConfigPath = configPath
 	return fa
 }
 
@@ -164,6 +168,7 @@ func (f *FctsdbAgent) setBinaryPath(binPath string) error {
 }
 
 func (f *FctsdbAgent) setConifgPath(configPath string) error {
+	log.Println("Decode the fctsdb config")
 	dbConfig, err := DecodeFromConfigFile(configPath)
 	if err != nil {
 		return fmt.Errorf("decode fctsdb config failed, error: %s", err.Error())
@@ -221,8 +226,8 @@ func (f *FctsdbAgent) StopDBHandler(w http.ResponseWriter, r *http.Request) {
 
 func (f *FctsdbAgent) SetHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
-		if r.URL.Query().Has("BinPath") {
-			binPath := r.URL.Query().Get("BinPath")
+		binPath := r.URL.Query().Get("BinPath")
+		if binPath != "" {
 			err := f.setBinaryPath(binPath)
 			if err != nil {
 				w.WriteHeader(http.StatusBadRequest)
@@ -230,14 +235,33 @@ func (f *FctsdbAgent) SetHandler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-		if r.URL.Query().Has("ConfigPath") {
-			configPath := r.URL.Query().Get("ConfigPath")
+		configPath := r.URL.Query().Get("ConfigPath")
+		if configPath != "" {
 			err := f.setConifgPath(configPath)
 			if err != nil {
 				w.WriteHeader(http.StatusBadRequest)
 				w.Write([]byte(err.Error()))
 				return
 			}
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	}
+}
+
+func (f *FctsdbAgent) ResetHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "GET" {
+		err := f.setBinaryPath(f.defaultBinPath)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(err.Error()))
+			return
+		}
+		err = f.setConifgPath(f.defaultConfigPath)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(err.Error()))
+			return
 		}
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))

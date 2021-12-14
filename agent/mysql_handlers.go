@@ -17,6 +17,11 @@ func (m MysqlAgent) SetHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("OK"))
 }
 
+func (m MysqlAgent) ResetHandler(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("OK"))
+}
+
 func (m MysqlAgent) StartDBHandler(w http.ResponseWriter, r *http.Request) {
 	log.Println(r.Host)
 	if r.Method == "GET" {
