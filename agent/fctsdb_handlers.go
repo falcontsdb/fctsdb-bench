@@ -316,10 +316,6 @@ func (f *FctsdbAgent) startDB() error {
 	return nil
 }
 
-func (f *FctsdbAgent) parseConfig() {
-
-}
-
 func KillOnLinux(pid string) error {
 	cmd := `kill -9 ` + pid
 	log.Println("Running linux cmd :" + cmd)
