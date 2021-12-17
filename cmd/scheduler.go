@@ -129,6 +129,11 @@ func (s *Scheduler) ScheduleBenchTask() {
 				if err != nil {
 					log.Fatalln("set agent failed:", err.Error())
 				}
+			case "stop":
+				err := agent.StopRemoteDatabase(s.agentEndpoint)
+				if err != nil {
+					log.Fatalln("stop remote database failed:", err.Error())
+				}
 			case "run":
 				index += 1
 				err := s.runBenchTaskByConfig(index, fileName, action.object.(buildin_testcase.BasicBenchTaskConfig))
@@ -185,7 +190,6 @@ func (s *Scheduler) checkConfigsFile() []Action {
 		log.Fatal("Invalid config path:", s.configsPath)
 	}
 	defer configsFile.Close()
-	var config buildin_testcase.BasicBenchTaskConfig
 	scanner := bufio.NewScanner(bufio.NewReaderSize(configsFile, 4*1024*1024))
 	lindID := 0
 
@@ -193,7 +197,9 @@ func (s *Scheduler) checkConfigsFile() []Action {
 	for scanner.Scan() {
 		lindID++
 		line := scanner.Bytes()
-
+		if len(bytes.TrimSpace(line)) < 4 {
+			continue
+		}
 		if bytes.HasPrefix(line, []byte("$Set")) {
 			param := make(map[string]string)
 			line := bytes.TrimSpace(line[4:])
@@ -206,7 +212,10 @@ func (s *Scheduler) checkConfigsFile() []Action {
 				log.Fatalln("$Set action can not be execute, line:", lindID, "error:", err.Error())
 			}
 			actions = append(actions, Action{act: "set", object: param})
+		} else if bytes.HasPrefix(line, []byte("$Stop")) {
+			actions = append(actions, Action{act: "stop"})
 		} else {
+			config := buildin_testcase.BasicBenchTaskConfig{}
 			err := json.Unmarshal(line, &config)
 			if err != nil {
 				log.Fatalln("cannot unmarshal the config line:", lindID, "error:", err.Error())
