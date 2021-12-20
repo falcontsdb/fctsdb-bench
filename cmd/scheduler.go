@@ -111,47 +111,40 @@ func init() {
 func (s *Scheduler) ScheduleBenchTask() {
 
 	fileName := time.Now().Format("benchmark_0102_150405")
+	// 开始时还原agent的配置并检查是否正确
+	if s.agentEndpoint != "" {
+		err := agent.ResetAgent(s.agentEndpoint)
+		if err != nil {
+			log.Fatalln("reset agent failed, please check the anget config:", err.Error())
+		}
+	}
 	// 根据配置文件执行测试
 	if s.configsPath != "" {
-		configsFile, err := os.Open(s.configsPath)
-		if err != nil {
-			log.Fatal("Invalid config path:", configsFile)
-		}
-		var config buildin_testcase.BasicBenchTaskConfig
-		scanner := bufio.NewScanner(bufio.NewReaderSize(configsFile, 4*1024*1024))
-		lindID := 0
-
-		for scanner.Scan() {
-			line := scanner.Bytes()
-			if bytes.HasPrefix(line, []byte("$Set")) {
-				param := make(map[string]string)
-				line := bytes.TrimSpace(line[4:])
-				err := json.Unmarshal(line, &param)
-				if err != nil {
-					log.Println("cannot unmarshal the $Set line:", string(line), err.Error())
-					continue
-				}
-				err = agent.SetAgent(s.agentEndpoint, param)
+		actions := s.checkConfigsFile()
+		var index = 0
+		for _, action := range actions {
+			switch action.act {
+			case "set":
+				err := agent.SetAgent(s.agentEndpoint, action.object.(map[string]string))
 				if err != nil {
 					log.Fatalln("set agent failed:", err.Error())
 				}
-			} else {
-				lindID++
-				err := json.Unmarshal(line, &config)
+			case "stop":
+				err := agent.StopRemoteDatabase(s.agentEndpoint)
 				if err != nil {
-					log.Println("cannot unmarshal the config line:", lindID, "error:", err.Error())
-					continue
+					log.Fatalln("stop remote database failed:", err.Error())
 				}
-				err = s.runBenchTaskByConfig(lindID, fileName, &config)
+			case "run":
+				index += 1
+				err := s.runBenchTaskByConfig(index, fileName, action.object.(buildin_testcase.BasicBenchTaskConfig))
 				if err != nil {
-					log.Println(err)
-					continue
+					log.Fatalln("run testcase failed:", err.Error())
 				}
 			}
 		}
 	} else { // 执行内置测试
 		for i, config := range buildin_testcase.BuildinConfigs {
-			err := s.runBenchTaskByConfig(i+1, fileName, &config)
+			err := s.runBenchTaskByConfig(i+1, fileName, config)
 			if err != nil {
 				log.Println(err)
 				continue
@@ -183,10 +176,57 @@ func (s *Scheduler) ScheduleBenchTask() {
 		defer f.Close()
 		report.ToHtmlOneFile(f)
 	}
-
 }
 
-func (s *Scheduler) runBenchTaskByConfig(index int, fileName string, config *buildin_testcase.BasicBenchTaskConfig) error {
+type Action struct {
+	act    string
+	object interface{}
+}
+
+func (s *Scheduler) checkConfigsFile() []Action {
+
+	configsFile, err := os.Open(s.configsPath)
+	if err != nil {
+		log.Fatal("Invalid config path:", s.configsPath)
+	}
+	defer configsFile.Close()
+	scanner := bufio.NewScanner(bufio.NewReaderSize(configsFile, 4*1024*1024))
+	lindID := 0
+
+	actions := make([]Action, 0)
+	for scanner.Scan() {
+		lindID++
+		line := scanner.Bytes()
+		if len(bytes.TrimSpace(line)) < 4 {
+			continue
+		}
+		if bytes.HasPrefix(line, []byte("$Set")) {
+			param := make(map[string]string)
+			line := bytes.TrimSpace(line[4:])
+			err := json.Unmarshal(line, &param)
+			if err != nil {
+				log.Fatalln("cannot unmarshal the $Set line:", lindID, "error:", err.Error())
+			}
+			err = agent.SetAgent(s.agentEndpoint, param)
+			if err != nil {
+				log.Fatalln("$Set action can not be execute, line:", lindID, "error:", err.Error())
+			}
+			actions = append(actions, Action{act: "set", object: param})
+		} else if bytes.HasPrefix(line, []byte("$Stop")) {
+			actions = append(actions, Action{act: "stop"})
+		} else {
+			config := buildin_testcase.BasicBenchTaskConfig{}
+			err := json.Unmarshal(line, &config)
+			if err != nil {
+				log.Fatalln("cannot unmarshal the config line:", lindID, "error:", err.Error())
+			}
+			actions = append(actions, Action{act: "run", object: config})
+		}
+	}
+	return actions
+}
+
+func (s *Scheduler) runBenchTaskByConfig(index int, fileName string, config buildin_testcase.BasicBenchTaskConfig) error {
 	log.Printf("---index %d ------------------------------------------------------------\n", index)
 	if s.agentEndpoint != "" {
 		var err error
@@ -268,7 +308,7 @@ func (s *Scheduler) writeResultToCsv(fileName string, info map[string]string, wr
 	csvWriter.Flush()
 }
 
-func (s *Scheduler) NewBasicBenchTask(conf *buildin_testcase.BasicBenchTaskConfig) (*BasicBenchTask, error) {
+func (s *Scheduler) NewBasicBenchTask(conf buildin_testcase.BasicBenchTaskConfig) (*BasicBenchTask, error) {
 	sampInter, err := ParseDuration(conf.SamplingInterval)
 	if err != nil {
 		return nil, fmt.Errorf("can not parse the SamplingInterval")

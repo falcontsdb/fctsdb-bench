@@ -98,11 +98,6 @@ func (d *DevopsSimulator) Next(p *Point) int64 {
 	// madePoint 增加int64(len(d.hosts))*NHostSims次，timestamp增加一次，保证每张表里面两条数据之间的间隔为 EpochDuration
 	timestamp := d.timestampStart.Add(EpochDuration * time.Duration(pointIndex/int64(len(d.hosts))/NHostSims))
 	p.SetTimestamp(&timestamp)
-	if hostIndex == int64(len(d.hosts)-1) {
-		for i := 0; i < len(d.hosts); i++ {
-			d.hosts[i].TickAll(EpochDuration)
-		}
-	}
 
 	// Populate host-specific tags:
 	p.AppendTag(MachineTagKeys[0], host.Name)

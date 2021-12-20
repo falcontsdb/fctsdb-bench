@@ -270,19 +270,18 @@ func CreateReport(fileNames ...string) *report.Page {
 
 	// 取第一个cse文件开始遍历
 	for rowIndex, row := range allCsvRecords[fileNames[0]] {
-
 		// 跳过第一行
 		if rowIndex == 0 {
 			continue
 		}
-		// 处理尾行
+		// 处理尾行携带的环境信息
 		if row[0] == "test-env" {
 			benchReport.Document += strings.ReplaceAll(row[1], ";", "\n")
 		} else {
 			if caseDefine, ok := performances[row[0]]; ok {
 				tableHeaders := caseDefine.TableTags
 
-				// 步骤1：处理表头
+				// 步骤1：处理一个测试用例的表格头部
 				if len(fileNames) > 1 {
 					// 多个文件需要进行以下步骤：
 					// 步骤1.1：记录所有csv的相同field值
@@ -306,7 +305,7 @@ func CreateReport(fileNames ...string) *report.Page {
 					tableHeaders = append(tableHeaders, "监控")
 				}
 
-				// 步骤2：判断是否需要创建表格
+				// 步骤2：判断是否需要在报告中新增一个测试用例，并同时给测试用例创建表格
 				if benchReport.HasTestCase(row[0]) {
 					currentTestCase = benchReport.GetTestCase(row[0]).(*report.PerformanceTestCase)
 				} else {
@@ -314,13 +313,14 @@ func CreateReport(fileNames ...string) *report.Page {
 					currentTestCase.Title = caseDefine.Title
 					currentTestCase.Document = caseDefine.Document + "\n单位解释：p/s - points/秒 、q/s - queries/秒"
 					currentTestCase.Table = table.CreateTable(tableHeaders...)
+					currentTestCase.Conclusion = "执行无异常"
 					benchReport.AddTestCase(currentTestCase)
 				}
 
-				// 步骤3：记录数据
+				// 步骤3：将数据记录到测试用例中，此处分为多个csv文件和单个csv文件
 				var rowData []interface{}
 				if len(fileNames) > 1 {
-
+					// 多个csv文件处理流程如下：
 					// 步骤3.1：先记录tag
 					for _, header := range caseDefine.TableTags {
 						// 替换场景的单词，方便显示美观
@@ -353,6 +353,7 @@ func CreateReport(fileNames ...string) *report.Page {
 						}
 
 						rate := (newData - oldData) / oldData * 100
+						// 显示时着色
 						if rate > 5 {
 							rowData = append(rowData, table.Cell{Text: fmt.Sprintf("%.2f%%", rate), Color: "limegreen"})
 						} else if rate < -5 {
@@ -360,20 +361,24 @@ func CreateReport(fileNames ...string) *report.Page {
 						} else {
 							rowData = append(rowData, fmt.Sprintf("%.2f%%", rate))
 						}
-
 					}
 
 					// 步骤3.4：监控列
 					for _, fileName := range fileNames {
-
-						// rowData = append(rowData, "[地址]("+allCsvRecords[fileName][rowIndex][csvHeaderMap["监控"]]+")")
 						rowData = append(rowData, table.Cell{Text: "地址", Href: allCsvRecords[fileName][rowIndex][csvHeaderMap["监控"]]})
 					}
-
+					// 步骤3.5：判断执行过程中是否有失败的数据
+					for _, fileName := range fileNames {
+						if (allCsvRecords[fileName][rowIndex][csvHeaderMap["Fail(r)"]] != "0" && allCsvRecords[fileName][rowIndex][csvHeaderMap["Fail(r)"]] != "") ||
+							(allCsvRecords[fileName][rowIndex][csvHeaderMap["Fail(w)"]] != "0" && allCsvRecords[fileName][rowIndex][csvHeaderMap["Fail(w)"]] != "") {
+							log.Printf("Need attention: the csv %s (line %d) has error http requests!!!!", fileName, rowIndex)
+							currentTestCase.Conclusion = "<b>执行有异常数据，请查看详细数据记录表</b>"
+						}
+					}
 				} else {
+					// 单个文件处理更简单，记录数据即可
 					for _, header := range tableHeaders {
 						if header == "监控" { // 监控特例化
-							// rowData = append(rowData, "[地址]("+row[csvHeaderMap[header]]+")")
 							rowData = append(rowData, table.Cell{Text: "地址", Href: row[csvHeaderMap[header]]})
 						} else {
 							// 替换场景的单词，方便显示美观
@@ -386,6 +391,12 @@ func CreateReport(fileNames ...string) *report.Page {
 							}
 							rowData = append(rowData, data)
 						}
+					}
+
+					if (row[csvHeaderMap["Fail(r)"]] != "0" && row[csvHeaderMap["Fail(r)"]] != "") ||
+						(row[csvHeaderMap["Fail(w)"]] != "0" && row[csvHeaderMap["Fail(w)"]] != "") {
+						log.Printf("Need attention: the csv (line %d) has error http requests!!!!", rowIndex)
+						currentTestCase.Conclusion = "<b>执行有异常数据，请查看详细数据记录表</b>"
 					}
 				}
 				currentTestCase.Table.AddRows(rowData...)

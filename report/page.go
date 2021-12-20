@@ -30,11 +30,12 @@ type TestCase interface {
 }
 
 type PerformanceTestCase struct {
-	name     string
-	Title    string
-	Document string
-	Table    *table.Table
-	Pictures []Picture
+	name       string
+	Title      string
+	Document   string
+	Table      *table.Table
+	Pictures   []Picture
+	Conclusion string
 }
 
 func NewPerformanceTestCase(name string) *PerformanceTestCase {
@@ -74,6 +75,14 @@ func (t *PerformanceTestCase) ToHtml(index string) string {
 		}
 	}
 
+	// 添加结论, 结论可编辑
+	htm += `<div contenteditable="true">`
+	for _, line := range strings.Split(t.Conclusion, "\n") {
+		if line != "" {
+			htm += ("<p>" + line + "</p>\n")
+		}
+	}
+	htm += `</div>`
 	return htm
 }
 
@@ -136,7 +145,6 @@ func (p *Page) ToHtmlOneFile(w io.Writer) error {
 	}
 	for index, tcase := range p.TestCases {
 		pageBody += tcase.ToHtml(strconv.Itoa(index+1) + ". ")
-		pageBody += `<div contenteditable="true"><p>执行无异常。</p></div>`
 	}
 	w.Write([]byte(pageBody))
 	pageEnd := "</div>\n</body>\n</html>"

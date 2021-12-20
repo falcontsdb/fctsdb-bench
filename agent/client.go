@@ -9,14 +9,17 @@ import (
 )
 
 func StartRemoteDatabase(endpoint string) error {
+	log.Println("start the remote database")
 	_, err := httpGet(endpoint, AGENT_START_PATH)
 	return err
 }
 func StopRemoteDatabase(endpoint string) error {
+	log.Println("stop the remote database")
 	_, err := httpGet(endpoint, AGENT_STOP_PATH)
 	return err
 }
 func CleanRemoteDatabase(endpoint string) error {
+	log.Println("clean the remote database data")
 	_, err := httpGet(endpoint, AGENT_CLEAN_PATH)
 	return err
 }
@@ -36,6 +39,10 @@ func httpGet(endpoint, path string) ([]byte, error) {
 	resp, err := http.Get(u.String())
 	if err != nil {
 		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		body, _ := ioutil.ReadAll(resp.Body)
+		return []byte{}, fmt.Errorf(string(body))
 	}
 	rData, err := ioutil.ReadAll(resp.Body)
 	return rData, err
@@ -64,4 +71,9 @@ func SetAgent(endpoint string, param map[string]string) error {
 		return fmt.Errorf(string(body))
 	}
 	return nil
+}
+
+func ResetAgent(endpoint string) error {
+	_, err := httpGet(endpoint, AGENT_RESET_PATH)
+	return err
 }

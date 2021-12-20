@@ -18,11 +18,11 @@ func TestMysqlClient_CreateDb(t *testing.T) {
 		Password:  "123456",
 		DebugInfo: "",
 	})
-	defer mc.Close()
 	if err != nil {
 		fmt.Println(err)
 	}
-	err = mc.CreateDb()
+	defer mc.Close()
+	err = mc.CreateDb(true)
 	if err != nil {
 		fmt.Println(err)
 	}
