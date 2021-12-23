@@ -188,6 +188,8 @@ func (d *FctsdbClient) CreateDb(withEncryption bool) error {
 	// serialize params the right way:
 	u.Path = "query"
 	v := u.Query()
+	v.Add("u", d.c.User)
+	v.Add("p", d.c.Password)
 	if withEncryption {
 		v.Set("q", fmt.Sprintf("CREATE DATABASE %s with encryption on", d.c.Database))
 	} else {
@@ -216,9 +218,21 @@ func (d *FctsdbClient) CreateDb(withEncryption bool) error {
 
 // listDatabases lists the existing databases in InfluxDB.
 func (d *FctsdbClient) ListDatabases() ([]string, error) {
+	//var u url.URL
+	//u.Host = string(d.host)
+	u, err := url.Parse(string(d.host))
+	if err != nil {
+		return nil, fmt.Errorf(" url parse failed: %s", err.Error())
+	}
 
-	u := fmt.Sprintf("%s/query?q=show%%20databases", d.host)
-	resp, err := http.Get(u)
+	u.Path = "/query"
+	q := u.Query()
+	q.Add("u", d.c.User)
+	q.Add("p", d.c.Password)
+	q.Add("q", "show databases")
+	u.RawQuery = q.Encode()
+
+	resp, err := http.Get(u.String())
 	if err != nil {
 		return nil, fmt.Errorf("listDatabases get error: %s", err.Error())
 	}
