@@ -33,3 +33,20 @@ func Uint64() uint64 {
 func Uint64n(n uint64) uint64 {
 	return Uint64() % n
 }
+
+func Int64() int64 {
+	return int64(Uint32())<<32 | int64(Uint32())
+}
+
+func Int63() int64 {
+	return int64(Uint32())<<31 | int64(Uint32())
+}
+
+func Float64() float64 {
+again:
+	f := float64(Int63()) / (1 << 63)
+	if f == 1 {
+		goto again // resample; this branch is taken O(never)
+	}
+	return f
+}

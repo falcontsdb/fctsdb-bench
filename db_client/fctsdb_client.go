@@ -158,7 +158,7 @@ func (w *FctsdbClient) Query(lines []byte) (int64, error) {
 			}
 		}
 		if w.c.Debug {
-			// fmt.Println(string(uri))
+			fmt.Println(string(uri))
 			var r Response
 			err := json.Unmarshal(body, &r)
 			if err != nil {
@@ -218,6 +218,7 @@ func (d *FctsdbClient) CreateDb(withEncryption bool) error {
 func (d *FctsdbClient) ListDatabases() ([]string, error) {
 
 	u := fmt.Sprintf("%s/query?q=show%%20databases", d.host)
+
 	resp, err := http.Get(u)
 	if err != nil {
 		return nil, fmt.Errorf("listDatabases get error: %s", err.Error())

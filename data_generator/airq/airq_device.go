@@ -40,7 +40,8 @@ type AirqDevice struct {
 	SimulatedMeasurements []common.SimulatedMeasurement
 
 	// These are all assigned once, at Host creation:
-	Province, City, County, SiteType, SiteID []byte
+	// Province, City, County, SiteType, SiteID []byte
+	TagValues [][]byte
 }
 
 func NewAirqDeviceMeasurements(start time.Time) []common.SimulatedMeasurement {
@@ -53,12 +54,14 @@ func NewAirqDeviceMeasurements(start time.Time) []common.SimulatedMeasurement {
 func NewAirqDevice(i int, offset int, start time.Time) AirqDevice {
 	sm := NewAirqDeviceMeasurements(start)
 	region := Region.SearchGBT2260(string(common.RandChoice(AreaCode)))
+	tagValues := make([][]byte, len(AirqTagKeys))
+	tagValues[0] = []byte(region[0])
+	tagValues[1] = []byte(region[1])
+	tagValues[2] = []byte(region[2])
+	tagValues[3] = common.RandChoice(SiteTypeChoices)
+	tagValues[4] = []byte(fmt.Sprintf("DEV%09d", i+offset))
 	h := AirqDevice{
-		Province:              []byte(region[0]),
-		City:                  []byte(region[1]),
-		County:                []byte(region[2]),
-		SiteType:              common.RandChoice(SiteTypeChoices),
-		SiteID:                []byte(fmt.Sprintf("DEV%09d", i+offset)),
+		TagValues:             tagValues,
 		SimulatedMeasurements: sm,
 	}
 

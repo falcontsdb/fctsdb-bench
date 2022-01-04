@@ -117,11 +117,14 @@ func (s *AirqSimulator) Next(p *common.Point) int64 {
 	p.SetTimestamp(&timestamp)
 
 	// Populate host-specific tags: for example, LSVNV2182E2100001
-	p.AppendTag(AirqTagKeys[0], Airq.Province)
-	p.AppendTag(AirqTagKeys[1], Airq.City)
-	p.AppendTag(AirqTagKeys[2], Airq.County)
-	p.AppendTag(AirqTagKeys[3], Airq.SiteType)
-	p.AppendTag(AirqTagKeys[4], Airq.SiteID)
+	// p.AppendTag(AirqTagKeys[0], Airq.Province)
+	// p.AppendTag(AirqTagKeys[1], Airq.City)
+	// p.AppendTag(AirqTagKeys[2], Airq.County)
+	// p.AppendTag(AirqTagKeys[3], Airq.SiteType)
+	// p.AppendTag(AirqTagKeys[4], Airq.SiteID)
+	for i := range AirqTagKeys {
+		p.AppendTag(AirqTagKeys[i], Airq.TagValues[i])
+	}
 
 	// Populate measurement-specific tags and fields:
 	Airq.SimulatedMeasurements[0].ToPoint(p)
@@ -145,15 +148,15 @@ func (s *AirqSimulator) NextSql(wr io.Writer) int64 {
 				key := tmp.KeyWords[i]
 				switch key {
 				case string(AirqTagKeys[0]):
-					wr.Write(Airq.Province)
+					wr.Write(Airq.TagValues[0])
 				case string(AirqTagKeys[1]):
-					wr.Write(Airq.City)
+					wr.Write(Airq.TagValues[1])
 				case string(AirqTagKeys[2]):
-					wr.Write(Airq.County)
+					wr.Write(Airq.TagValues[2])
 				case string(AirqTagKeys[3]):
-					wr.Write(Airq.SiteType)
+					wr.Write(Airq.TagValues[3])
 				case string(AirqTagKeys[4]):
-					wr.Write(Airq.SiteID)
+					wr.Write(Airq.TagValues[4])
 				case "start":
 					wr.Write([]byte(s.TimestampStart.Format(time.RFC3339)))
 				case "end":

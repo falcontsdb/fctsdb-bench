@@ -2,8 +2,6 @@ package query_generator
 
 import (
 	"sync"
-
-	"git.querycap.com/falcontsdb/fctsdb-bench/common"
 )
 
 var bufPool = sync.Pool{
@@ -13,10 +11,9 @@ var bufPool = sync.Pool{
 }
 
 type QueryType struct {
-	Name      string
-	RawSql    string
-	Comment   string
-	Generator QueryGenerator
+	Name    string
+	RawSql  string
+	Comment string
 }
 
 type QueryCase struct {
@@ -36,9 +33,4 @@ func NewQueryCase(caseName string) *QueryCase {
 func (qs *QueryCase) Regist(q *QueryType) {
 	qs.Count += 1
 	qs.Types[qs.Count] = q
-}
-
-type QueryGenerator interface {
-	Next() string
-	Init(common.Simulator) error
 }

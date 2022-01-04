@@ -19,9 +19,20 @@ import (
 )
 
 func TestRegion(t *testing.T) {
-	reg := gbt2260.NewGBT2260()
-	fmt.Println(reg.SearchGBT2260("310112"))
-	// fmt.Println(reg.GetAllAreaCode())
+	// reg := gbt2260.NewGBT2260()
+	// fmt.Println(reg.SearchGBT2260("310112"))
+	count := 0
+	gbt2260Table := gbt2260.GetGbt2260Table()
+	for _, cell := range gbt2260Table {
+		code := cell[0]
+		if code[len(code)-2:] == "00" {
+			if code[len(code)-4:] != "0000" {
+				fmt.Println(cell[0], cell[1])
+				count += 1
+			}
+		}
+	}
+	fmt.Println(count)
 	// fmt.Println(reg.GetAllProvince())
 	// fmt.Println(reg.GetCityByProvince("120000"))
 	// fmt.Println(reg.GetAreaByCity("110100"))
