@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"git.querycap.com/falcontsdb/fctsdb-bench/common"
-	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/airq/gbt2260"
+	"git.querycap.com/falcontsdb/fctsdb-bench/util/gbt2260"
 )
 
 // Count of choices for auto-generated tag values:

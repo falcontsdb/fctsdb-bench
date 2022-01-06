@@ -12,27 +12,29 @@ import (
 	"time"
 
 	"git.querycap.com/falcontsdb/fctsdb-bench/common"
-	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/airq/gbt2260"
 	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/devops"
 	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/vehicle"
 	"git.querycap.com/falcontsdb/fctsdb-bench/serializers"
+	"git.querycap.com/falcontsdb/fctsdb-bench/util/gbt2260"
 )
 
 func TestRegion(t *testing.T) {
 	// reg := gbt2260.NewGBT2260()
 	// fmt.Println(reg.SearchGBT2260("310112"))
-	count := 0
-	gbt2260Table := gbt2260.GetGbt2260Table()
-	for _, cell := range gbt2260Table {
-		code := cell[0]
-		if code[len(code)-2:] == "00" {
-			if code[len(code)-4:] != "0000" {
-				fmt.Println(cell[0], cell[1])
-				count += 1
-			}
-		}
-	}
-	fmt.Println(count)
+	// count := 0
+	// gbt2260Table := gbt2260.GetGbt2260Table()
+	// for _, cell := range gbt2260Table {
+	// 	code := cell[0]
+	// 	if code[len(code)-2:] == "00" {
+	// 		if code[len(code)-4:] != "0000" {
+	// 			fmt.Println(cell[0], cell[1])
+	// 			count += 1
+	// 		}
+	// 	}
+	Region := gbt2260.NewGBT2260()
+	AreaCode := Region.GetAreaCodeByCity("510100")
+	fmt.Println(AreaCode)
+	// fmt.Println(count)
 	// fmt.Println(reg.GetAllProvince())
 	// fmt.Println(reg.GetCityByProvince("120000"))
 	// fmt.Println(reg.GetAreaByCity("110100"))

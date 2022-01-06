@@ -16,6 +16,7 @@ import (
 	"git.querycap.com/falcontsdb/fctsdb-bench/common"
 	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/airq"
 	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/devops"
+	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/live"
 	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/vehicle"
 	"git.querycap.com/falcontsdb/fctsdb-bench/db_client"
 	fctsdb "git.querycap.com/falcontsdb/fctsdb-bench/query_generator"
@@ -125,25 +126,25 @@ func (d *BasicBenchTask) Validate() {
 
 	log.Println("Use case", d.useCase)
 
-	var queryCase *fctsdb.QueryCase
-	switch d.useCase {
-	case fctsdb.AirQuality.CaseName:
-		queryCase = fctsdb.AirQuality
-	case fctsdb.Vehicle.CaseName:
-		queryCase = fctsdb.Vehicle
-	default:
-		log.Fatal("the use-case is unsupported")
-	}
-
-	if d.queryType > 0 {
-		if d.queryType <= queryCase.Count {
-			d.sqlTemplate = []string{queryCase.Types[d.queryType].RawSql}
-		} else {
-			log.Fatalln("the query-type is out of range")
-		}
-	}
-
 	if d.mixMode != "write_only" {
+		var queryCase *fctsdb.QueryCase
+		switch d.useCase {
+		case fctsdb.AirQuality.CaseName:
+			queryCase = fctsdb.AirQuality
+		case fctsdb.Vehicle.CaseName:
+			queryCase = fctsdb.Vehicle
+		default:
+			log.Fatal("the use-case is unsupported")
+		}
+
+		if d.queryType > 0 {
+			if d.queryType <= queryCase.Count {
+				d.sqlTemplate = []string{queryCase.Types[d.queryType].RawSql}
+			} else {
+				log.Fatalln("the query-type is out of range")
+			}
+		}
+
 		if len(d.sqlTemplate) < 1 {
 			log.Fatalln("the sql template is empty")
 		} else {
@@ -197,6 +198,16 @@ func (d *BasicBenchTask) PrepareWorkers() int {
 		d.simulator = cfg.ToSimulator()
 	case common.UseCaseAirQuality:
 		cfg := &airq.AirqSimulatorConfig{
+			Start:            d.timestampStart,
+			End:              d.timestampEnd,
+			SamplingInterval: d.samplingInterval,
+			DeviceCount:      d.scaleVar,
+			DeviceOffset:     d.scaleVarOffset,
+			SqlTemplates:     d.sqlTemplate,
+		}
+		d.simulator = cfg.ToSimulator()
+	case common.UseCaseLiveCharge:
+		cfg := &live.LiveChargeSimulatorConfig{
 			Start:            d.timestampStart,
 			End:              d.timestampEnd,
 			SamplingInterval: d.samplingInterval,
