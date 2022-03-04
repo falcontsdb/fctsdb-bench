@@ -3,6 +3,7 @@ package live
 import (
 	// "math/rand"
 
+	"sync/atomic"
 	"time"
 
 	"git.querycap.com/falcontsdb/fctsdb-bench/common"
@@ -27,6 +28,10 @@ type CityCastMeasurement struct {
 	water     int64
 	power     int64
 	gas       int64
+	counter   int64
+	waterDay  float64
+	powerDay  float64
+	gasDay    float64
 	// rand      rand.RNG
 }
 
@@ -42,18 +47,28 @@ func (m *CityCastMeasurement) Tick(d time.Duration) {
 
 func (m *CityCastMeasurement) ToPoint(p *common.Point) bool {
 	p.SetMeasurementName(CityCastByteString)
-	randNum := fastrand.Uint32() //一个64位随机数可以通过掩码的形式生成其他数字，减少随机数的生成，9+9+9+7+6+8+10 = 58
+	// randNum := fastrand.Uint32() //一个64位随机数可以通过掩码的形式生成其他数字，减少随机数的生成，9+9+9+7+6+8+10 = 58
+	atomic.AddInt64(&m.counter, 1)
 
 	// aqi占9位，随机范围即10-522，以此类推
-	m.water += int64(randNum&uint32(1<<4-1) + 5)
-	p.AppendField(CityCast[0], m.water)
-	randNum >>= 4
-	m.power += int64(randNum&uint32(1<<4-1) + 50)
-	p.AppendField(CityCast[1], m.power)
-	randNum >>= 4
-	m.gas += int64(randNum & uint32(1<<1-1))
-	p.AppendField(CityCast[2], m.gas)
-	randNum >>= 1
+	// p.AppendField(CityCast[0], atomic.AddInt64(&m.water, int64(float64(randNum&uint32(1<<10-1)+2)*m.waterDay/1000)))
+	// randNum >>= 10
+	// p.AppendField(CityCast[1], atomic.AddInt64(&m.power, int64(float64(randNum&uint32(1<<10-1)+10)*m.powerDay/1000)))
+	// randNum >>= 10
+	// p.AppendField(CityCast[2], atomic.AddInt64(&m.gas, int64(float64(randNum&uint32(1<<10-1))*m.gasDay/1000)))
+	// randNum >>= 1
+
+	if m.counter%6 == 0 {
+		m.waterDay = float64(fastrand.Uint32n(300) + 1)
+		m.gasDay = float64(fastrand.Uint32n(200) + 1)
+		m.powerDay = float64(fastrand.Uint32n(100) + 1)
+		// fmt.Println(m.bigNum)
+		// m.bigNum = 0.1
+	}
+	p.AppendField(CityCast[0], atomic.AddInt64(&m.water, int64(m.waterDay)/10))
+	p.AppendField(CityCast[1], atomic.AddInt64(&m.power, int64(m.powerDay)/10))
+	p.AppendField(CityCast[2], atomic.AddInt64(&m.gas, int64(m.gasDay)/10))
+
 	return true
 }
 

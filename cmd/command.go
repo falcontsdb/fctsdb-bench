@@ -101,7 +101,7 @@ func InitWrite(task *BasicBenchTask, cmd *cobra.Command) {
 	cmdFlags.IntVar(&task.batchSize, "batch-size", 100, "1个http请求中携带Point个数")
 	cmdFlags.IntVar(&task.useGzip, "gzip", 1, "是否使用gzip,level[0-9],小于0表示不使用")
 	cmdFlags.IntVar(&task.workers, "workers", 1, "并发的http个数")
-	cmdFlags.DurationVar(&task.timeLimit, "time-limit", 300*time.Second, "最大测试时间")
+	cmdFlags.DurationVar(&task.timeLimit, "time-limit", -1, "最大测试时间")
 	cmdFlags.BoolVar(&task.debug, "debug", false, "是否打印详细日志(default false).")
 	cmdFlags.StringVar(&task.format, "format", "fctsdb", "目标数据库类型，当前仅支持fctsdb和mysql")
 

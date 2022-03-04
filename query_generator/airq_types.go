@@ -93,32 +93,32 @@ func init() {
 	// })
 
 	// case 10
-	AirQuality.Regist(&QueryType{
-		Name:    "查询城市级别最新实时数据",
-		RawSql:  "select mean(*) from (select last(*) from city_air_quality where city='{city}' group by site_id)",
-		Comment: "业务用途：用于页面展示城市级别实时数据\n数据库能力：对子查询求平均值，子查询为：指定某中层级tag，并按某低层级tag分组，返回分组最新值",
-	})
+	// AirQuality.Regist(&QueryType{
+	// 	Name:    "查询城市级别最新实时数据",
+	// 	RawSql:  "select mean(*) from (select last(*) from city_air_quality where city='{city}' group by site_id)",
+	// 	Comment: "业务用途：用于页面展示城市级别实时数据\n数据库能力：对子查询求平均值，子查询为：指定某中层级tag，并按某低层级tag分组，返回分组最新值",
+	// })
 
-	// case 11
-	AirQuality.Regist(&QueryType{
-		Name:    "查询某城市按站点分组的站点实时数据",
-		RawSql:  "select last(*) from city_air_quality where city='{city}' group by site_id",
-		Comment: "业务用途：用于页面展示城市级别站点实时数据\n数据库能力：指定某低层级tag，并按某tag分组，返回分组最新值",
-	})
+	// // case 11
+	// AirQuality.Regist(&QueryType{
+	// 	Name:    "查询某城市按站点分组的站点实时数据",
+	// 	RawSql:  "select last(*) from city_air_quality where city='{city}' group by site_id",
+	// 	Comment: "业务用途：用于页面展示城市级别站点实时数据\n数据库能力：指定某低层级tag，并按某tag分组，返回分组最新值",
+	// })
 
-	// case 12
-	AirQuality.Regist(&QueryType{
-		Name:    "按小时分组，查看过去24小时某站点各污染物的平均值变化",
-		RawSql:  "select mean(*) from city_air_quality where site_id = '{site_id}' and time > '{now}'-24h group by time(1h);",
-		Comment: "业务用途：展示某站点24小时污染物变化趋势\n数据库能力：指定某低层级tag和24h时间段，并按1h作为分组窗口，查询所有字段平均值",
-	})
+	// // case 12
+	// AirQuality.Regist(&QueryType{
+	// 	Name:    "按小时分组，查看过去24小时某站点各污染物的平均值变化",
+	// 	RawSql:  "select mean(*) from city_air_quality where site_id = '{site_id}' and time > '{now}'-24h group by time(1h);",
+	// 	Comment: "业务用途：展示某站点24小时污染物变化趋势\n数据库能力：指定某低层级tag和24h时间段，并按1h作为分组窗口，查询所有字段平均值",
+	// })
 
-	// case 13
-	AirQuality.Regist(&QueryType{
-		Name:    "按小时分组，查看过去24小时某站点各污染物的平均值变化",
-		RawSql:  "select mean(*) from city_air_quality where city = '{city}' and time > '{now}'-24h group by time(1h);",
-		Comment: "业务用途：展示某站点24小时污染物变化趋势\n数据库能力：指定某中层级tag和24h时间段，并按1h作为分组窗口，查询所有字段平均值",
-	})
+	// // case 13
+	// AirQuality.Regist(&QueryType{
+	// 	Name:    "按小时分组，查看过去24小时某站点各污染物的平均值变化",
+	// 	RawSql:  "select mean(*) from city_air_quality where city = '{city}' and time > '{now}'-24h group by time(1h);",
+	// 	Comment: "业务用途：展示某站点24小时污染物变化趋势\n数据库能力：指定某中层级tag和24h时间段，并按1h作为分组窗口，查询所有字段平均值",
+	// })
 
 	// case 14
 	AirQuality.Regist(&QueryType{
