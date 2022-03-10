@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"git.querycap.com/falcontsdb/fctsdb-bench/common"
+	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/common"
 	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/devops"
 	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/vehicle"
 	"git.querycap.com/falcontsdb/fctsdb-bench/serializers"
@@ -769,13 +769,16 @@ func BenchmarkNewPointAirqEasy(b *testing.B) {
 	point := common.MakeUsablePoint()
 	// ser := common.NewSerializerInflux()
 	// out := Printer{}
+	out := bytes.NewBuffer(make([]byte, 0, 1024))
+	ser := serializers.NewSerializerInflux()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// host := sim.Hosts[i%len(sim.Hosts)]
 		// _ = string(host.SiteID)
 		sim.Next(point)
-		// ser.SerializePoint(out, point)
+		ser.SerializePoint(out, point)
 		point.Reset()
+		out.Reset()
 	}
 }
 

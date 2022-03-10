@@ -5,7 +5,7 @@ import (
 
 	"time"
 
-	"git.querycap.com/falcontsdb/fctsdb-bench/common"
+	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/common"
 	"git.querycap.com/falcontsdb/fctsdb-bench/util/fastrand"
 )
 

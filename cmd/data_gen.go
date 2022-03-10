@@ -25,8 +25,8 @@ import (
 	"strings"
 	"time"
 
-	"git.querycap.com/falcontsdb/fctsdb-bench/common"
 	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/airq"
+	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/common"
 	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/devops"
 	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/vehicle"
 	"git.querycap.com/falcontsdb/fctsdb-bench/serializers"
@@ -84,7 +84,7 @@ func DataGen() {
 func (g *DataGenerator) Init(cmd *cobra.Command) {
 	dataGenFlag := cmd.Flags()
 	dataGenFlag.StringVar(&g.format, "format", formatChoices[0], fmt.Sprintf("Format to emit. (choices: %s)", strings.Join(formatChoices, ", ")))
-	dataGenFlag.StringVar(&g.useCase, "use-case", common.CaseChoices[0], fmt.Sprintf("Use case to model. (choices: %s)", strings.Join(common.CaseChoices, ", ")))
+	dataGenFlag.StringVar(&g.useCase, "use-case", CaseChoices[0], fmt.Sprintf("Use case to model. (choices: %s)", strings.Join(CaseChoices, ", ")))
 	dataGenFlag.Int64Var(&g.scaleVar, "scale-var", 1, "Scaling variable specific to the use case.")
 	dataGenFlag.Int64Var(&g.scaleVarOffset, "scale-var-offset", 0, "Scaling variable offset specific to the use case.")
 	dataGenFlag.DurationVar(&g.samplingInterval, "sampling-interval", time.Second, "Simulated sampling interval.")
@@ -173,7 +173,7 @@ func (g *DataGenerator) RunProcess() {
 	var sim common.Simulator
 
 	switch g.useCase {
-	case common.CaseChoices[0]:
+	case CaseChoices[0]:
 		cfg := &vehicle.VehicleSimulatorConfig{
 			Start:            g.timestampStart,
 			End:              g.timestampEnd,
@@ -182,7 +182,7 @@ func (g *DataGenerator) RunProcess() {
 			DeviceOffset:     g.scaleVarOffset,
 		}
 		sim = cfg.ToSimulator()
-	case common.CaseChoices[1]:
+	case CaseChoices[1]:
 		cfg := &airq.AirqSimulatorConfig{
 			Start:            g.timestampStart,
 			End:              g.timestampEnd,
@@ -191,7 +191,7 @@ func (g *DataGenerator) RunProcess() {
 			DeviceOffset:     g.scaleVarOffset,
 		}
 		sim = cfg.ToSimulator()
-	case common.CaseChoices[2]:
+	case CaseChoices[2]:
 		cfg := &devops.DevopsSimulatorConfig{
 			Start: g.timestampStart,
 			End:   g.timestampEnd,
@@ -205,7 +205,7 @@ func (g *DataGenerator) RunProcess() {
 		log.Fatalln("the case is not supported")
 	}
 
-	var serializer common.Serializer
+	var serializer serializers.Serializer
 	switch g.format {
 	case "influx-bulk":
 		serializer = serializers.NewSerializerInflux()

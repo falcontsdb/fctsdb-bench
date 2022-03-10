@@ -2,9 +2,10 @@ package serializers
 
 import (
 	"fmt"
-	"git.querycap.com/falcontsdb/fctsdb-bench/common"
 	"testing"
 	"time"
+
+	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/common"
 )
 
 var (

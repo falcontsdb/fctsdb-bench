@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"git.querycap.com/falcontsdb/fctsdb-bench/common"
 	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/airq"
+	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/common"
 	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/vehicle"
 	fctsdb "git.querycap.com/falcontsdb/fctsdb-bench/query_generator"
 	"github.com/spf13/cobra"
@@ -67,7 +67,7 @@ func RunGenerateQueries() {
 
 func (q *QueryGenerator) Init(cmd *cobra.Command) {
 	queryGenFlag := cmd.Flags()
-	queryGenFlag.StringVar(&q.useCase, "use-case", common.CaseChoices[0], fmt.Sprintf("Use case to model. (choices: %s)", strings.Join(common.CaseChoices, ", ")))
+	queryGenFlag.StringVar(&q.useCase, "use-case", CaseChoices[0], fmt.Sprintf("Use case to model. (choices: %s)", strings.Join(CaseChoices, ", ")))
 	queryGenFlag.Int64Var(&q.scaleVar, "scale-var", 1, "Scaling variable specific to the use case.")
 	queryGenFlag.Int64Var(&q.scaleVarOffset, "scale-var-offset", 0, "Scaling variable offset specific to the use case.")
 	queryGenFlag.IntVar(&q.queryTypeId, "query-type", 1, "Scaling variable offset specific to the use case.")

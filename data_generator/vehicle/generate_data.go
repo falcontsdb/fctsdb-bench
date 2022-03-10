@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"git.querycap.com/falcontsdb/fctsdb-bench/common"
+	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/common"
 )
 
 // Type IotSimulatorConfig is used to create a IotSimulator.

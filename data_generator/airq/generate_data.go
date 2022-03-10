@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"git.querycap.com/falcontsdb/fctsdb-bench/common"
+	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/common"
 )
 
 // Type AirqSimulatorConfig is used to create a AirqSimulator.
