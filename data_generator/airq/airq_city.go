@@ -60,32 +60,6 @@ func (m *CityAirQualityMeasurement) ToPoint(p *common.Point) bool {
 	p.AppendField(CityAirQualityFieldKeys[5], int64(randNum&uint64(1<<8-1)+10))
 	randNum >>= 8
 	p.AppendField(CityAirQualityFieldKeys[6], float32(randNum&uint64(1<<10-1))/1000.0+0.5)
-	p.AppendField(CityAirQualityFieldKeys[7], m.RandomString(20))
+	p.AppendField(CityAirQualityFieldKeys[7], fastrand.RandomString(20))
 	return true
-}
-
-func (m *CityAirQualityMeasurement) RandomString(n int) []byte {
-	letterBytes := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	letterIdxBits := 6                            // 6 bits to represent a letter index
-	letterIdxMask := uint32(1<<letterIdxBits - 1) // All 1-bits, as many as letterIdxBits
-	letterIdxMax := 32 / letterIdxBits            // # of letter indices fitting in 63 bits
-
-	// sb := strings.Builder{}
-	// sb.Grow(n)
-	buf := make([]byte, n)
-	// A src.Int63() generates 63 random bits, enough for letterIdxMax characters!
-	for i, cache, remain := n-1, fastrand.Uint32(), letterIdxMax; i >= 0; {
-		if remain == 0 {
-			cache, remain = fastrand.Uint32(), letterIdxMax
-		}
-		idx := int(cache&letterIdxMask) % len(letterBytes)
-		buf[i] = letterBytes[idx]
-		i--
-
-		cache >>= letterIdxBits
-		remain--
-	}
-
-	// return *(*string)(unsafe.Pointer(&buf))
-	return buf
 }

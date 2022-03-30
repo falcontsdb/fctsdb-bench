@@ -58,7 +58,7 @@ func NewFctsdbClient(c ClientConfig) *FctsdbClient {
 	}
 
 	queryUrl := make([]byte, 0)
-	queryUrl = append(queryUrl, c.Host...)
+	queryUrl = append(queryUrl, host...)
 	queryUrl = append(queryUrl, "/query?db="...)
 	queryUrl = fasthttp.AppendQuotedArg(queryUrl, []byte(c.Database))
 	if c.User != "" {

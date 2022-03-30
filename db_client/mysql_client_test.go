@@ -2,6 +2,7 @@ package db_client
 
 import (
 	"fmt"
+	"net/url"
 	"testing"
 
 	"github.com/valyala/fasthttp"
@@ -114,4 +115,16 @@ func TestFastHttpUrl(t *testing.T) {
 
 	// uri, _ := url.Parse("172.17.2.22:8086")
 	fmt.Println(uri.String())
+}
+
+func TestHttpUrl(t *testing.T) {
+	uri, err := url.Parse("http://172.17.2.22:8086")
+	if err != nil {
+		fmt.Println(err.Error())
+	} else {
+		fmt.Println(uri.Host)
+	}
+
+	// uri, _ := url.Parse("172.17.2.22:8086")
+
 }
