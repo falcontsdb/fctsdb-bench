@@ -4,7 +4,7 @@ import (
 	"math/rand"
 	"time"
 
-	. "git.querycap.com/falcontsdb/fctsdb-bench/common"
+	. "git.querycap.com/falcontsdb/fctsdb-bench/data_generator/common"
 )
 
 var HomeStates = [][]byte{

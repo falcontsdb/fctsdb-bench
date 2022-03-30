@@ -33,3 +33,46 @@ func Uint64() uint64 {
 func Uint64n(n uint64) uint64 {
 	return Uint64() % n
 }
+
+func Int64() int64 {
+	return int64(Uint32())<<32 | int64(Uint32())
+}
+
+func Int63() int64 {
+	return int64(Uint32())<<31 | int64(Uint32())
+}
+
+func Float64() float64 {
+again:
+	f := float64(Int63()) / (1 << 63)
+	if f == 1 {
+		goto again // resample; this branch is taken O(never)
+	}
+	return f
+}
+
+func RandomString(n int) []byte {
+	letterBytes := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	letterIdxBits := 6                            // 6 bits to represent a letter index
+	letterIdxMask := uint32(1<<letterIdxBits - 1) // All 1-bits, as many as letterIdxBits
+	letterIdxMax := 32 / letterIdxBits            // # of letter indices fitting in 63 bits
+
+	// sb := strings.Builder{}
+	// sb.Grow(n)
+	buf := make([]byte, n)
+	// A src.Int63() generates 63 random bits, enough for letterIdxMax characters!
+	for i, cache, remain := n-1, Uint32(), letterIdxMax; i >= 0; {
+		if remain == 0 {
+			cache, remain = Uint32(), letterIdxMax
+		}
+		idx := int(cache&letterIdxMask) % len(letterBytes)
+		buf[i] = letterBytes[idx]
+		i--
+
+		cache >>= letterIdxBits
+		remain--
+	}
+
+	// return *(*string)(unsafe.Pointer(&buf))
+	return buf
+}

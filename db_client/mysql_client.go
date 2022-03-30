@@ -8,18 +8,17 @@ import (
 	"net"
 	"time"
 
-	"git.querycap.com/falcontsdb/fctsdb-bench/common"
 	_ "github.com/go-sql-driver/mysql"
 )
 
 // MysqlWrite is a Writer that writes to a mysql server.
 type MysqlClient struct {
 	DB *sql.DB
-	c  common.ClientConfig
+	c  ClientConfig
 }
 
 // NewMysqlClient returns a new DBClient of Mysql .
-func NewMysqlClient(c common.ClientConfig) (*MysqlClient, error) {
+func NewMysqlClient(c ClientConfig) (*MysqlClient, error) {
 	dsn := fmt.Sprintf("%s:%s@%s(%s)/%s?multiStatements=true&charset=utf8", c.User, c.Password, "tcp", c.Host, c.Database)
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {

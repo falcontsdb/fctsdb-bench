@@ -11,24 +11,53 @@ import (
 
 // BenchSink prevents the compiler from optimizing away benchmark loops.
 var BenchSink uint64
+var s = make(map[int]int, 1000000)
+
+func init() {
+	for i := 0; i < 1000000; i++ {
+		s[i] = i
+	}
+}
+
+func BenchmarkSlice(b *testing.B) {
+	i := 0
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			i += 1
+			_ = s[i%1000000]
+		}
+	})
+}
 
 func BenchmarkUint64n(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
-		s := uint64(0)
 		for pb.Next() {
-			s += Uint64n(1e6)
+			Uint64n(1e6)
 		}
-		atomic.AddUint64(&BenchSink, s)
 	})
 }
 
 func BenchmarkUint32n(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
-		s := uint32(0)
 		for pb.Next() {
-			s += Uint32n(1e6)
+			Uint32n(1e6)
 		}
-		atomic.AddUint64(&BenchSink, uint64(s))
+	})
+}
+
+func BenchmarkFloat64(b *testing.B) {
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			Float64()
+		}
+	})
+}
+
+func BenchmarkInt63(b *testing.B) {
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			Int63()
+		}
 	})
 }
 
@@ -88,6 +117,14 @@ func BenchmarkUint32n(b *testing.B) {
 // 		atomic.AddUint64(&BenchSink, s)
 // 	})
 // }
+
+func BenchmarkMathRandInt63(b *testing.B) {
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			rand.Int63n(1e6)
+		}
+	})
+}
 
 func BenchmarkMathRandInt63n(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
@@ -189,7 +226,7 @@ func TestUint64n(t *testing.T) {
 	// Seed(12345678)
 	for i := 0; i < 100; i++ {
 		// fmt.Println(Uint64n(10))
-		fmt.Println(Uint64())
+		fmt.Println(Float64())
 		// runtime.FuncForPC()
 	}
 	// time.Sleep(time.Second)

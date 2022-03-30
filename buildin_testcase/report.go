@@ -148,6 +148,77 @@ func init() {
 		},
 	}
 
+	// 空气质量查询性能
+	performances["空气质量查询-Series变化"] = &fcbenchCaseDefine{
+		Title:       "空气质量查询-Series变化",
+		Document:    "测试空气质量（5个tag，8个field），tag in查询语句中不同series数量的性能",
+		TableTags:   []string{"场景", "并发数", "Sql"},
+		TableFeilds: []string{"查询(q/s)"},
+	}
+	performances["空气质量查询-limit数量变化"] = &fcbenchCaseDefine{
+		Title:       "空气质量查询-limit数量变化",
+		Document:    "测试空气质量（5个tag，8个field），limit查询语句中数量变化的性能",
+		TableTags:   []string{"场景", "并发数", "Sql"},
+		TableFeilds: []string{"查询(q/s)"},
+	}
+	performances["空气质量查询-shard数量变化"] = &fcbenchCaseDefine{
+		Title:       "空气质量查询-shard数量变化",
+		Document:    "测试空气质量（5个tag，8个field），查询语句命中的shard数量变化的性能",
+		TableTags:   []string{"场景", "并发数", "Sql"},
+		TableFeilds: []string{"查询(q/s)"},
+	}
+	performances["空气质量查询-field数量变化"] = &fcbenchCaseDefine{
+		Title:       "空气质量查询-field数量变化",
+		Document:    "测试空气质量（5个tag，8个field），查询语句中含有的feild数量不同的性能",
+		TableTags:   []string{"场景", "并发数", "Sql"},
+		TableFeilds: []string{"查询(q/s)"},
+	}
+	performances["空气质量查询-聚合函数"] = &fcbenchCaseDefine{
+		Title:       "空气质量查询-聚合函数",
+		Document:    "测试空气质量（5个tag，8个field），查询语句中不同聚合函数的性能",
+		TableTags:   []string{"场景", "并发数", "Sql"},
+		TableFeilds: []string{"查询(q/s)"},
+	}
+	performances["空气质量查询-window函数"] = &fcbenchCaseDefine{
+		Title:       "空气质量查询-window函数",
+		Document:    "测试空气质量（5个tag，8个field），单并发下不同的window范围的查询响应时间",
+		TableTags:   []string{"场景", "并发数", "Sql"},
+		TableFeilds: []string{"查询(q/s)", "P95(r)", "Min(r)", "Max(r)", "Avg(r)"},
+	}
+	performances["空气质量查询-时间排序"] = &fcbenchCaseDefine{
+		Title:       "空气质量查询-时间排序",
+		Document:    "测试空气质量（5个tag，8个field），查询语句中时间排序对count函数的性能影响",
+		TableTags:   []string{"场景", "并发数", "Sql"},
+		TableFeilds: []string{"查询(q/s)"},
+	}
+	performances["空气质量查询-并发数变化"] = &fcbenchCaseDefine{
+		Title:       "空气质量查询-并发数变化",
+		Document:    "测试空气质量（5个tag，8个field），查询语句并发数变化的性能",
+		TableTags:   []string{"场景", "并发数", "Sql"},
+		TableFeilds: []string{"查询(q/s)"},
+		Pictures: []PictureDefine{
+			{Type: "line", XAxisColumn: "并发数", SeriesColumn: []string{"查询(q/s)"}},
+		},
+	}
+	performances["空气质量查询-group by从句"] = &fcbenchCaseDefine{
+		Title:       "空气质量查询-group by从句",
+		Document:    "测试空气质量（5个tag，8个field），带group by从句的查询性能",
+		TableTags:   []string{"场景", "并发数", "Sql"},
+		TableFeilds: []string{"查询(q/s)"},
+	}
+	performances["空气质量查询-嵌套语句"] = &fcbenchCaseDefine{
+		Title:       "空气质量查询-嵌套语句",
+		Document:    "测试空气质量（5个tag，8个field），带嵌套语句的查询性能",
+		TableTags:   []string{"场景", "并发数", "Sql"},
+		TableFeilds: []string{"查询(q/s)"},
+	}
+	performances["空气质量查询-slimit语句"] = &fcbenchCaseDefine{
+		Title:       "空气质量查询-slimit语句",
+		Document:    "测试空气质量（5个tag，8个field），带slimit从句的查询性能",
+		TableTags:   []string{"场景", "并发数", "Sql"},
+		TableFeilds: []string{"查询(q/s)"},
+	}
+
 	performances["空气质量查询性能"] = &fcbenchCaseDefine{
 		Title:       "空气质量场景-查询性能",
 		Document:    "测试空气质量（5个tag，8个field），不同查询语句的性能",
@@ -311,7 +382,7 @@ func CreateReport(fileNames ...string) *report.Page {
 				} else {
 					currentTestCase = report.NewPerformanceTestCase(row[0])
 					currentTestCase.Title = caseDefine.Title
-					currentTestCase.Document = caseDefine.Document + "\n单位解释：p/s - points/秒 、q/s - queries/秒"
+					currentTestCase.Document = caseDefine.Document + "\n单位解释：p/s - points/秒 、q/s - queries/秒、响应时间单位（ms）"
 					currentTestCase.Table = table.CreateTable(tableHeaders...)
 					currentTestCase.Conclusion = "执行无异常"
 					benchReport.AddTestCase(currentTestCase)

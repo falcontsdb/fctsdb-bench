@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"git.querycap.com/falcontsdb/fctsdb-bench/common"
+	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/common"
 	"github.com/spf13/cobra"
 )
 
@@ -19,7 +19,7 @@ var (
 		Use:   "mixed",
 		Short: "混合读写测试",
 		Run: func(cmd *cobra.Command, args []string) {
-			common.RunBenchTask(mixReadWrite)
+			RunBenchTask(mixReadWrite)
 		},
 	}
 	writeTask = &BasicBenchTask{mixMode: "write_only", needPrePare: false}
@@ -27,7 +27,7 @@ var (
 		Use:   "write",
 		Short: "生成数据并直接发送至数据库",
 		Run: func(cmd *cobra.Command, args []string) {
-			common.RunBenchTask(writeTask)
+			RunBenchTask(writeTask)
 		},
 	}
 	queryTask = &BasicBenchTask{mixMode: "read_only", needPrePare: false}
@@ -35,7 +35,7 @@ var (
 		Use:   "query",
 		Short: "生成查询语句并直接发送至数据库",
 		Run: func(cmd *cobra.Command, args []string) {
-			common.RunBenchTask(queryTask)
+			RunBenchTask(queryTask)
 		},
 	}
 )
@@ -53,7 +53,7 @@ func InitMixed(task *BasicBenchTask, cmd *cobra.Command) {
 	// writeFlag.StringVar(&d.format, "format", formatChoices[0], fmt.Sprintf("Format to emit. (choices: %s)", strings.Join(formatChoices, ", ")))
 	cmdFlags.StringVar(&task.csvDaemonUrls, "urls", "http://localhost:8086", "*被测数据库的地址")
 	cmdFlags.StringVar(&task.dbName, "db", "benchmark_db", "*数据库的database名称")
-	cmdFlags.StringVar(&task.useCase, "use-case", common.CaseChoices[0], fmt.Sprintf("*使用的测试场景(可选场景: %s)", strings.Join(common.CaseChoices, ", ")))
+	cmdFlags.StringVar(&task.useCase, "use-case", CaseChoices[0], fmt.Sprintf("*使用的测试场景(可选场景: %s)", strings.Join(CaseChoices, ", ")))
 	cmdFlags.Int64Var(&task.scaleVar, "scale-var", 1, "*场景的变量，一般情况下是场景中模拟机的数量")
 	cmdFlags.Int64Var(&task.scaleVarOffset, "scale-var-offset", 0, "*场景偏移量，一般情况下是模拟机的起始MN编号 (default 0)")
 	cmdFlags.DurationVar(&task.samplingInterval, "sampling-interval", time.Second, "*模拟机的采样时间")
@@ -87,7 +87,7 @@ func InitWrite(task *BasicBenchTask, cmd *cobra.Command) {
 	// writeFlag.StringVar(&d.format, "format", formatChoices[0], fmt.Sprintf("Format to emit. (choices: %s)", strings.Join(formatChoices, ", ")))
 	cmdFlags.StringVar(&task.csvDaemonUrls, "urls", "http://localhost:8086", "*被测数据库的地址")
 	cmdFlags.StringVar(&task.dbName, "db", "benchmark_db", "*数据库的database名称")
-	cmdFlags.StringVar(&task.useCase, "use-case", common.CaseChoices[0], fmt.Sprintf("*使用的测试场景(可选场景: %s)", strings.Join(common.CaseChoices, ", ")))
+	cmdFlags.StringVar(&task.useCase, "use-case", CaseChoices[0], fmt.Sprintf("*使用的测试场景(可选场景: %s)", strings.Join(CaseChoices, ", ")))
 	cmdFlags.Int64Var(&task.scaleVar, "scale-var", 1, "*场景的变量，一般情况下是场景中模拟机的数量")
 	cmdFlags.Int64Var(&task.scaleVarOffset, "scale-var-offset", 0, "*场景偏移量，一般情况下是模拟机的起始MN编号 (default 0)")
 	cmdFlags.DurationVar(&task.samplingInterval, "sampling-interval", time.Second, "*模拟机的采样时间")
@@ -101,7 +101,7 @@ func InitWrite(task *BasicBenchTask, cmd *cobra.Command) {
 	cmdFlags.IntVar(&task.batchSize, "batch-size", 100, "1个http请求中携带Point个数")
 	cmdFlags.IntVar(&task.useGzip, "gzip", 1, "是否使用gzip,level[0-9],小于0表示不使用")
 	cmdFlags.IntVar(&task.workers, "workers", 1, "并发的http个数")
-	cmdFlags.DurationVar(&task.timeLimit, "time-limit", 300*time.Second, "最大测试时间")
+	cmdFlags.DurationVar(&task.timeLimit, "time-limit", -1, "最大测试时间")
 	cmdFlags.BoolVar(&task.debug, "debug", false, "是否打印详细日志(default false).")
 	cmdFlags.StringVar(&task.format, "format", "fctsdb", "目标数据库类型，当前仅支持fctsdb和mysql")
 
@@ -118,7 +118,7 @@ func InitQuery(task *BasicBenchTask, cmd *cobra.Command) {
 	// writeFlag.StringVar(&d.format, "format", formatChoices[0], fmt.Sprintf("Format to emit. (choices: %s)", strings.Join(formatChoices, ", ")))
 	cmdFlags.StringVar(&task.csvDaemonUrls, "urls", "http://localhost:8086", "*被测数据库的地址")
 	cmdFlags.StringVar(&task.dbName, "db", "benchmark_db", "*数据库的database名称")
-	cmdFlags.StringVar(&task.useCase, "use-case", common.CaseChoices[0], fmt.Sprintf("*使用的测试场景(可选场景: %s)", strings.Join(common.CaseChoices, ", ")))
+	cmdFlags.StringVar(&task.useCase, "use-case", CaseChoices[0], fmt.Sprintf("*使用的测试场景(可选场景: %s)", strings.Join(CaseChoices, ", ")))
 	cmdFlags.Int64Var(&task.scaleVar, "scale-var", 1, "*场景的变量，一般情况下是场景中模拟机的数量")
 	cmdFlags.Int64Var(&task.scaleVarOffset, "scale-var-offset", 0, "*场景偏移量，一般情况下是模拟机的起始MN编号 (default 0)")
 	cmdFlags.DurationVar(&task.samplingInterval, "sampling-interval", time.Second, "*模拟机的采样时间")

@@ -18,6 +18,7 @@ const (
 	UseCaseGroupWindowTranspose = "group-window-transpose"
 	UseCaseVehicle              = "vehicle"
 	UseCaseAirQuality           = "air-quality"
+	UseCaseLiveCharge           = "live"
 )
 
 // Use case choices:

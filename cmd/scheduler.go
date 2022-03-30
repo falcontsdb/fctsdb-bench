@@ -16,7 +16,7 @@ import (
 
 	"git.querycap.com/falcontsdb/fctsdb-bench/agent"
 	"git.querycap.com/falcontsdb/fctsdb-bench/buildin_testcase"
-	"git.querycap.com/falcontsdb/fctsdb-bench/common"
+	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/common"
 	"github.com/spf13/cobra"
 )
 
@@ -253,7 +253,7 @@ func (s *Scheduler) runBenchTaskByConfig(index int, fileName string, config buil
 	if err != nil {
 		return err
 	}
-	result := common.RunBenchTask(basicBenchTask)
+	result := RunBenchTask(basicBenchTask)
 	var writeHead = true
 	if index > 1 {
 		writeHead = false

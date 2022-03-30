@@ -7,12 +7,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/pelletier/go-toml"
 	"log"
 	"math/rand"
 	"net/http"
 	"reflect"
 	"strings"
+
+	"github.com/pelletier/go-toml"
 )
 
 type Source interface{}
@@ -39,20 +40,20 @@ func getSourceValue(s *Source, measurementName, itemKey string, itemDefaultValue
 }
 
 type Tag struct {
-	Name string
+	Name   string
 	Source Source
 }
 
 type Field struct {
-	Count int
-	Name string
+	Count  int
+	Name   string
 	Source Source
 }
 
 type Measurement struct {
-	Name string
+	Name   string
 	Sample float32
-	Tags []Tag
+	Tags   []Tag
 	Fields []Field
 }
 
@@ -64,15 +65,15 @@ var Config *ExternalConfig
 
 func (c *ExternalConfig) String() string {
 	var buf bytes.Buffer
-	for _,m := range c.measurements {
+	for _, m := range c.measurements {
 		buf.WriteString(fmt.Sprintf("definition: %s, sample: %f\n", m.Name, m.Sample))
 		buf.WriteString(fmt.Sprintf("  tags:\n"))
-		for _,tag := range m.Tags {
+		for _, tag := range m.Tags {
 			buf.WriteString(fmt.Sprintf("    tag: %s\n", tag.Name))
 			buf.WriteString(fmt.Sprintf("      source: %v\n", tag.Source))
 		}
 		buf.WriteString(fmt.Sprintf("  fields:\n"))
-		for _,field := range m.Fields {
+		for _, field := range m.Fields {
 			buf.WriteString(fmt.Sprintf("    field: %s, count: %d\n", field.Name, field.Count))
 			buf.WriteString(fmt.Sprintf("      source: %v\n", field.Source))
 		}
@@ -85,9 +86,9 @@ func (c *ExternalConfig) GetTagBytesValue(measurementName, tagKey []byte, failIf
 }
 
 func (c *ExternalConfig) GetTagValue(measurementName, tagKey string, failIfNotFound bool, defaultValue string) string {
-	for _,m := range c.measurements {
+	for _, m := range c.measurements {
 		if "" == measurementName || m.Name == measurementName {
-			for _,tag := range m.Tags {
+			for _, tag := range m.Tags {
 				if tag.Name == tagKey {
 					return fmt.Sprintf("%v", getSourceValue(&tag.Source, m.Name, tag.Name, defaultValue))
 				}
@@ -105,9 +106,9 @@ func (c *ExternalConfig) GetFieldBytesValue(measurementName, tagKey []byte, fail
 }
 
 func (c *ExternalConfig) GetFieldValue(measurementName, fieldKey string, failIfNotFound bool, defaultValue interface{}) interface{} {
-	for _,m := range c.measurements {
+	for _, m := range c.measurements {
 		if "" == measurementName || m.Name == measurementName {
-			for _,field := range m.Fields {
+			for _, field := range m.Fields {
 				if field.Name == fieldKey {
 					return getSourceValue(&field.Source, m.Name, field.Name, defaultValue)
 				}
@@ -123,7 +124,7 @@ func (c *ExternalConfig) GetFieldValue(measurementName, fieldKey string, failIfN
 func NewConfig(path string) (*ExternalConfig, error) {
 	var tree *toml.Tree
 	var err error
-	if strings.HasPrefix(path, "http://") || strings.HasPrefix(path,"https://") {
+	if strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://") {
 		tree, err = LoadURL(path)
 	} else {
 		tree, err = toml.LoadFile(path)

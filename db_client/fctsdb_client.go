@@ -12,7 +12,6 @@ import (
 	"net/url"
 	"time"
 
-	"git.querycap.com/falcontsdb/fctsdb-bench/common"
 	"github.com/valyala/fasthttp"
 )
 
@@ -32,7 +31,7 @@ var (
 // FctsdbClient is a Writer that writes to a fctsdb HTTP server.
 type FctsdbClient struct {
 	client   fasthttp.Client
-	c        common.ClientConfig
+	c        ClientConfig
 	writeUrl []byte
 	queryUrl []byte
 	host     []byte
@@ -40,7 +39,7 @@ type FctsdbClient struct {
 }
 
 // NewFctsdbClient returns a new HTTPWriter from the supplied HTTPWriterConfig.
-func NewFctsdbClient(c common.ClientConfig) *FctsdbClient {
+func NewFctsdbClient(c ClientConfig) *FctsdbClient {
 	var host []byte
 	writeUrl := make([]byte, 0)
 	if c.Host[len(c.Host)-1] == '/' {
@@ -59,7 +58,7 @@ func NewFctsdbClient(c common.ClientConfig) *FctsdbClient {
 	}
 
 	queryUrl := make([]byte, 0)
-	queryUrl = append(queryUrl, c.Host...)
+	queryUrl = append(queryUrl, host...)
 	queryUrl = append(queryUrl, "/query?db="...)
 	queryUrl = fasthttp.AppendQuotedArg(queryUrl, []byte(c.Database))
 	if c.User != "" {
@@ -158,7 +157,7 @@ func (w *FctsdbClient) Query(lines []byte) (int64, error) {
 			}
 		}
 		if w.c.Debug {
-			// fmt.Println(string(uri))
+			fmt.Println(string(uri))
 			var r Response
 			err := json.Unmarshal(body, &r)
 			if err != nil {

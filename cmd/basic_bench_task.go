@@ -13,9 +13,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"git.querycap.com/falcontsdb/fctsdb-bench/common"
 	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/airq"
+	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/common"
 	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/devops"
+	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/live"
 	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/vehicle"
 	"git.querycap.com/falcontsdb/fctsdb-bench/db_client"
 	fctsdb "git.querycap.com/falcontsdb/fctsdb-bench/query_generator"
@@ -58,7 +59,7 @@ type BasicBenchTask struct {
 	daemonUrls     []string
 	bufPool        sync.Pool
 	inputDone      chan struct{}
-	writers        []common.DBClient
+	writers        []db_client.DBClient
 	valuesRead     int64
 	itemsRead      int64
 	bytesRead      int64
@@ -66,7 +67,7 @@ type BasicBenchTask struct {
 	simulator      common.Simulator
 	respCollector  ResponseCollector
 	sqlTemplate    []string
-	serializer     common.Serializer
+	serializer     serializers.Serializer
 }
 
 func (d *BasicBenchTask) Validate() {
@@ -125,25 +126,25 @@ func (d *BasicBenchTask) Validate() {
 
 	log.Println("Use case", d.useCase)
 
-	var queryCase *fctsdb.QueryCase
-	switch d.useCase {
-	case fctsdb.AirQuality.CaseName:
-		queryCase = fctsdb.AirQuality
-	case fctsdb.Vehicle.CaseName:
-		queryCase = fctsdb.Vehicle
-	default:
-		log.Fatal("the use-case is unsupported")
-	}
-
-	if d.queryType > 0 {
-		if d.queryType <= queryCase.Count {
-			d.sqlTemplate = []string{queryCase.Types[d.queryType].RawSql}
-		} else {
-			log.Fatalln("the query-type is out of range")
-		}
-	}
-
 	if d.mixMode != "write_only" {
+		var queryCase *fctsdb.QueryCase
+		switch d.useCase {
+		case fctsdb.AirQuality.CaseName:
+			queryCase = fctsdb.AirQuality
+		case fctsdb.Vehicle.CaseName:
+			queryCase = fctsdb.Vehicle
+		default:
+			log.Fatal("the use-case is unsupported")
+		}
+
+		if d.queryType > 0 {
+			if d.queryType <= queryCase.Count {
+				d.sqlTemplate = []string{queryCase.Types[d.queryType].RawSql}
+			} else {
+				log.Fatalln("the query-type is out of range")
+			}
+		}
+
 		if len(d.sqlTemplate) < 1 {
 			log.Fatalln("the sql template is empty")
 		} else {
@@ -161,9 +162,9 @@ func (d *BasicBenchTask) PrepareWorkers() int {
 		},
 	}
 	d.inputDone = make(chan struct{})
-	d.writers = make([]common.DBClient, d.workers)
+	d.writers = make([]db_client.DBClient, d.workers)
 	for i := 0; i < len(d.writers); i++ {
-		c := &common.ClientConfig{
+		c := &db_client.ClientConfig{
 			Host:      d.daemonUrls[i%len(d.daemonUrls)],
 			Database:  d.dbName,
 			Gzip:      d.useGzip > 0,
@@ -197,6 +198,16 @@ func (d *BasicBenchTask) PrepareWorkers() int {
 		d.simulator = cfg.ToSimulator()
 	case common.UseCaseAirQuality:
 		cfg := &airq.AirqSimulatorConfig{
+			Start:            d.timestampStart,
+			End:              d.timestampEnd,
+			SamplingInterval: d.samplingInterval,
+			DeviceCount:      d.scaleVar,
+			DeviceOffset:     d.scaleVarOffset,
+			SqlTemplates:     d.sqlTemplate,
+		}
+		d.simulator = cfg.ToSimulator()
+	case common.UseCaseLiveCharge:
+		cfg := &live.LiveChargeSimulatorConfig{
 			Start:            d.timestampStart,
 			End:              d.timestampEnd,
 			SamplingInterval: d.samplingInterval,
@@ -252,7 +263,7 @@ func (d *BasicBenchTask) PrepareWorkers() int {
 				log.Fatalln("wrong mysql serializer")
 			}
 			point := common.MakeUsablePoint()
-			createdMeasurement := make(map[string]bool, 0)
+			createdMeasurement := make(map[string]bool)
 			buf := bytes.NewBuffer(make([]byte, 0, 1024))
 			for {
 				d.simulator.Next(point)
@@ -440,7 +451,7 @@ func (d *BasicBenchTask) CleanUp() {
 }
 
 // processWrite reads byte buffers from batchChan and writes them to the target server, while tracking stats on the write.
-func (d *BasicBenchTask) processWrite(w common.DBClient, batchSize int, useCountLimit bool, point *common.Point) error {
+func (d *BasicBenchTask) processWrite(w db_client.DBClient, batchSize int, useCountLimit bool, point *common.Point) error {
 	// var batchesSeen int64
 	// 发送http write
 
@@ -484,7 +495,7 @@ func (d *BasicBenchTask) processWrite(w common.DBClient, batchSize int, useCount
 	return err
 }
 
-func (d *BasicBenchTask) processQuery(w common.DBClient, batchSize int, useCountLimit bool) error {
+func (d *BasicBenchTask) processQuery(w db_client.DBClient, batchSize int, useCountLimit bool) error {
 	var err error
 	var lat int64
 	buf := d.bufPool.Get().(*bytes.Buffer)
@@ -553,7 +564,7 @@ func (d *BasicBenchTask) processQueryOnly(i int) {
 	}
 }
 
-func (d *BasicBenchTask) writeToDb(w common.DBClient, buf *bytes.Buffer) error {
+func (d *BasicBenchTask) writeToDb(w db_client.DBClient, buf *bytes.Buffer) error {
 	// var batchesSeen int64
 	// 发送http write
 	var err error
@@ -580,7 +591,7 @@ func (d *BasicBenchTask) writeToDb(w common.DBClient, buf *bytes.Buffer) error {
 	return nil
 }
 
-func (d *BasicBenchTask) createDb(writer common.DBClient) {
+func (d *BasicBenchTask) createDb(writer db_client.DBClient) {
 	// this also test db connection
 	existingDatabases, err := writer.ListDatabases()
 	if err != nil {
@@ -606,7 +617,7 @@ func (d *BasicBenchTask) createDb(writer common.DBClient) {
 	log.Printf("Database %s created", d.dbName)
 }
 
-func (d *BasicBenchTask) checkDbConnection(w common.DBClient) error {
+func (d *BasicBenchTask) checkDbConnection(w db_client.DBClient) error {
 	for i := 0; i < 30; i++ {
 		err := w.Ping()
 		if err != nil {

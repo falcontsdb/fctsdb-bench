@@ -4,7 +4,7 @@ import (
 	"io"
 	"strconv"
 
-	"git.querycap.com/falcontsdb/fctsdb-bench/common"
+	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/common"
 )
 
 type serializerInflux struct {

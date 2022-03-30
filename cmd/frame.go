@@ -1,38 +1,22 @@
-package common
+package main
 
 import (
 	"log"
 	"sync"
 	"time"
+
+	data_gen "git.querycap.com/falcontsdb/fctsdb-bench/data_generator/common"
 )
 
 var (
 	CaseChoices = []string{
-		UseCaseVehicle,
-		UseCaseAirQuality,
-		UseCaseDevOps,
+		data_gen.UseCaseVehicle,
+		data_gen.UseCaseAirQuality,
+		data_gen.UseCaseDevOps,
 	}
 )
 
 // ClientConfig is the configuration used to create an DBClient.
-type ClientConfig struct {
-	Host     string
-	Database string
-	Gzip     bool
-	Debug    bool
-	User     string
-	Password string
-	// Debug label for more informative errors.
-	DebugInfo string
-}
-
-type DBClient interface {
-	Write([]byte) (int64, error)
-	Query([]byte) (int64, error)
-	ListDatabases() ([]string, error)
-	CreateDb(withEncryption bool) error
-	Ping() error
-}
 
 type BenchTask interface {
 	Validate()

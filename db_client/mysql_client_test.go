@@ -2,14 +2,14 @@ package db_client
 
 import (
 	"fmt"
+	"net/url"
 	"testing"
 
-	"git.querycap.com/falcontsdb/fctsdb-bench/common"
 	"github.com/valyala/fasthttp"
 )
 
 func TestMysqlClient_CreateDb(t *testing.T) {
-	mc, err := NewMysqlClient(common.ClientConfig{
+	mc, err := NewMysqlClient(ClientConfig{
 		Host:      "172.17.2.22",
 		Database:  "test1",
 		Gzip:      false,
@@ -29,7 +29,7 @@ func TestMysqlClient_CreateDb(t *testing.T) {
 }
 
 func TestMysqlClient_ListDatabases(t *testing.T) {
-	mc, err := NewMysqlClient(common.ClientConfig{
+	mc, err := NewMysqlClient(ClientConfig{
 		Host: "172.17.2.22",
 		//Database:  "benchmark_db",
 		Gzip:      false,
@@ -50,7 +50,7 @@ func TestMysqlClient_ListDatabases(t *testing.T) {
 }
 
 func TestMysqlClient_Ping(t *testing.T) {
-	mc, err := NewMysqlClient(common.ClientConfig{
+	mc, err := NewMysqlClient(ClientConfig{
 		Host:      "172.17.2.22:3306",
 		Database:  "test",
 		Gzip:      false,
@@ -67,7 +67,7 @@ func TestMysqlClient_Ping(t *testing.T) {
 }
 
 func TestMysqlClient_Query(t *testing.T) {
-	mc, err := NewMysqlClient(common.ClientConfig{
+	mc, err := NewMysqlClient(ClientConfig{
 		Host:      "172.17.2.22",
 		Database:  "test",
 		Gzip:      false,
@@ -88,7 +88,7 @@ func TestMysqlClient_Query(t *testing.T) {
 }
 
 func TestMysqlClient_Write(t *testing.T) {
-	mc, err := NewMysqlClient(common.ClientConfig{
+	mc, err := NewMysqlClient(ClientConfig{
 		Host:      "172.17.2.22",
 		Database:  "test",
 		Gzip:      false,
@@ -115,4 +115,16 @@ func TestFastHttpUrl(t *testing.T) {
 
 	// uri, _ := url.Parse("172.17.2.22:8086")
 	fmt.Println(uri.String())
+}
+
+func TestHttpUrl(t *testing.T) {
+	uri, err := url.Parse("http://172.17.2.22:8086")
+	if err != nil {
+		fmt.Println(err.Error())
+	} else {
+		fmt.Println(uri.Host)
+	}
+
+	// uri, _ := url.Parse("172.17.2.22:8086")
+
 }

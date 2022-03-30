@@ -2,9 +2,10 @@ package serializers
 
 import (
 	"fmt"
-	"git.querycap.com/falcontsdb/fctsdb-bench/common"
 	"io"
 	"strconv"
+
+	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/common"
 )
 
 type SerializerMysql struct {

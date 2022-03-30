@@ -20,7 +20,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"git.querycap.com/falcontsdb/fctsdb-bench/common"
 	"git.querycap.com/falcontsdb/fctsdb-bench/db_client"
 	"git.querycap.com/falcontsdb/fctsdb-bench/serializers"
 	"github.com/spf13/cobra"
@@ -261,7 +260,7 @@ func (l *DataLoad) GetScanner() Scanner {
 
 func (l *DataLoad) PrepareProcess(i int) {
 
-	c := &common.ClientConfig{
+	c := &db_client.ClientConfig{
 		Host:      l.daemonUrls[i%len(l.daemonUrls)],
 		Database:  l.dbName,
 		Debug:     l.debug,

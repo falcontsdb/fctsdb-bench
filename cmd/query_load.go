@@ -12,7 +12,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"git.querycap.com/falcontsdb/fctsdb-bench/common"
 	"git.querycap.com/falcontsdb/fctsdb-bench/db_client"
 	"github.com/spf13/cobra"
 )
@@ -156,7 +155,7 @@ func (q *QueryLoad) Validate() {
 
 func (q *QueryLoad) PrepareProcess(i int) {
 
-	c := &common.ClientConfig{
+	c := &db_client.ClientConfig{
 		Host:      q.daemonUrls[i%len(q.daemonUrls)],
 		Database:  q.dbName,
 		Debug:     q.debug,

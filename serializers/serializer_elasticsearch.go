@@ -4,7 +4,7 @@ import (
 	"io"
 	"strings"
 
-	"git.querycap.com/falcontsdb/fctsdb-bench/common"
+	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/common"
 )
 
 var typeName5x = []byte("point")

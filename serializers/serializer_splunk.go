@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 
-	"git.querycap.com/falcontsdb/fctsdb-bench/common"
+	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/common"
 )
 
 type SerializerSplunkJson struct {

@@ -106,6 +106,24 @@ func (b *BGT2260) GetAreaByCity(code string) map[string]string {
 	return areaMap
 }
 
+func (b *BGT2260) GetAreaCodeByCity(code string) [][]byte {
+	var areaCodes = make([][]byte, 0)
+	var lCode = stringParse(code)
+	node := b.trie.Root()
+	for pk, pv := range node.Children() {
+		if lCode[0] == pk {
+			for ck, cv := range pv.Children() {
+				if ck == lCode[1] {
+					for ak := range cv.Children() {
+						areaCodes = append(areaCodes, []byte(pk+ck+ak))
+					}
+				}
+			}
+		}
+	}
+	return areaCodes
+}
+
 func (b *BGT2260) GetAllAreaCode() [][]byte {
 	gbt2260Table := GetGbt2260Table()
 	t := make([][]byte, 0)
