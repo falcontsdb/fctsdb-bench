@@ -11,22 +11,24 @@ import (
 func StartRemoteDatabase(endpoint string) error {
 	log.Println("start the remote database")
 	_, err := httpGet(endpoint, AGENT_START_PATH)
-	return err
+	return fmt.Errorf("start remote database error: %s", err.Error())
 }
 func StopRemoteDatabase(endpoint string) error {
 	log.Println("stop the remote database")
 	_, err := httpGet(endpoint, AGENT_STOP_PATH)
-	return err
+	return fmt.Errorf("stop remote database error: %s", err.Error())
 }
 func CleanRemoteDatabase(endpoint string) error {
 	log.Println("clean the remote database data")
 	_, err := httpGet(endpoint, AGENT_CLEAN_PATH)
-	return err
+	return fmt.Errorf("clean remote database error: %s", err.Error())
 }
 func GetEnvironment(endpoint string) ([]byte, error) {
-	return httpGet(endpoint, AGENT_GET_ENV_PATH)
+	resp, err := httpGet(endpoint, AGENT_GET_ENV_PATH)
+	return resp, fmt.Errorf("get environment error: %s", err.Error())
 }
 func httpGet(endpoint, path string) ([]byte, error) {
+
 	u, err := url.Parse(endpoint)
 	if err != nil {
 		log.Fatal("Invalid agent address:", endpoint, ", error:", err.Error())
@@ -51,10 +53,10 @@ func httpGet(endpoint, path string) ([]byte, error) {
 func SetAgent(endpoint string, param map[string]string) error {
 	u, err := url.Parse(endpoint)
 	if err != nil {
-		log.Fatal("Invalid agent address:", endpoint, ", error:", err.Error())
+		log.Fatal("set agent error: Invalid agent address:", endpoint, ", error:", err.Error())
 	}
 	if u.Scheme == "" {
-		log.Fatal("Invalid agent address:", endpoint)
+		log.Fatal("set agent error: Invalid agent address:", endpoint)
 	}
 	u.Path = AGENT_SET_PATH
 	q := u.Query()
@@ -75,5 +77,5 @@ func SetAgent(endpoint string, param map[string]string) error {
 
 func ResetAgent(endpoint string) error {
 	_, err := httpGet(endpoint, AGENT_RESET_PATH)
-	return err
+	return fmt.Errorf("reset agent error: %s", err.Error())
 }

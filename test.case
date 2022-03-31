@@ -1,0 +1,1 @@
+{"Group":"车载Series变化","MixMode":"write_only","UseCase":"vehicle","Workers":64,"BatchSize":10000000,"ScaleVar":10000000,"SamplingInterval":"1s","TimeLimit":"10m","UseGzip":1,"QueryPercent":0,"PrePareData":"","NeedPrePare":false,"Clean":true,"SqlTemplate":null}
