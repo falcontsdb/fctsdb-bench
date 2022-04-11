@@ -11,21 +11,33 @@ import (
 func StartRemoteDatabase(endpoint string) error {
 	log.Println("start the remote database")
 	_, err := httpGet(endpoint, AGENT_START_PATH)
-	return fmt.Errorf("start remote database error: %s", err.Error())
+	if err != nil {
+		return fmt.Errorf("start remote database error: %s", err.Error())
+	}
+	return nil
 }
 func StopRemoteDatabase(endpoint string) error {
 	log.Println("stop the remote database")
 	_, err := httpGet(endpoint, AGENT_STOP_PATH)
-	return fmt.Errorf("stop remote database error: %s", err.Error())
+	if err != nil {
+		return fmt.Errorf("stop remote database error: %s", err.Error())
+	}
+	return nil
 }
 func CleanRemoteDatabase(endpoint string) error {
 	log.Println("clean the remote database data")
 	_, err := httpGet(endpoint, AGENT_CLEAN_PATH)
-	return fmt.Errorf("clean remote database error: %s", err.Error())
+	if err != nil {
+		return fmt.Errorf("clean remote database error: %s", err.Error())
+	}
+	return nil
 }
 func GetEnvironment(endpoint string) ([]byte, error) {
 	resp, err := httpGet(endpoint, AGENT_GET_ENV_PATH)
-	return resp, fmt.Errorf("get environment error: %s", err.Error())
+	if err != nil {
+		return nil, fmt.Errorf("get environment error: %s", err.Error())
+	}
+	return resp, nil
 }
 func httpGet(endpoint, path string) ([]byte, error) {
 
@@ -77,5 +89,8 @@ func SetAgent(endpoint string, param map[string]string) error {
 
 func ResetAgent(endpoint string) error {
 	_, err := httpGet(endpoint, AGENT_RESET_PATH)
-	return fmt.Errorf("reset agent error: %s", err.Error())
+	if err != nil {
+		return fmt.Errorf("reset agent error: %s", err.Error())
+	}
+	return nil
 }

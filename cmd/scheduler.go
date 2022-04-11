@@ -234,21 +234,23 @@ func (s *Scheduler) runBenchTaskByConfig(index int, fileName string, config buil
 	log.Printf("---index %d ------------------------------------------------------------\n", index)
 	if len(s.agentEndpoints) != 0 {
 		for _, agentEndpoint := range s.agentEndpoints {
-
-			var err error
-			err = agent.StopRemoteDatabase(agentEndpoint)
+			err := agent.StopRemoteDatabase(agentEndpoint)
 			if err != nil {
 				log.Println("request agent error:", err.Error())
 			}
 			log.Println(agentEndpoint, "Stop the fctsdb")
-			if config.Clean {
-				err = agent.CleanRemoteDatabase(agentEndpoint)
+		}
+		if config.Clean {
+			for _, agentEndpoint := range s.agentEndpoints {
+				err := agent.CleanRemoteDatabase(agentEndpoint)
 				if err != nil {
 					log.Println("request agent error:", err.Error())
 				}
 				log.Println(agentEndpoint, "Clean the fctsdb data")
 			}
-			err = agent.StartRemoteDatabase(agentEndpoint)
+		}
+		for _, agentEndpoint := range s.agentEndpoints {
+			err := agent.StartRemoteDatabase(agentEndpoint)
 			if err != nil {
 				log.Println("request agent error:", err.Error())
 			}
