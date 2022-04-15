@@ -52,13 +52,14 @@ func (s *serializerInflux) SerializePoint(w io.Writer, p *common.Point) (err err
 		switch v.(type) {
 		case int, int64:
 			buf = append(buf, 'i')
+		case uint, uint64, uint32:
+			buf = append(buf, 'u')
 		}
 
 		if i+1 < len(p.FieldKeys) {
 			buf = append(buf, ',')
 		}
 	}
-
 	if i > 0 && len(p.Int64FiledKeys) > 0 {
 		buf = append(buf, ',')
 	}
@@ -80,10 +81,10 @@ func (s *serializerInflux) SerializePoint(w io.Writer, p *common.Point) (err err
 	buf = fastFormatAppend(p.Timestamp.UTC().UnixNano(), buf, true)
 	buf = append(buf, '\n')
 	_, err = w.Write(buf)
+	// fmt.Println(string(buf))
 
 	buf = buf[:0]
 	scratchBufPool.Put(buf)
-
 	return err
 }
 

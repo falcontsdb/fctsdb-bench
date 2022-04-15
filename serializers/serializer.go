@@ -56,6 +56,12 @@ func fastFormatAppend(v interface{}, buf []byte, singleQuotesForString bool) []b
 		buf = append(buf, v...)
 		buf = append(buf, quotationChar...)
 		return buf
+	case uint64:
+		return strconv.AppendUint(buf, uint64(v), 10)
+	case uint32:
+		return strconv.AppendUint(buf, uint64(v), 10)
+	case uint:
+		return strconv.AppendUint(buf, uint64(v), 10)
 	default:
 		panic(fmt.Sprintf("unknown field type for %v", v))
 	}
