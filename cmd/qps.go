@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -36,20 +37,34 @@ type RespTimeResult struct {
 
 type GroupResult []RespTimeResult
 
-type ResponseCollector struct {
+type ResultCollector struct {
 	states    []*RespState
 	startTime time.Time
 	endTime   time.Time
 	mutex     sync.Mutex
+	values    int64
+	points    int64
+	bytes     int64
+	queries   int64
 }
 
-func (c *ResponseCollector) Add(r *RespState) {
+func NewResponseCollector() *ResultCollector {
+	return &ResultCollector{
+		states:  make([]*RespState, 0),
+		values:  0,
+		points:  0,
+		bytes:   0,
+		queries: 0,
+	}
+}
+
+func (c *ResultCollector) Add(r *RespState) {
 	c.mutex.Lock()
 	c.states = append(c.states, r)
 	c.mutex.Unlock()
 }
 
-func (c *ResponseCollector) AddOne(label string, lat int64, isPass bool) {
+func (c *ResultCollector) AddOneResponTime(label string, lat int64, isPass bool) {
 	c.mutex.Lock()
 	c.states = append(c.states, &RespState{
 		Label:  label,
@@ -59,15 +74,57 @@ func (c *ResponseCollector) AddOne(label string, lat int64, isPass bool) {
 	c.mutex.Unlock()
 }
 
-func (c *ResponseCollector) SetStart(t time.Time) {
+func (c *ResultCollector) AddValues(count int64) {
+	atomic.AddInt64(&c.values, count)
+}
+
+func (c *ResultCollector) AddPoints(count int64) {
+	atomic.AddInt64(&c.points, count)
+}
+
+func (c *ResultCollector) AddBytes(count int64) {
+	atomic.AddInt64(&c.bytes, count)
+}
+
+func (c *ResultCollector) AddQueries(count int64) {
+	atomic.AddInt64(&c.queries, count)
+}
+
+func (c *ResultCollector) GetValues() int64 {
+	return atomic.LoadInt64(&c.values)
+}
+
+func (c *ResultCollector) GetPoints() int64 {
+	return atomic.LoadInt64(&c.points)
+}
+
+func (c *ResultCollector) GetBytes() int64 {
+	return atomic.LoadInt64(&c.bytes)
+}
+
+func (c *ResultCollector) GetQueries() int64 {
+	return atomic.LoadInt64(&c.queries)
+}
+
+func (c *ResultCollector) Reset() {
+	c.values = 0
+	c.points = 0
+	c.bytes = 0
+	c.queries = 0
+	c.states = c.states[:0]
+	c.startTime = time.Time{}
+	c.endTime = time.Time{}
+}
+
+func (c *ResultCollector) SetStartTime(t time.Time) {
 	c.startTime = t
 }
 
-func (c *ResponseCollector) SetEnd(t time.Time) {
+func (c *ResultCollector) SetEndTime(t time.Time) {
 	c.endTime = t
 }
 
-func (c *ResponseCollector) GetDetail() RespTimeResult {
+func (c *ResultCollector) GetDetail() RespTimeResult {
 	respTimes := make([]int64, 0)
 	successCount := 0
 	for _, state := range c.states {
@@ -101,7 +158,7 @@ func (c *ResponseCollector) GetDetail() RespTimeResult {
 	return RespTimeResult{}
 }
 
-func (c *ResponseCollector) GetGroupDetail() (gr GroupResult) {
+func (c *ResultCollector) GetGroupDetail() (gr GroupResult) {
 
 	groupRespTime := make(map[string][]int64) // 按标签分组保存成功的响应时间{"label": [rt1, rt2, rt3]}
 	groupCount := make(map[string]int)        // 按标签分组保存总的请求数

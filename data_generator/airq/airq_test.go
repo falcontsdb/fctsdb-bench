@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"log"
-	"runtime"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -45,655 +44,6 @@ func BenchmarkRegion(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		reg.SearchGBT2260("620823")
 	}
-}
-
-func TestDevice(t *testing.T) {
-	fmt.Println(time.Now())
-	// rand.Seed(time.Now().UnixNano())
-	// fmt.Println(string(NewDevice(1, 1, time.Now()).Province))
-	// fmt.Println(reg.GetAllProvince())
-	// fmt.Println(reg.GetCityByProvince("120000"))
-	// fmt.Println(reg.GetAreaByCity("110100"))
-}
-
-var mutex sync.Mutex
-
-type mockWriter struct {
-	outchan chan []byte
-}
-
-func (m mockWriter) Write(p []byte) (n int, err error) {
-	b := make([]byte, len(p))
-	copy(b, p)
-	m.outchan <- b
-	return len(p), nil
-}
-
-var pointPool = sync.Pool{
-	New: func() interface{} {
-		return common.MakeUsablePoint()
-	},
-}
-
-func BenchmarkNewPointVehicle(b *testing.B) {
-
-	now := time.Now()
-
-	cfg := &vehicle.VehicleSimulatorConfig{
-		Start:            now.Add(time.Hour * -24000),
-		End:              now,
-		SamplingInterval: time.Second,
-		DeviceCount:      100,
-		DeviceOffset:     1,
-	}
-	outchan := make(chan []byte, 10000)
-	sim := cfg.ToSimulator()
-	out := mockWriter{
-		outchan: outchan,
-	}
-	serializer := serializers.NewSerializerInflux()
-	// str := []byte("aaa")
-	for j := 0; j < runtime.NumCPU(); j++ {
-		go func() {
-			// runtime.LockOSThread()
-			point := common.MakeUsablePoint()
-			for !sim.Finished() {
-				// outchan <- &str
-				// point := pointPool.Get().(*common.Point)
-				sim.Next(point)
-				// runtime.Gosched()
-				serializer.SerializePoint(out, point)
-				point.Reset()
-				runtime.Gosched()
-				// time.Sleep(0)
-				// pointPool.Put(point)
-			}
-		}()
-	}
-
-	// n := 1000000
-	// start := time.Now()
-	for i := 0; i < b.N; i++ {
-		<-outchan
-	}
-	// interval := time.Since(start)
-	// fmt.Println(float64(n) / interval.Seconds())
-}
-
-func BenchmarkNewPointAirq1_1(b *testing.B) {
-	now := time.Now()
-	cfg := &AirqSimulatorConfig{
-		Start:            now.Add(time.Hour * -24000),
-		End:              now,
-		SamplingInterval: time.Second,
-		DeviceCount:      100000,
-		DeviceOffset:     1,
-	}
-	// out := bufio.NewWriterSize(os.Stdout, 4<<24)
-	outPointChan := make(chan *common.Point, 10000)
-	// outchan := make(chan []byte, 10000)
-	// out := mockWriter{
-	// 	outchan: outchan,
-	// }
-	// serializer := common.NewSerializerInflux()
-	sim := cfg.ToSimulator()
-	// point := common.MakeUsablePoint()
-	// for i := 0; i < b.N; i++ {
-	// 	sim.Next(point)
-	// 	serializer.SerializePoint(out, point)
-	// 	point.Reset()
-	// }
-	// point := common.MakeUsablePoint()
-	// sim.Next(point)
-	for j := 0; j < 1; j++ {
-		go func() {
-			// runtime.LockOSThread()
-
-			// point := common.MakeUsablePoint()
-			for !sim.Finished() {
-				// outchan <- &str
-				point := pointPool.Get().(*common.Point)
-				sim.Next(point)
-				outPointChan <- point
-				// runtime.Gosched()
-				// serializer.SerializePoint(out, point)
-				// point.Reset()
-				// runtime.Gosched()
-				// pointPool.Put(point)
-			}
-		}()
-	}
-	// for k := 0; k < 1; k++ {
-	// 	go func() {
-	// 		for p := range outPointChan {
-	// 			serializer.SerializePoint(out, p)
-	// 			p.Reset()
-	// 			pointPool.Put(p)
-	// 		}
-	// 	}()
-	// }
-	for i := 0; i < b.N; i++ {
-		// runtime.LockOSThread()
-		p := <-outPointChan
-		p.Reset()
-		pointPool.Put(p)
-	}
-}
-
-func BenchmarkNewPointAirq1_2(b *testing.B) {
-	now := time.Now()
-	cfg := &AirqSimulatorConfig{
-		Start:            now.Add(time.Hour * -24000),
-		End:              now,
-		SamplingInterval: time.Second,
-		DeviceCount:      100000,
-		DeviceOffset:     1,
-	}
-	// out := bufio.NewWriterSize(os.Stdout, 4<<24)
-	outPointChan := make(chan *common.Point, 10000)
-	outchan := make(chan []byte, 10000)
-	out := mockWriter{
-		outchan: outchan,
-	}
-	serializer := serializers.NewSerializerInflux()
-	sim := cfg.ToSimulator()
-	// point := common.MakeUsablePoint()
-	// for i := 0; i < b.N; i++ {
-	// 	sim.Next(point)
-	// 	serializer.SerializePoint(out, point)
-	// 	point.Reset()
-	// }
-	// point := common.MakeUsablePoint()
-	// sim.Next(point)
-	runtime.GOMAXPROCS(3)
-	for j := 0; j < 1; j++ {
-		go func() {
-			runtime.LockOSThread()
-			// point := common.MakeUsablePoint()
-			for !sim.Finished() {
-				// outchan <- &str
-				point := pointPool.Get().(*common.Point)
-				sim.Next(point)
-				outPointChan <- point
-				// runtime.Gosched()
-				// serializer.SerializePoint(out, point)
-				// point.Reset()
-				// runtime.Gosched()
-				// pointPool.Put(point)
-			}
-		}()
-	}
-	for k := 0; k < 2; k++ {
-		go func() {
-			runtime.LockOSThread()
-			for p := range outPointChan {
-				serializer.SerializePoint(out, p)
-				p.Reset()
-				pointPool.Put(p)
-				// runtime.Gosched()
-			}
-		}()
-	}
-	for i := 0; i < b.N; i++ {
-		<-outchan
-	}
-}
-
-func BenchmarkNewPointAirq2_2(b *testing.B) {
-	now := time.Now()
-	cfg := &AirqSimulatorConfig{
-		Start:            now.Add(time.Hour * -24000),
-		End:              now,
-		SamplingInterval: time.Second,
-		DeviceCount:      100000,
-		DeviceOffset:     1,
-	}
-	// out := bufio.NewWriterSize(os.Stdout, 4<<24)
-	outPointChan := make(chan *common.Point, 10000)
-	outchan := make(chan []byte, 10000)
-	out := mockWriter{
-		outchan: outchan,
-	}
-	serializer := serializers.NewSerializerInflux()
-	sim := cfg.ToSimulator()
-	// point := common.MakeUsablePoint()
-	// for i := 0; i < b.N; i++ {
-	// 	sim.Next(point)
-	// 	serializer.SerializePoint(out, point)
-	// 	point.Reset()
-	// }
-	// point := common.MakeUsablePoint()
-	// sim.Next(point)
-	for j := 0; j < 1; j++ {
-		go func() {
-			// runtime.LockOSThread()
-			// point := common.MakeUsablePoint()
-			for !sim.Finished() {
-				// outchan <- &str
-				point := pointPool.Get().(*common.Point)
-				sim.Next(point)
-				outPointChan <- point
-				// runtime.Gosched()
-				// serializer.SerializePoint(out, point)
-				// point.Reset()
-				// runtime.Gosched()
-				// pointPool.Put(point)
-			}
-		}()
-	}
-	for k := 0; k < 2; k++ {
-		go func() {
-			for p := range outPointChan {
-				serializer.SerializePoint(out, p)
-				p.Reset()
-				pointPool.Put(p)
-			}
-		}()
-	}
-	for i := 0; i < b.N; i++ {
-		<-outchan
-	}
-}
-
-func BenchmarkNewPointAirq2_4(b *testing.B) {
-	now := time.Now()
-	cfg := &AirqSimulatorConfig{
-		Start:            now.Add(time.Hour * -24000),
-		End:              now,
-		SamplingInterval: time.Second,
-		DeviceCount:      100000,
-		DeviceOffset:     1,
-	}
-	// out := bufio.NewWriterSize(os.Stdout, 4<<24)
-	outPointChan := make(chan *common.Point, 1000)
-	outchan := make(chan []byte, 10000)
-	out := mockWriter{
-		outchan: outchan,
-	}
-	serializer := serializers.NewSerializerInflux()
-	sim := cfg.ToSimulator()
-	// point := common.MakeUsablePoint()
-	// for i := 0; i < b.N; i++ {
-	// 	sim.Next(point)
-	// 	serializer.SerializePoint(out, point)
-	// 	point.Reset()
-	// }
-	// point := common.MakeUsablePoint()
-	// sim.Next(point)
-	for j := 0; j < 2; j++ {
-		go func() {
-			// runtime.LockOSThread()
-			// point := common.MakeUsablePoint()
-			for !sim.Finished() {
-
-				// outchan <- &str
-				point := pointPool.Get().(*common.Point)
-				sim.Next(point)
-				outPointChan <- point
-				// runtime.Gosched()
-				// serializer.SerializePoint(out, point)
-				// point.Reset()
-				// runtime.Gosched()
-				// pointPool.Put(point)
-			}
-		}()
-	}
-	for k := 0; k < 4; k++ {
-		go func() {
-			for p := range outPointChan {
-				serializer.SerializePoint(out, p)
-				p.Reset()
-				pointPool.Put(p)
-			}
-		}()
-	}
-	for i := 0; i < b.N; i++ {
-		<-outchan
-	}
-}
-
-func BenchmarkNewPointAirq2_4_New(b *testing.B) {
-	now := time.Now()
-	cfg := &AirqSimulatorConfig{
-		Start:            now.Add(time.Hour * -24000),
-		End:              now,
-		SamplingInterval: time.Second,
-		DeviceCount:      100000,
-		DeviceOffset:     1,
-	}
-	// out := bufio.NewWriterSize(os.Stdout, 4<<24)
-	outPointChan1 := make(chan *common.Point, 1000)
-	outPointChan2 := make(chan *common.Point, 1000)
-	outchan := make(chan []byte, 10000)
-	out := mockWriter{
-		outchan: outchan,
-	}
-	serializer := serializers.NewSerializerInflux()
-	sim := cfg.ToSimulator()
-	// point := common.MakeUsablePoint()
-	// for i := 0; i < b.N; i++ {
-	// 	sim.Next(point)
-	// 	serializer.SerializePoint(out, point)
-	// 	point.Reset()
-	// }
-	// point := common.MakeUsablePoint()
-	// sim.Next(point)
-
-	go func() {
-		for !sim.Finished() {
-			point := pointPool.Get().(*common.Point)
-			sim.Next(point)
-			outPointChan1 <- point
-
-		}
-	}()
-	go func() {
-		for !sim.Finished() {
-			point := pointPool.Get().(*common.Point)
-			sim.Next(point)
-			outPointChan2 <- point
-		}
-	}()
-	// for k := 0; k < 2; k++ {
-	go func() {
-		for p := range outPointChan1 {
-			serializer.SerializePoint(out, p)
-			p.Reset()
-			pointPool.Put(p)
-		}
-
-	}()
-	go func() {
-		for p := range outPointChan2 {
-			serializer.SerializePoint(out, p)
-			p.Reset()
-			pointPool.Put(p)
-		}
-	}()
-	for i := 0; i < b.N; i++ {
-		<-outchan
-	}
-}
-
-func BenchmarkNewPointAirqHand(b *testing.B) {
-	now := time.Now()
-	cfg := &AirqSimulatorConfig{
-		Start:            now.Add(time.Hour * -24000),
-		End:              now,
-		SamplingInterval: time.Second,
-		DeviceCount:      100000,
-		DeviceOffset:     1,
-	}
-	// out := bufio.NewWriterSize(os.Stdout, 4<<24)
-	// outPointChan := make(chan *common.Point, 10000)
-	outchan := make(chan []byte, 10000)
-	out := mockWriter{
-		outchan: outchan,
-	}
-	serializer := serializers.NewSerializerInflux()
-	sim := cfg.ToSimulator()
-	// point := common.MakeUsablePoint()
-	// for i := 0; i < b.N; i++ {
-	// 	sim.Next(point)
-	// 	serializer.SerializePoint(out, point)
-	// 	point.Reset()
-	// }
-	// point := common.MakeUsablePoint()
-	// sim.Next(point)
-	for j := 0; j < runtime.NumCPU(); j++ {
-		go func() {
-			// runtime.LockOSThread()
-			point := common.MakeUsablePoint()
-			for !sim.Finished() {
-				// outchan <- &str
-				// point := pointPool.Get().(*common.Point)
-				sim.Next(point)
-				// outPointChan <- point
-				// runtime.Gosched()
-				serializer.SerializePoint(out, point)
-				point.Reset()
-				runtime.Gosched()
-				// pointPool.Put(point)
-			}
-		}()
-	}
-	// for k := 0; k < 4; k++ {
-	// 	go func() {
-	// 		for p := range outPointChan {
-	// 			serializer.SerializePoint(out, p)
-	// 			p.Reset()
-	// 			pointPool.Put(p)
-	// 		}
-	// 	}()
-	// }
-	for i := 0; i < b.N; i++ {
-		<-outchan
-	}
-}
-
-func BenchmarkNewPointAirq(b *testing.B) {
-	now := time.Now()
-	cfg := &AirqSimulatorConfig{
-		Start:            now.Add(time.Hour * -24000),
-		End:              now,
-		SamplingInterval: time.Second,
-		DeviceCount:      100000,
-		DeviceOffset:     1,
-	}
-	// out := bufio.NewWriterSize(os.Stdout, 4<<24)
-	// outPointChan := make(chan *common.Point, 10000)
-	outchan := make(chan []byte, 10000)
-	out := mockWriter{
-		outchan: outchan,
-	}
-	serializer := serializers.NewSerializerInflux()
-	sim := cfg.ToSimulator()
-	// point := common.MakeUsablePoint()
-	// for i := 0; i < b.N; i++ {
-	// 	sim.Next(point)
-	// 	serializer.SerializePoint(out, point)
-	// 	point.Reset()
-	// }
-	// point := common.MakeUsablePoint()
-	// sim.Next(point)
-	for j := 0; j < runtime.NumCPU(); j++ {
-		go func() {
-			// runtime.LockOSThread()
-			point := common.MakeUsablePoint()
-			for !sim.Finished() {
-				// outchan <- &str
-				// point := pointPool.Get().(*common.Point)
-				sim.Next(point)
-				// outPointChan <- point
-				// runtime.Gosched()
-				serializer.SerializePoint(out, point)
-				point.Reset()
-				// runtime.Gosched()
-				// pointPool.Put(point)
-			}
-		}()
-	}
-	// for k := 0; k < 4; k++ {
-	// 	go func() {
-	// 		for p := range outPointChan {
-	// 			serializer.SerializePoint(out, p)
-	// 			p.Reset()
-	// 			pointPool.Put(p)
-	// 		}
-	// 	}()
-	// }
-	for i := 0; i < b.N; i++ {
-		// runtime.LockOSThread()
-		<-outchan
-	}
-}
-
-func BenchmarkNewPointAirq2Sim(b *testing.B) {
-	simCount := 1
-	scaleVar := 100000
-	now := time.Now()
-	simulators := make([]*AirqSimulator, simCount)
-	var step = scaleVar / simCount
-	var offset = 0
-	for i := 0; i < simCount; i++ {
-		offset = step * i
-		if i == simCount-1 {
-			step = scaleVar - step*i
-		}
-		cfg := &AirqSimulatorConfig{
-			Start:            now.Add(time.Hour * -24000),
-			End:              now,
-			SamplingInterval: time.Second,
-			DeviceCount:      int64(step),
-			DeviceOffset:     int64(offset),
-		}
-		simulators[i] = cfg.ToSimulator()
-	}
-
-	// out := bufio.NewWriterSize(os.Stdout, 4<<24)
-	outPointChan := make(chan *common.Point, 10000)
-	// outchan := make(chan []byte, 10000)
-	// out := mockWriter{
-	// 	outchan: outchan,
-	// }
-
-	// point := common.MakeUsablePoint()
-	// for i := 0; i < b.N; i++ {
-	// 	sim.Next(point)
-	// 	serializer.SerializePoint(out, point)
-	// 	point.Reset()
-	// }
-	// point := common.MakeUsablePoint()
-	// sim.Next(point)
-	for j := 0; j < simCount; j++ {
-		go func(w int) {
-			runtime.LockOSThread()
-			// serializer := common.NewSerializerInflux()
-			sim := simulators[w]
-			// point := common.MakeUsablePoint()
-			for !sim.Finished() {
-				point := pointPool.Get().(*common.Point)
-				sim.Next(point)
-				outPointChan <- point
-				// serializer.SerializePoint(out, point)
-				// point.Reset()
-				// runtime.Gosched()
-				// pointPool.Put(point)
-			}
-		}(j)
-	}
-	for i := 0; i < b.N; i++ {
-		p := <-outPointChan
-		p.Reset()
-		pointPool.Put(p)
-	}
-}
-
-func BenchmarkNewPointAirq2SimWith(b *testing.B) {
-	simCount := 2
-	scaleVar := 100000
-	now := time.Now()
-	simulators := make([]*AirqSimulator, simCount)
-	var step = scaleVar / simCount
-	var offset = 0
-	for i := 0; i < simCount; i++ {
-		offset = step * i
-		if i == simCount-1 {
-			step = scaleVar - step*i
-		}
-		cfg := &AirqSimulatorConfig{
-			Start:            now.Add(time.Hour * -24000),
-			End:              now,
-			SamplingInterval: time.Second,
-			DeviceCount:      int64(step),
-			DeviceOffset:     int64(offset),
-		}
-		simulators[i] = cfg.ToSimulator()
-	}
-
-	// out := bufio.NewWriterSize(os.Stdout, 4<<24)
-	outPointChan := make(chan *common.Point, 10000)
-	outchan := make(chan []byte, 10000)
-	out := mockWriter{
-		outchan: outchan,
-	}
-
-	for j := 0; j < simCount; j++ {
-		go func(w int) {
-			sim := simulators[w]
-			for !sim.Finished() {
-				point := pointPool.Get().(*common.Point)
-				sim.Next(point)
-				outPointChan <- point
-			}
-		}(j)
-	}
-	for j := 0; j < simCount; j++ {
-		go func(w int) {
-			serializer := serializers.NewSerializerInflux()
-			for point := range outPointChan {
-				serializer.SerializePoint(out, point)
-				point.Reset()
-				// runtime.Gosched()
-				pointPool.Put(point)
-			}
-		}(j)
-	}
-
-	for i := 0; i < b.N; i++ {
-		<-outchan
-	}
-}
-
-func TestNewPointVehicle(t *testing.T) {
-	now := time.Now()
-
-	cfg := &vehicle.VehicleSimulatorConfig{
-		Start:            now.Add(time.Hour * -24),
-		End:              now,
-		SamplingInterval: time.Second,
-		DeviceCount:      100,
-		DeviceOffset:     0,
-	}
-	outchan := make(chan []byte, 10000)
-	sim := cfg.ToSimulator()
-	out := bytes.NewBuffer(make([]byte, 0, 1024))
-	serializer := serializers.NewSerializerInflux()
-	// str := []byte("aaa")
-	var num int32 = 4
-	for j := int32(0); j < num; j++ {
-		go func() {
-			// point := common.MakeUsablePoint()
-			for !sim.Finished() {
-				// outchan <- &str
-				point := pointPool.Get().(*common.Point)
-				// mutex.Lock()
-				sim.Next(point)
-				serializer.SerializePoint(out, point)
-				// mutex.Unlock()
-				point.Reset()
-				pointPool.Put(point)
-			}
-			nowNum := atomic.AddInt32(&num, -1)
-			if nowNum == 0 {
-				close(outchan)
-			}
-		}()
-	}
-
-	n := 0
-	start := time.Now()
-	for p := range outchan {
-		n++
-		_ = p
-		fmt.Println(string(p))
-		if n == 30 {
-			break
-		}
-	}
-	interval := time.Since(start)
-	fmt.Println(float64(n) / interval.Seconds())
-	fmt.Println(n)
 }
 
 func TestTime(t *testing.T) {
@@ -742,13 +92,13 @@ func TestNewPointVehicleEasy(t *testing.T) {
 	sim := cfg.ToSimulator()
 
 	point := common.MakeUsablePoint()
-	out := bytes.NewBuffer(make([]byte, 0, 1024))
+	out := make([]byte, 0, 4*1024)
 	ser := serializers.NewSerializerInflux()
 	for i := 0; i < 10; i++ {
 		sim.Next(point)
-		ser.SerializePoint(out, point)
-		fmt.Println(out.String())
-		out.Reset()
+		out = ser.SerializePoint(out, point)
+		fmt.Println(string(out))
+		out = out[:0]
 		point.Reset()
 	}
 }
@@ -769,16 +119,16 @@ func BenchmarkNewPointAirqEasy(b *testing.B) {
 	point := common.MakeUsablePoint()
 	// ser := common.NewSerializerInflux()
 	// out := Printer{}
-	out := bytes.NewBuffer(make([]byte, 0, 1024))
+	out := make([]byte, 0, 4*1024)
 	ser := serializers.NewSerializerInflux()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// host := sim.Hosts[i%len(sim.Hosts)]
 		// _ = string(host.SiteID)
 		sim.Next(point)
-		ser.SerializePoint(out, point)
+		out = ser.SerializePoint(out, point)
 		point.Reset()
-		out.Reset()
+		out = out[:0]
 	}
 }
 
@@ -796,7 +146,7 @@ func TestNewPointAirqEasy(t *testing.T) {
 	sim := cfg.ToSimulator()
 	ser := serializers.NewSerializerInflux()
 	point := common.MakeUsablePoint()
-	out := Printer{}
+	out := make([]byte, 0, 4*1024)
 	// for i := 0; i < 10; i++ {
 	i := 0
 
@@ -805,8 +155,9 @@ func TestNewPointAirqEasy(t *testing.T) {
 		// host := sim.Hosts[i%len(sim.Hosts)]
 		// _ = string(host.SiteID)
 		sim.Next(point)
-		ser.SerializePoint(out, point)
+		out = ser.SerializePoint(out, point)
 		point.Reset()
+		out = out[:0]
 		i += 1
 	}
 	fmt.Println(i)
@@ -828,7 +179,7 @@ func TestNewPointDevposEasy(t *testing.T) {
 	sim := cfg.ToSimulator()
 	ser := serializers.NewSerializerInflux()
 	point := common.MakeUsablePoint()
-	out := Printer{}
+	out := make([]byte, 0, 4*1024)
 	// for i := 0; i < 10; i++ {
 	i := 0
 
@@ -837,7 +188,8 @@ func TestNewPointDevposEasy(t *testing.T) {
 		// host := sim.Hosts[i%len(sim.Hosts)]
 		// _ = string(host.SiteID)
 		sim.Next(point)
-		ser.SerializePoint(out, point)
+		out = ser.SerializePoint(out, point)
+		out = out[:0]
 		point.Reset()
 		i += 1
 	}
@@ -867,12 +219,13 @@ func TestNewPointDevopsEasy(t *testing.T) {
 	sim := cfg.ToSimulator()
 	ser := serializers.NewSerializerInflux()
 	point := common.MakeUsablePoint()
-	out := Printer{}
+	out := make([]byte, 0, 4*1024)
 	for i := 0; i < 20; i++ {
 		// host := sim.Hosts[i%len(sim.Hosts)]
 		// _ = string(host.SiteID)
 		sim.Next(point)
-		ser.SerializePoint(out, point)
+		out = ser.SerializePoint(out, point)
+		out = out[:0]
 		point.Reset()
 	}
 }

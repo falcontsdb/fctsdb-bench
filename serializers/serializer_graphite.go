@@ -17,6 +17,10 @@ func NewSerializerGraphiteLine() *SerializerGraphiteLine {
 	}
 }
 
+func (m *SerializerGraphiteLine) SerializePrepare(w io.Writer, p *common.Point) (err error) {
+	return nil
+}
+
 // SerializePoint writes Point data to the given writer, conforming to the
 // Graphite plain text line protocol.
 func (s *SerializerGraphiteLine) SerializePoint(w io.Writer, p *common.Point) (err error) {
@@ -44,6 +48,10 @@ func (s *SerializerGraphiteLine) SerializePoint(w io.Writer, p *common.Point) (e
 		return err
 	}
 
+	return nil
+}
+
+func (m *SerializerGraphiteLine) SerializeEnd(w io.Writer, p *common.Point) (err error) {
 	return nil
 }
 

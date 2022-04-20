@@ -25,6 +25,10 @@ func NewSerializerElastic(version string) *SerializerElastic {
 	return &SerializerElastic{typeName: typeName}
 }
 
+func (m *SerializerElastic) SerializePrepare(w io.Writer, p *common.Point) (err error) {
+	return nil
+}
+
 // SerializeESBulk writes Point data to the given writer, conforming to the
 // ElasticSearch bulk load protocol.
 //
@@ -93,6 +97,10 @@ func (s *SerializerElastic) SerializePoint(w io.Writer, p *common.Point) error {
 	scratchBufPool.Put(buf)
 
 	return err
+}
+
+func (m *SerializerElastic) SerializeEnd(w io.Writer, p *common.Point) (err error) {
+	return nil
 }
 
 func (s *SerializerElastic) SerializeSize(w io.Writer, points int64, values int64) error {

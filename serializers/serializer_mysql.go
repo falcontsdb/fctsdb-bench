@@ -2,7 +2,6 @@ package serializers
 
 import (
 	"fmt"
-	"io"
 	"strconv"
 
 	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/common"
@@ -15,9 +14,16 @@ func NewSerializerMysql() *SerializerMysql {
 	return &SerializerMysql{}
 }
 
+func (m *SerializerMysql) SerializePrepare(buf []byte, p *common.Point) []byte {
+	buf = append(buf, "insert into "...)
+	buf = append(buf, p.MeasurementName...)
+	buf = append(buf, " values"...)
+	return buf
+}
+
 // insert into table values ( "xxx","xxx")
-func (s *SerializerMysql) SerializePoint(w io.Writer, p *common.Point) (err error) {
-	buf := scratchBufPool.Get().([]byte)
+func (s *SerializerMysql) SerializePoint(buf []byte, p *common.Point) []byte {
+	// buf := scratchBufPool.Get().([]byte)
 	// buf := make([]byte, 0, 4*1024)
 	//buf = append(buf, "insert into "...)
 	//buf = append(buf, p.MeasurementName...)
@@ -53,20 +59,26 @@ func (s *SerializerMysql) SerializePoint(w io.Writer, p *common.Point) (err erro
 		}
 	}
 	buf = append(buf, ")"...)
-	_, err = w.Write(buf)
+	buf = append(buf, ',')
+	// _, err = w.Write(buf)
 
-	buf = buf[:0]
-	scratchBufPool.Put(buf)
-	return err
+	// buf = buf[:0]
+	// scratchBufPool.Put(buf)
+	return buf
 }
 
-func (s *SerializerMysql) SerializeSize(w io.Writer, points int64, values int64) error {
+func (s *SerializerMysql) SerializeSize(buf []byte, points int64, values int64) []byte {
 	//return serializeSizeInText(w, points, values)
-	return nil
+	return buf
 }
 
-func (s *SerializerMysql) CreateTableFromPoint(w io.Writer, p *common.Point) error {
-	buf := scratchBufPool.Get().([]byte)
+func (m *SerializerMysql) SerializeEnd(buf []byte, p *common.Point) []byte {
+	buf = buf[:len(buf)-1]
+	return append(buf, ';')
+}
+
+func (s *SerializerMysql) CreateTableFromPoint(buf []byte, p *common.Point) []byte {
+	// buf := scratchBufPool.Get().([]byte)
 	// buf := make([]byte, 0, 4*1024)
 	buf = append(buf, "create table IF NOT EXISTS "...)
 	buf = append(buf, p.MeasurementName...)
@@ -121,10 +133,10 @@ func (s *SerializerMysql) CreateTableFromPoint(w io.Writer, p *common.Point) err
 	buf = append(buf, ")"...)
 	buf = append(buf, ");"...)
 
-	_, err := w.Write(buf)
+	// _, err := w.Write(buf)
 
-	buf = buf[:0]
-	scratchBufPool.Put(buf)
-	return err
+	// buf = buf[:0]
+	// scratchBufPool.Put(buf)
+	return buf
 
 }

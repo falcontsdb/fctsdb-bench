@@ -102,6 +102,8 @@ func (w *FctsdbClient) Write(body []byte) (int64, error) {
 	}
 	// fmt.Println(string(body))
 	req.SetBody(body)
+	// fmt.Println("-------------------------------------------------")
+	// fmt.Println(string(body))
 
 	resp := fasthttp.AcquireResponse()
 	start := time.Now()
@@ -181,18 +183,22 @@ func (w *FctsdbClient) Query(lines []byte) (int64, error) {
 	return lat, err
 }
 
-func (d *FctsdbClient) CreateDb(withEncryption bool) error {
+func (d *FctsdbClient) CreateDb(name string, withEncryption bool) error {
 	u, _ := url.Parse(string(d.host))
 
 	// serialize params the right way:
+	if name == "" {
+		name = d.c.Database
+	}
+
 	u.Path = "query"
 	v := u.Query()
 	v.Add("u", d.c.User)
 	v.Add("p", d.c.Password)
 	if withEncryption {
-		v.Set("q", fmt.Sprintf("CREATE DATABASE %s with encryption on", d.c.Database))
+		v.Set("q", fmt.Sprintf("CREATE DATABASE %s with encryption on", name))
 	} else {
-		v.Set("q", fmt.Sprintf("CREATE DATABASE %s", d.c.Database))
+		v.Set("q", fmt.Sprintf("CREATE DATABASE %s", name))
 	}
 	u.RawQuery = v.Encode()
 

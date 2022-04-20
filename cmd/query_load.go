@@ -37,7 +37,7 @@ type QueryLoad struct {
 	writers               []*db_client.FctsdbClient
 	itemsRead             int64
 	sourceReader          *os.File
-	respCollector         ResponseCollector
+	respCollector         ResultCollector
 }
 
 var (
@@ -66,7 +66,7 @@ func RunQueryLoad() {
 	syncChanDone := make(chan int)
 	queryLoad.PrepareWorkers()
 
-	queryLoad.respCollector.SetStart(time.Now())
+	queryLoad.respCollector.SetStartTime(time.Now())
 	for i := 0; i < queryLoad.workers; i++ {
 		queryLoad.PrepareProcess(i)
 		workersGroup.Add(1)
@@ -97,7 +97,7 @@ func RunQueryLoad() {
 	queryLoad.SyncEnd()
 	close(syncChanDone)
 	workersGroup.Wait()
-	queryLoad.respCollector.SetEnd(time.Now())
+	queryLoad.respCollector.SetEndTime(time.Now())
 
 	queryLoad.CleanUp()
 
@@ -298,10 +298,10 @@ func (q *QueryLoad) processBatches(w *db_client.FctsdbClient, telemetryWorkerLab
 		buf.Write(batch.Buffer.Bytes())
 		lat, err := w.Query(buf.Bytes())
 		if err != nil {
-			q.respCollector.AddOne(q.dbName, lat, false)
+			q.respCollector.AddOneResponTime(q.dbName, lat, false)
 			return fmt.Errorf("error writing: %s", err.Error())
 		}
-		q.respCollector.AddOne(q.dbName, lat, true)
+		q.respCollector.AddOneResponTime(q.dbName, lat, true)
 		batch.Buffer.Reset()
 		q.bufPool.Put(batch.Buffer)
 		buf.Reset()

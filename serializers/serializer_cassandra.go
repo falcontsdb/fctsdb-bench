@@ -14,6 +14,10 @@ func NewSerializerCassandra() *SerializerCassandra {
 	return &SerializerCassandra{}
 }
 
+func (m *SerializerCassandra) SerializePrepare(w io.Writer, p *common.Point) (err error) {
+	return nil
+}
+
 // SerializeCassandra writes Point data to the given writer, conforming to the
 // Cassandra query format.
 //
@@ -60,6 +64,10 @@ func (m *SerializerCassandra) SerializePoint(w io.Writer, p *common.Point) (err 
 		return err
 	}
 
+	return nil
+}
+
+func (m *SerializerCassandra) SerializeEnd(w io.Writer, p *common.Point) (err error) {
 	return nil
 }
 

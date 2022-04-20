@@ -209,26 +209,26 @@ func (g *DataGenerator) RunProcess() {
 	switch g.format {
 	case "influx-bulk":
 		serializer = serializers.NewSerializerInflux()
-	case "es-bulk":
-		serializer = serializers.NewSerializerElastic("5x")
-	case "es-bulk6x":
-		serializer = serializers.NewSerializerElastic("6x")
-	case "es-bulk7x":
-		serializer = serializers.NewSerializerElastic("7x")
-	case "cassandra":
-		serializer = serializers.NewSerializerCassandra()
+	// case "es-bulk":
+	// serializer = serializers.NewSerializerElastic("5x")
+	// case "es-bulk6x":
+	// serializer = serializers.NewSerializerElastic("6x")
+	// case "es-bulk7x":
+	// serializer = serializers.NewSerializerElastic("7x")
+	// case "cassandra":
+	// serializer = serializers.NewSerializerCassandra()
 	// case "mongo":
 	// 	serializer = common.NewSerializerMongo()
-	case "opentsdb":
-		serializer = serializers.NewSerializerOpenTSDB()
+	// case "opentsdb":
+	// serializer = serializers.NewSerializerOpenTSDB()
 	// case "timescaledb-sql":
 	// 	serializer = common.NewSerializerTimescaleSql()
 	// case "timescaledb-copyFrom":
 	// 	serializer = common.NewSerializerTimescaleBin()
-	case "graphite-line":
-		serializer = serializers.NewSerializerGraphiteLine()
-	case "splunk-json":
-		serializer = serializers.NewSerializerSplunkJson()
+	// case "graphite-line":
+	// serializer = serializers.NewSerializerGraphiteLine()
+	// case "splunk-json":
+	// serializer = serializers.NewSerializerSplunkJson()
 	default:
 		panic("unreachable")
 	}
@@ -236,20 +236,19 @@ func (g *DataGenerator) RunProcess() {
 	t := time.Now()
 	point := common.MakeUsablePoint()
 	n := int64(0)
+	buf := make([]byte, 0, 4*1024)
 	for !sim.Finished() {
 		sim.Next(point)
 		n++
-		err := serializer.SerializePoint(out, point)
-		if err != nil {
-			log.Fatal(err)
-		}
-
+		buf = serializer.SerializePoint(buf, point)
+		out.Write(buf)
+		buf = buf[:0]
 		point.Reset()
 	}
 	if n != sim.SeenPoints() {
 		panic(fmt.Sprintf("Logic error, written %d points, generated %d points", n, sim.SeenPoints()))
 	}
-	serializer.SerializeSize(out, sim.SeenPoints(), sim.SeenValues())
+	// serializer.SerializeSize(out, sim.SeenPoints(), sim.SeenValues())
 	err := out.Flush()
 	dur := time.Since(t)
 	log.Printf("Written %d points, %d values, took %0f seconds\n", n, sim.SeenValues(), dur.Seconds())

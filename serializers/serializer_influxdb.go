@@ -1,7 +1,6 @@
 package serializers
 
 import (
-	"io"
 	"strconv"
 
 	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/common"
@@ -14,6 +13,10 @@ func NewSerializerInflux() *serializerInflux {
 	return &serializerInflux{}
 }
 
+func (m *serializerInflux) SerializePrepare(buf []byte, p *common.Point) []byte {
+	return buf
+}
+
 // SerializeInfluxBulk writes Point data to the given writer, conforming to the
 // InfluxDB wire protocol.
 //
@@ -24,8 +27,7 @@ func NewSerializerInflux() *serializerInflux {
 // foo,tag0=bar baz=-1.0 100\n
 //
 // TODO(rw): Speed up this function. The bulk of time is spent in strconv.
-func (s *serializerInflux) SerializePoint(w io.Writer, p *common.Point) (err error) {
-	buf := scratchBufPool.Get().([]byte)
+func (s *serializerInflux) SerializePoint(buf []byte, p *common.Point) []byte {
 	// buf := make([]byte, 0, 4*1024)
 	buf = append(buf, p.MeasurementName...)
 
@@ -79,14 +81,15 @@ func (s *serializerInflux) SerializePoint(w io.Writer, p *common.Point) (err err
 	buf = append(buf, ' ')
 	buf = fastFormatAppend(p.Timestamp.UTC().UnixNano(), buf, true)
 	buf = append(buf, '\n')
-	_, err = w.Write(buf)
 
-	buf = buf[:0]
-	scratchBufPool.Put(buf)
-
-	return err
+	return buf
 }
 
-func (s *serializerInflux) SerializeSize(w io.Writer, points int64, values int64) error {
-	return serializeSizeInText(w, points, values)
+func (m *serializerInflux) SerializeEnd(buf []byte, p *common.Point) []byte {
+	return buf
+}
+
+func (s *serializerInflux) SerializeSize(buf []byte, points int64, values int64) []byte {
+	// return serializeSizeInText(w, points, values)
+	return buf
 }

@@ -64,7 +64,10 @@ func (c *MysqlClient) Query(lines []byte) (int64, error) {
 	return executeTime, err
 }
 
-func (c *MysqlClient) CreateDb(withEncryption bool) error {
+func (c *MysqlClient) CreateDb(name string, withEncryption bool) error {
+	if name == "" {
+		name = c.c.Database
+	}
 	dsn := fmt.Sprintf("%s:%s@%s(%s)/", c.c.User, c.c.Password, "tcp", c.c.Host)
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
@@ -74,7 +77,7 @@ func (c *MysqlClient) CreateDb(withEncryption bool) error {
 	if withEncryption {
 		return errors.New("mysql version do not support the encryption option")
 	}
-	createDbSql := fmt.Sprintf("create database %s;", c.c.Database)
+	createDbSql := fmt.Sprintf("create database %s;", name)
 	_, err = db.Exec(createDbSql)
 	return err
 }

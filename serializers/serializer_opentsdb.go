@@ -14,6 +14,10 @@ func NewSerializerOpenTSDB() *SerializerOpenTSDB {
 	return &SerializerOpenTSDB{}
 }
 
+func (m *SerializerOpenTSDB) SerializePrepare(w io.Writer, p *common.Point) (err error) {
+	return nil
+}
+
 // SerializeOpenTSDBBulk writes Point data to the given writer, conforming to
 // the OpenTSDB bulk load protocol (the /api/put endpoint). Note that no line
 // has a trailing comma. Downstream programs are responsible for creating
@@ -72,6 +76,10 @@ func (m *SerializerOpenTSDB) SerializePoint(w io.Writer, p *common.Point) (err e
 		scratchBufPool.Put(buf)
 	}
 
+	return nil
+}
+
+func (m *SerializerOpenTSDB) SerializeEnd(w io.Writer, p *common.Point) (err error) {
 	return nil
 }
 

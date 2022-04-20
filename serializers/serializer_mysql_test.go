@@ -54,27 +54,44 @@ var (
 	}
 )
 
-type selfWrite struct {
-	data []byte
-}
+// type selfWrite struct {
+// 	data []byte
+// }
 
-func (w *selfWrite) Write(data []byte) (n int, err error) {
-	w.data = data
-	return len(data), nil
-}
+// func (w *selfWrite) Write(data []byte) (n int, err error) {
+// 	w.data = data
+// 	return len(data), nil
+// }
 func TestSerializerMysql_SerializePoint(t *testing.T) {
 	sm := NewSerializerMysql()
-	w := selfWrite{
-		data: []byte{},
+	w := make([]byte, 0, 1024)
+	// w := selfWrite{
+	// 	data: []byte{},
+	// }
+	w = sm.SerializePrepare(w, &point)
+	for i := 0; i < 3; i++ {
+		w = sm.SerializePoint(w, &point)
 	}
-	fmt.Println(sm.SerializePoint(&w, &point))
-	fmt.Println(string(w.data))
+	w = sm.SerializeEnd(w, &point)
+	fmt.Println(string(w))
 }
+
+func BenchmarkSerializerMysql_SerializePoint(t *testing.B) {
+	sm := NewSerializerMysql()
+	w := make([]byte, 0, 1024)
+	// w := bytes.NewBuffer(make([]byte, 0, 1024))
+	for i := 0; i < t.N; i++ {
+		w = sm.SerializePoint(w, &point)
+		w = w[:0]
+	}
+}
+
 func TestSerializerMysql_CreateDatabaseFromPoint(t *testing.T) {
 	sm := NewSerializerMysql()
-	w := selfWrite{
-		data: []byte{},
-	}
-	fmt.Println(sm.CreateTableFromPoint(&w, &point))
-	fmt.Println(string(w.data))
+	w := make([]byte, 0, 1024)
+	// w := selfWrite{
+	// 	data: []byte{},
+	// }
+	fmt.Println(sm.CreateTableFromPoint(w, &point))
+	fmt.Println(string(w))
 }

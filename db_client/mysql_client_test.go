@@ -22,7 +22,7 @@ func TestMysqlClient_CreateDb(t *testing.T) {
 		fmt.Println(err)
 	}
 	defer mc.Close()
-	err = mc.CreateDb(true)
+	err = mc.CreateDb("test1", true)
 	if err != nil {
 		fmt.Println(err)
 	}

@@ -18,6 +18,10 @@ func NewSerializerSplunkJson() *SerializerSplunkJson {
 	}
 }
 
+func (m *SerializerSplunkJson) SerializePrepare(w io.Writer, p *common.Point) (err error) {
+	return nil
+}
+
 // SerializePoint writes Point data to the given writer, conforming to the
 // Splunk JSON format.
 //
@@ -65,6 +69,10 @@ func (s *SerializerSplunkJson) SerializePoint(w io.Writer, p *common.Point) (err
 		return err
 	}
 
+	return nil
+}
+
+func (m *SerializerSplunkJson) SerializeEnd(w io.Writer, p *common.Point) (err error) {
 	return nil
 }
 

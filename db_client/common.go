@@ -15,6 +15,6 @@ type DBClient interface {
 	Write([]byte) (int64, error)
 	Query([]byte) (int64, error)
 	ListDatabases() ([]string, error)
-	CreateDb(withEncryption bool) error
+	CreateDb(string, bool) error
 	Ping() error
 }
