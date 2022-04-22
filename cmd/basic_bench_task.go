@@ -357,6 +357,7 @@ func (d *BasicBenchTask) Run() {
 			log.Printf("We will query %d sql", d.QueryCount*int64(len(d.databaseNames)))
 		}
 	}
+	log.Printf("Start run with %d workers", len(d.workerProcess))
 
 	// 运行测试
 	d.resultCollector.Reset()
