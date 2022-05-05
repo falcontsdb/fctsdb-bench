@@ -280,13 +280,15 @@ func (f *FctsdbAgent) GetEnvHandler(w http.ResponseWriter, r *http.Request) {
 func (f *FctsdbAgent) CheckTelegrafHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		pid, err := GetPidOnLinux("telegraf")
+		fmt.Println(pid, err)
 		if err != nil {
 			log.Println("error: " + err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
 		} else if pid == "" {
 			w.WriteHeader(http.StatusInternalServerError)
 		} else {
-			w.WriteHeader(http.StatusNoContent)
+			w.Write([]byte("OK"))
+			w.WriteHeader(http.StatusOK)
 		}
 	}
 }

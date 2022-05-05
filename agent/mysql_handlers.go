@@ -84,7 +84,8 @@ func (f *MysqlAgent) CheckTelegrafHandler(w http.ResponseWriter, r *http.Request
 		} else if pid == "" {
 			w.WriteHeader(http.StatusInternalServerError)
 		} else {
-			w.WriteHeader(http.StatusNoContent)
+			w.Write([]byte("OK"))
+			w.WriteHeader(http.StatusOK)
 		}
 	}
 }

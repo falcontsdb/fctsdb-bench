@@ -80,7 +80,7 @@ func SetAgent(endpoint string, param map[string]string) error {
 	if err != nil {
 		return err
 	}
-	if resp.StatusCode >= 200 && 300 > resp.StatusCode {
+	if resp.StatusCode != http.StatusOK {
 		body, _ := ioutil.ReadAll(resp.Body)
 		return fmt.Errorf(string(body))
 	}
