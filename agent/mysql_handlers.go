@@ -75,6 +75,20 @@ func (m MysqlAgent) GetEnvHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (f *MysqlAgent) CheckTelegrafHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "GET" {
+		pid, err := GetPidOnLinux("telegraf")
+		if err != nil {
+			log.Println("error: " + err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+		} else if pid == "" {
+			w.WriteHeader(http.StatusInternalServerError)
+		} else {
+			w.WriteHeader(http.StatusNoContent)
+		}
+	}
+}
+
 func (m MysqlAgent) cleanData() error {
 	return nil
 }

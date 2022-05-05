@@ -113,15 +113,20 @@ func (s *Scheduler) ScheduleBenchTask() {
 
 	fileName := time.Now().Format("benchmark_0102_150405")
 	// 开始时还原agent的配置并检查是否正确
-
 	if len(s.agentEndpoints) != 0 {
 		for _, agentEndpoint := range s.agentEndpoints {
 			err := agent.ResetAgent(agentEndpoint)
 			if err != nil {
 				log.Fatalln(agentEndpoint, "reset failed, please check the anget config:", err.Error())
 			}
+
+			// 检查telegraf是否开启
+			if s.grafanaEndpoint != "" {
+				agent.CheckTelegraf(agentEndpoint)
+			}
 		}
 	}
+
 	// 根据配置文件执行测试
 	if s.configsPath != "" {
 		actions := s.checkConfigsFile()

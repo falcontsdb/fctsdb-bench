@@ -7,12 +7,13 @@ import (
 )
 
 const (
-	AGENT_CLEAN_PATH   = "/clean"
-	AGENT_START_PATH   = "/start"
-	AGENT_STOP_PATH    = "/stop"
-	AGENT_SET_PATH     = "/set" //参数BinPath, ConfigPath分别设置数据库的二进制文件路径和config路径
-	AGENT_RESET_PATH   = "/reset"
-	AGENT_GET_ENV_PATH = "/env"
+	AGENT_CLEAN_PATH     = "/clean"
+	AGENT_START_PATH     = "/start"
+	AGENT_STOP_PATH      = "/stop"
+	AGENT_SET_PATH       = "/set" //参数BinPath, ConfigPath分别设置数据库的二进制文件路径和config路径
+	AGENT_RESET_PATH     = "/reset"
+	AGENT_GET_ENV_PATH   = "/env"
+	AGENT_CHECK_TELEGRAF = "/telegraf"
 )
 
 type AgentHandlers interface {
@@ -22,6 +23,7 @@ type AgentHandlers interface {
 	GetEnvHandler(w http.ResponseWriter, r *http.Request)
 	SetHandler(w http.ResponseWriter, r *http.Request)
 	ResetHandler(w http.ResponseWriter, r *http.Request)
+	CheckTelegrafHandler(w http.ResponseWriter, r *http.Request)
 }
 
 type AgentService struct {
@@ -64,6 +66,7 @@ func (s *AgentService) ListenAndServe() {
 	http.HandleFunc(AGENT_SET_PATH, s.handlers.SetHandler)
 	http.HandleFunc(AGENT_RESET_PATH, s.handlers.ResetHandler)
 	http.HandleFunc(AGENT_GET_ENV_PATH, s.handlers.GetEnvHandler)
+	http.HandleFunc(AGENT_CHECK_TELEGRAF, s.handlers.CheckTelegrafHandler)
 	log.Println("Start service 0.0.0.0:" + s.Port)
 	err = http.ListenAndServe("0.0.0.0:"+s.Port, nil)
 	if err != nil {

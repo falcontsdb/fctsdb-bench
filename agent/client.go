@@ -80,7 +80,7 @@ func SetAgent(endpoint string, param map[string]string) error {
 	if err != nil {
 		return err
 	}
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode >= 200 && 300 > resp.StatusCode {
 		body, _ := ioutil.ReadAll(resp.Body)
 		return fmt.Errorf(string(body))
 	}
@@ -93,4 +93,11 @@ func ResetAgent(endpoint string) error {
 		return fmt.Errorf("reset agent error: %s", err.Error())
 	}
 	return nil
+}
+
+func CheckTelegraf(endpoint string) {
+	_, err := httpGet(endpoint, AGENT_CHECK_TELEGRAF)
+	if err != nil {
+		log.Fatalln("can not find telegraf, please check")
+	}
 }

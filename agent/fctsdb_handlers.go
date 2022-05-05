@@ -157,9 +157,7 @@ func NewFctsdbAgent(binPath, configPath string) *FctsdbAgent {
 }
 
 func (f *FctsdbAgent) setBinaryPath(binPath string) error {
-	cmd := binPath + ` version`
-	log.Println("Running linux cmd :" + cmd)
-	_, err := exec.Command("bash", "-c", cmd).Output()
+	_, err := GetFctsdbVersion(binPath)
 	if err != nil {
 		return fmt.Errorf("can't run fctsdb binary, error: %s", err.Error())
 	}
@@ -270,8 +268,26 @@ func (f *FctsdbAgent) ResetHandler(w http.ResponseWriter, r *http.Request) {
 
 func (f *FctsdbAgent) GetEnvHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
-		w.Write(getEnv())
+		version, _ := GetFctsdbVersion(f.BinPath)
+		msg := getEnv()
+		msg = append(msg, " 数据库版本: "...)
+		msg = append(msg, version...)
+		w.Write(msg)
 		w.WriteHeader(http.StatusOK)
+	}
+}
+
+func (f *FctsdbAgent) CheckTelegrafHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "GET" {
+		pid, err := GetPidOnLinux("telegraf")
+		if err != nil {
+			log.Println("error: " + err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+		} else if pid == "" {
+			w.WriteHeader(http.StatusInternalServerError)
+		} else {
+			w.WriteHeader(http.StatusNoContent)
+		}
 	}
 }
 
@@ -366,6 +382,12 @@ func GetPidOnLinux(serverName string) (string, error) {
 	// 	return "", err
 	// }
 	return "", err
+}
+
+func GetFctsdbVersion(binPath string) ([]byte, error) {
+	cmd := binPath + ` version`
+	log.Println("Running linux cmd :" + cmd)
+	return exec.Command("bash", "-c", cmd).Output()
 }
 
 type Env struct {
