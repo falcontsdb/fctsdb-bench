@@ -9,23 +9,26 @@ import (
 )
 
 type Line struct {
-	name   string
-	xAxis  []string
-	series map[string][]string
-	small  bool
+	name        string
+	xAxis       []string
+	seriesKey   []string
+	seriesValue [][]string
+	small       bool
 }
 
 func NewLine(name string) *Line {
 	return &Line{
-		name:   name,
-		xAxis:  make([]string, 0),
-		series: make(map[string][]string),
-		small:  false,
+		name:        name,
+		xAxis:       make([]string, 0),
+		seriesKey:   make([]string, 0),
+		seriesValue: make([][]string, 0),
+		small:       false,
 	}
 }
 
 func (l *Line) AddSeries(name string, series []string) {
-	l.series[name] = series
+	l.seriesKey = append(l.seriesKey, name)
+	l.seriesValue = append(l.seriesValue, series)
 }
 
 func (l *Line) SetXAxis(xAxis []string) {
@@ -63,7 +66,7 @@ func (l *Line) ToHtml() string {
 	}
 
 	series := make([]map[string]interface{}, 0)
-	for key, values := range l.series {
+	for i, key := range l.seriesKey {
 		ser := make(map[string]interface{})
 		ser["name"] = key
 		ser["type"] = "line"
@@ -79,7 +82,7 @@ func (l *Line) ToHtml() string {
 		// 	data["value"] = value
 		// 	datas = append(datas, data)
 		// }
-		ser["data"] = values
+		ser["data"] = l.seriesValue[i]
 		series = append(series, ser)
 	}
 	options["series"] = series
