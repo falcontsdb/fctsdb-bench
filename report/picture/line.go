@@ -20,7 +20,7 @@ func NewLine(name string) *Line {
 	return &Line{
 		name:        name,
 		xAxis:       make([]string, 0),
-		seriesKey:   make([]string, 0),
+		seriesKey:   make([]string, 0), //为了有序输出，key和value单独存储
 		seriesValue: make([][]string, 0),
 		small:       false,
 	}
@@ -75,13 +75,6 @@ func (l *Line) ToHtml() string {
 		// ser["selectedMode"] = false
 		ser["animation"] = false
 		ser["label"] = map[string]interface{}{"show": true}
-
-		// datas := make([]map[string]interface{}, 0)
-		// for _, value := range values {
-		// 	data := make(map[string]interface{})
-		// 	data["value"] = value
-		// 	datas = append(datas, data)
-		// }
 		ser["data"] = l.seriesValue[i]
 		series = append(series, ser)
 	}
@@ -101,20 +94,15 @@ func (l *Line) ToHtml() string {
 	}
 
 	options["tooltip"] = map[string]interface{}{
-		// "show":    true,
 		"trigger": "axis",
 	}
 	options["legend"] = map[string]interface{}{
-		// "show": true,
 		"top": "20px",
 	}
 	options["toolbox"] = map[string]interface{}{
-		// "show":  true,
 		"right": "20px",
 		"feature": map[string]interface{}{
-			"saveAsImage": map[string]interface{}{
-				// "show": true, dd
-			},
+			"saveAsImage": map[string]interface{}{},
 		},
 	}
 

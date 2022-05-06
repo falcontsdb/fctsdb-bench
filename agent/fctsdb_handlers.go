@@ -270,7 +270,7 @@ func (f *FctsdbAgent) GetEnvHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		version, _ := GetFctsdbVersion(f.BinPath)
 		msg := getEnv()
-		msg = append(msg, " 数据库版本: "...)
+		msg = append(msg, "**数据库版本: "...)
 		msg = append(msg, version...)
 		w.Write(msg)
 		w.WriteHeader(http.StatusOK)

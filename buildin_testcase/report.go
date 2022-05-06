@@ -323,7 +323,15 @@ func CreateReport(fileNames ...string) *report.Page {
 		}
 		// 处理尾行携带的环境信息
 		if row[0] == "test-env" {
-			benchReport.Document += strings.ReplaceAll(row[1], ";", "\n")
+			benchReport.Document += strings.ReplaceAll(strings.Split(row[1], "**")[0], ";", "\n")
+			for _, fileName := range fileNames {
+				benchReport.Document += "\n"
+				infos := strings.Split(allCsvRecords[fileName][rowIndex][1], "**")
+				if len(infos) > 1 {
+					benchReport.Document += fileName
+					benchReport.Document += infos[len(infos)-1]
+				}
+			}
 		} else {
 			if caseDefine, ok := performances[row[0]]; ok {
 				// 步骤1：判断是否需要在报告中新增一个测试用例，并同时给测试用例创建表格
