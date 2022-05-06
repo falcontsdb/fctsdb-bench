@@ -277,6 +277,7 @@ func (d *BasicBenchTask) prepareWorkersOnDB(dbName string) {
 		worker.resultCollector = d.resultCollector
 		worker.Debug = d.Debug
 		worker.UseGzip = d.UseGzip
+		worker.BatchSize = d.BatchSize
 		switch d.MixMode {
 		case "write_only":
 			worker.Mode = "write"
@@ -287,6 +288,8 @@ func (d *BasicBenchTask) prepareWorkersOnDB(dbName string) {
 				worker.Mode = "write"
 			} else {
 				worker.Mode = "query"
+				// 混合测试时，查询的batch size设置为1
+				worker.BatchSize = 1
 			}
 		}
 		workersEachDB[j] = worker
@@ -367,7 +370,7 @@ func (d *BasicBenchTask) Run() {
 	for i := range d.workerProcess {
 		wg.Add(1)
 		go func(i int) {
-			d.workerProcess[i].StartRun(d.TimeLimit, d.BatchSize, &wg)
+			d.workerProcess[i].StartRun(d.TimeLimit, &wg)
 		}(i)
 	}
 	d.SyncShowStatics(d.MixMode, ctx)
@@ -511,20 +514,21 @@ type Worker struct {
 	Mode            string
 	UseGzip         int
 	QueryCount      int64
+	BatchSize       int
 }
 
 func (w *Worker) Prepare(wg *sync.WaitGroup) {
 	defer wg.Done()
 	point := common.MakeUsablePoint()
 	for !w.simulator.Finished() {
-		err := w.runBatchAndWrite(5000, true, point)
+		err := w.runBatchAndWrite(2000, true, point)
 		if err != nil && w.Debug {
 			log.Println(err.Error())
 		}
 	}
 }
 
-func (w *Worker) StartRun(timeLimit time.Duration, batchSize int, waitGroup *sync.WaitGroup) {
+func (w *Worker) StartRun(timeLimit time.Duration, waitGroup *sync.WaitGroup) {
 	defer waitGroup.Done()
 	endTime := time.Now().Add(timeLimit)
 	switch w.Mode {
@@ -532,14 +536,14 @@ func (w *Worker) StartRun(timeLimit time.Duration, batchSize int, waitGroup *syn
 		point := common.MakeUsablePoint()
 		if timeLimit > 0 {
 			for time.Now().Before(endTime) {
-				err := w.runBatchAndWrite(batchSize, false, point)
+				err := w.runBatchAndWrite(w.BatchSize, false, point)
 				if err != nil && w.Debug {
 					log.Println(err.Error())
 				}
 			}
 		} else {
 			for !w.simulator.Finished() {
-				err := w.runBatchAndWrite(batchSize, true, point)
+				err := w.runBatchAndWrite(w.BatchSize, true, point)
 				if err != nil && w.Debug {
 					log.Println(err.Error())
 				}
@@ -548,14 +552,14 @@ func (w *Worker) StartRun(timeLimit time.Duration, batchSize int, waitGroup *syn
 	case "query":
 		if timeLimit > 0 {
 			for time.Now().Before(endTime) {
-				err := w.runBanchAndQuery(batchSize, false)
+				err := w.runBatchAndQuery(w.BatchSize, false)
 				if err != nil && w.Debug {
 					log.Println(err.Error())
 				}
 			}
 		} else {
 			for w.resultCollector.GetQueries() < w.QueryCount {
-				err := w.runBanchAndQuery(batchSize, true)
+				err := w.runBatchAndQuery(w.BatchSize, true)
 				if err != nil && w.Debug {
 					log.Println(err.Error())
 				}
@@ -633,7 +637,7 @@ func (d *Worker) writeToDb(buf []byte) error {
 	return nil
 }
 
-func (d *Worker) runBanchAndQuery(batchSize int, useCountLimit bool) error {
+func (d *Worker) runBatchAndQuery(batchSize int, useCountLimit bool) error {
 	var err error
 	var lat int64
 	buf := bufferPool.Get().(*bytes.Buffer)
@@ -650,7 +654,7 @@ func (d *Worker) runBanchAndQuery(batchSize int, useCountLimit bool) error {
 	}
 
 	if batchItemCount > 0 {
-		d.resultCollector.AddQueries(int64(batchItemCount))
+		d.resultCollector.AddQueries(1)
 		// atomic.AddInt64(&d.queryRead, int64(batchItemCount))
 		lat, err = d.writer.Query(buf.Bytes())
 		if err != nil {
