@@ -60,6 +60,6 @@ func (m *CityAirQualityMeasurement) ToPoint(p *common.Point) bool {
 	p.AppendField(CityAirQualityFieldKeys[5], int64(randNum&uint64(1<<8-1)+10))
 	randNum >>= 8
 	p.AppendField(CityAirQualityFieldKeys[6], float32(randNum&uint64(1<<10-1))/1000.0+0.5)
-	p.AppendField(CityAirQualityFieldKeys[7], fastrand.RandomString(20))
+	p.AppendField(CityAirQualityFieldKeys[7], fastrand.RandomNormalBytes(20))
 	return true
 }

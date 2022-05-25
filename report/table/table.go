@@ -7,7 +7,7 @@ import (
 
 type Table struct {
 	Columns []string
-	RowHead []string
+	RowHead []string //不使用map存储rows，会打乱行顺序
 	Rows    [][]Cell
 }
 

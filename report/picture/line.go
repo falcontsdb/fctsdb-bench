@@ -3,9 +3,11 @@ package picture
 import (
 	"encoding/json"
 	"fmt"
-	"math/rand"
+	"strconv"
 	"strings"
-	"unsafe"
+	"time"
+
+	"git.querycap.com/falcontsdb/fctsdb-bench/util/fastrand"
 )
 
 type Line struct {
@@ -49,9 +51,7 @@ func (l *Line) ToHtml() string {
 	</script>
 	`
 
-	id := generateUniqueID(10)
-
-	htm := strings.ReplaceAll(tmp, "{{ ChartID }}", id)
+	htm := strings.ReplaceAll(tmp, "{{ ChartID }}", generateUniqueID())
 	if l.small {
 		htm = strings.ReplaceAll(htm, "{{ Style }}", "width:495px;height:300px;display:inline-block;")
 	} else {
@@ -83,7 +83,7 @@ func (l *Line) ToHtml() string {
 	options["yAxis"] = map[string]interface{}{
 		"type": "value",
 		"axisLabel": map[string]string{
-			"formatter": "{{ yAxisLabelFormatter }}",
+			"formatter": "{{ yAxisLabelFormatter }}", // function无法通过json.Marshal得到正确的结果，用字符串{{ yAxisLabelFormatter }}占位，后期替换
 		},
 	}
 
@@ -132,29 +132,26 @@ func (l *Line) ToHtml() string {
 
 	htm = strings.ReplaceAll(htm, "{{ JSON }}", string(js))
 
+	// 替换function的占位字符串{{ yAxisLabelFormatter }}
 	yAxisLabelFormatter := "function(value,index){if (value < 1000) {return value;}else{return value/1000+'k';}}"
 	htm = strings.ReplaceAll(htm, `"{{ yAxisLabelFormatter }}"`, yAxisLabelFormatter)
 	return htm
 }
 
-func generateUniqueID(n int) string {
+func generateUniqueID() string {
 	letterBytes := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	letterIdxBits := 6                           // 6 bits to represent a letter index
-	letterIdxMask := int64(1<<letterIdxBits - 1) // All 1-bits, as many as letterIdxBits
-	letterIdxMax := 63 / letterIdxBits           // # of letter indices fitting in 63 bits
+	letterIdxBits := 6                            // 6 bits to represent a letter index
+	letterIdxMask := uint64(1<<letterIdxBits - 1) // All 1-bits, as many as letterIdxBits
+	letterIdxMax := uint64(10)                    // # of letter indices fitting in 63 bits
 
-	buf := make([]byte, n)
-	// A src.Int63() generates 63 random bits, enough for letterIdxMax characters!
-	for i, cache, remain := n-1, rand.Int63(), letterIdxMax; i >= 0; {
-		if remain == 0 {
-			cache, remain = rand.Int63(), letterIdxMax
-		}
-		if idx := int(cache & letterIdxMask); idx < len(letterBytes) {
-			buf[i] = letterBytes[idx]
-			i--
-		}
+	buf := make([]byte, letterIdxMax, 1024)
+
+	for cache, remain := fastrand.Uint64(), letterIdxMax; remain != 0; {
+		buf[remain-1] = letterBytes[int(cache&letterIdxMask)%len(letterBytes)]
 		cache >>= letterIdxBits
 		remain--
 	}
-	return *(*string)(unsafe.Pointer(&buf))
+	buf = append(buf, '_')
+	buf = strconv.AppendUint(buf, uint64(time.Now().UnixNano()), 10)
+	return string(buf[:len(buf)-3])
 }

@@ -21,10 +21,13 @@ const (
 //go:linkname Uint32 runtime.fastrand
 func Uint32() uint32
 
-// 这里是引用runtime.fastrandn，协程安全，但是不能指定seed
-// Uint32n returns a lock free uint32 value in the interval [0, n).
-//go:linkname Uint32n runtime.fastrandn
-func Uint32n(n uint32) uint32
+// Uint32n 在gccgo时不能编译
+// //go:linkname Uint32n runtime.fastrandn
+// func Uint32n(n uint32) uint32
+
+func Uint32n(n uint32) uint32 {
+	return uint32(uint64(Uint32()) * uint64(n) >> 32)
+}
 
 func Uint64() uint64 {
 	return uint64(Uint32())<<32 | uint64(Uint32())
@@ -51,7 +54,7 @@ again:
 	return f
 }
 
-func RandomString(n int) []byte {
+func RandomNormalBytes(n int) []byte {
 	letterBytes := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	letterIdxBits := 6                            // 6 bits to represent a letter index
 	letterIdxMask := uint32(1<<letterIdxBits - 1) // All 1-bits, as many as letterIdxBits
