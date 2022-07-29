@@ -19,7 +19,7 @@ func TestNewPointDevopsEasy(t *testing.T) {
 		SamplingInterval: time.Second,
 		DeviceCount:      2,
 		DeviceOffset:     0,
-		TagsDefine:       []int64{2, 3, 4},
+		TagKeyCount:      3,
 		FieldsDefine:     [3]int64{2, 3, 1},
 	}
 	sim := cfg.ToSimulator()
@@ -47,7 +47,7 @@ func BenchmarkNewPointDevopsEasy(b *testing.B) {
 		SamplingInterval: time.Second,
 		DeviceCount:      2,
 		DeviceOffset:     0,
-		TagsDefine:       []int64{10, 10, 100},
+		TagKeyCount:      3,
 		FieldsDefine:     [3]int64{6, 3, 1},
 	}
 	sim := cfg.ToSimulator()

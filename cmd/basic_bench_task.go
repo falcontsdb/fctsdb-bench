@@ -244,7 +244,7 @@ func (d *BasicBenchTask) prepareWorkersOnEachDB(dbName string) {
 			SamplingInterval: d.SamplingInterval,
 			DeviceCount:      d.ScaleVar,
 			DeviceOffset:     d.ScaleVarOffset,
-			TagsDefine:       ucase.TagsDefine,
+			TagKeyCount:      ucase.TagKeyCount,
 			FieldsDefine:     ucase.FieldsDefine,
 		}
 		simulator = cfg.ToSimulator()

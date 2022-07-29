@@ -25,15 +25,15 @@ func NewDeviceMeasurements(fieldDefine [3]int64) []common.SimulatedMeasurement {
 	return sm
 }
 
-func NewDevice(id int64, tagsDefine []int64, fieldDefine [3]int64) Device {
+func NewDevice(id int64, tagKeyCount int64, fieldDefine [3]int64) Device {
 	sm := NewDeviceMeasurements(fieldDefine)
 	d := Device{
 		SimulatedMeasurements: sm,
 	}
 
-	for i, valueCount := range tagsDefine {
+	for i := 0; i < int(tagKeyCount); i++ {
 		d.TagKeys = append(d.TagKeys, []byte("key_"+strconv.Itoa(i)))
-		d.TagValues = append(d.TagValues, []byte("Tag"+strconv.Itoa(i)+"Value"+strconv.FormatInt(id%valueCount, 10)))
+		d.TagValues = append(d.TagValues, strconv.AppendInt(fastrand.RandomNormalBytes(4), id, 10))
 	}
 
 	return d

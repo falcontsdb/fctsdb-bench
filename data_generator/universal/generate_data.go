@@ -17,12 +17,12 @@ type UniversalSimulatorConfig struct {
 	DeviceCount      int64
 	DeviceOffset     int64
 	MeasurementCount int64
-	TagsDefine       []int64
+	TagKeyCount      int64
 	FieldsDefine     [3]int64
 }
 
 type UniversalCase struct {
-	TagsDefine   []int64
+	TagKeyCount  int64
 	FieldsDefine [3]int64
 }
 
@@ -31,7 +31,7 @@ func (d *UniversalSimulatorConfig) ToSimulator() *UniversalSimulator {
 	var measNum int64
 
 	for i := 0; i < len(devices); i++ {
-		devices[i] = NewDevice(d.DeviceOffset+int64(i), d.TagsDefine, d.FieldsDefine)
+		devices[i] = NewDevice(d.DeviceOffset+int64(i), d.TagKeyCount, d.FieldsDefine)
 		measNum += int64(devices[i].NumMeasurements())
 	}
 
