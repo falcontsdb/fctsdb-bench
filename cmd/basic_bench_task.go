@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -17,6 +18,7 @@ import (
 	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/common"
 	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/devops"
 	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/live"
+	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/universal"
 	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/vehicle"
 	"git.querycap.com/falcontsdb/fctsdb-bench/db_client"
 	fctsdb "git.querycap.com/falcontsdb/fctsdb-bench/query_generator"
@@ -177,11 +179,11 @@ func (d *BasicBenchTask) PrepareWorkers() {
 
 	// 根据dbName准备workers
 	for _, dbName := range d.databaseNames {
-		d.prepareWorkersOnDB(dbName)
+		d.prepareWorkersOnEachDB(dbName)
 	}
 }
 
-func (d *BasicBenchTask) prepareWorkersOnDB(dbName string) {
+func (d *BasicBenchTask) prepareWorkersOnEachDB(dbName string) {
 
 	// 每个database有Workers个线程
 	workersEachDB := make([]Worker, d.Workers)
@@ -230,7 +232,22 @@ func (d *BasicBenchTask) prepareWorkersOnDB(dbName string) {
 		}
 		simulator = cfg.ToSimulator()
 	default:
-		log.Fatalln("the case is not supported")
+
+		ucase := universal.UniversalCase{}
+		err := json.Unmarshal([]byte(d.UseCase), &ucase)
+		if err != nil {
+			log.Fatalln("the case is not supported")
+		}
+		cfg := universal.UniversalSimulatorConfig{
+			Start:            d.timestampStart,
+			End:              d.timestampEnd,
+			SamplingInterval: d.SamplingInterval,
+			DeviceCount:      d.ScaleVar,
+			DeviceOffset:     d.ScaleVarOffset,
+			TagsDefine:       ucase.TagsDefine,
+			FieldsDefine:     ucase.FieldsDefine,
+		}
+		simulator = cfg.ToSimulator()
 	}
 
 	// 只测试查询时，需要将模拟器的WrittenPoints设置为最大值，这样保证生成的sql在数据范围内。
@@ -600,9 +617,6 @@ func (d *Worker) runBatchAndWrite(batchSize int, useCountLimit bool, point *comm
 			d.resultCollector.AddBytes(int64(len(buf)))
 			d.resultCollector.AddValues(int64(vaulesWritten))
 			d.resultCollector.AddPoints(int64(batchItemCount))
-			// atomic.AddInt64(&d.bytesRead, int64(buf.Len()))
-			// atomic.AddInt64(&d.valuesRead, int64(vaulesWritten))
-			// atomic.AddInt64(&d.itemsRead, int64(batchItemCount))
 			d.simulator.SetWrittenPoints(pointMadeIndex)
 		}
 	}

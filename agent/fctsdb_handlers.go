@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path"
 	"runtime"
 	"strconv"
 	"syscall"
@@ -139,6 +140,7 @@ type FctsdbAgent struct {
 	dbConfig          *DbConfig
 	defaultBinPath    string
 	defaultConfigPath string
+	binName           string
 }
 
 func NewFctsdbAgent(binPath, configPath string) *FctsdbAgent {
@@ -153,6 +155,7 @@ func NewFctsdbAgent(binPath, configPath string) *FctsdbAgent {
 		log.Fatalln(err.Error())
 	}
 	fa.defaultConfigPath = configPath
+	_, fa.binName = path.Split(binPath)
 	return fa
 }
 
@@ -162,6 +165,7 @@ func (f *FctsdbAgent) setBinaryPath(binPath string) error {
 		return fmt.Errorf("can't run fctsdb binary, error: %s", err.Error())
 	}
 	f.BinPath = binPath
+	_, f.binName = path.Split(binPath)
 	return nil
 }
 
@@ -293,7 +297,7 @@ func (f *FctsdbAgent) CheckTelegrafHandler(w http.ResponseWriter, r *http.Reques
 }
 
 func (f *FctsdbAgent) stopDB() error {
-	pid, err := GetPidOnLinux("fctsdb")
+	pid, err := GetPidOnLinux(f.binName)
 	if err != nil {
 		log.Println("Get fctsdb failed, error: " + err.Error())
 		return err
@@ -306,7 +310,7 @@ func (f *FctsdbAgent) stopDB() error {
 	//check that fctsdb exists or not
 	for i := 0; i < 20; i++ {
 		time.Sleep(time.Second)
-		pid, _ = GetPidOnLinux("fctsdb")
+		pid, _ = GetPidOnLinux(f.binName)
 		if pid == "" {
 			log.Println("Stop falconTSDB succeed")
 			return nil
@@ -330,7 +334,7 @@ func (f *FctsdbAgent) cleanData() error {
 }
 
 func (f *FctsdbAgent) startDB() error {
-	pid, err := GetPidOnLinux("fctsdb")
+	pid, err := GetPidOnLinux(f.binName)
 	if err != nil {
 		log.Println("Start db failed, error: " + err.Error())
 		return err

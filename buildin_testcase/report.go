@@ -374,7 +374,7 @@ func CreateReport(fileNames ...string) *report.Page {
 					benchReport.AddTestCase(currentTestCase)
 				}
 
-				// 步骤3：将数据记录到测试用例中，此处分为多个csv文件和单个csv文件
+				// 步骤3：将数据记录到测试用例中
 				var rowData []interface{}
 				for _, column := range caseDefine.TableColumns {
 					switch column := column.(type) {
@@ -451,15 +451,9 @@ func CreateReport(fileNames ...string) *report.Page {
 					words := strings.Split(testcase.Title, "-")
 					line := picture.NewLine(words[len(words)-1] + "-" + picDefine.SeriesColumn[0])
 					line.SetXAxis(testcase.Table.GetColumn(picDefine.XAxisColumn))
-					if len(fileNames) > 1 {
-						for _, field := range picDefine.SeriesColumn {
-							for _, fileName := range fileNames {
-								line.AddSeries(field+":"+fileName, testcase.Table.GetColumn(field+tableSep+fileName))
-							}
-						}
-					} else {
-						for _, field := range picDefine.SeriesColumn {
-							line.AddSeries(field, testcase.Table.GetColumn(field))
+					for _, field := range picDefine.SeriesColumn {
+						for _, fileName := range fileNames {
+							line.AddSeries(field+":"+fileName, testcase.Table.GetColumn(field+tableSep+fileName))
 						}
 					}
 					testcase.Pictures = append(testcase.Pictures, line)

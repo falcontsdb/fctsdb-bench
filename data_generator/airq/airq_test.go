@@ -425,3 +425,15 @@ func BenchmarkAirqNextSql(b *testing.B) {
 
 	// fmt.Println(buf.String())
 }
+
+func TestTimeStamp(t *testing.T) {
+	timestampStart, err := time.Parse(time.RFC3339, "2018-01-01T00:10:00Z")
+	if err != nil {
+		log.Fatalln("parse start error: ", err)
+	}
+	timestampStart = timestampStart.UTC()
+
+	nowTime := timestampStart.Add(time.Minute)
+
+	fmt.Println(nowTime.UTC().UnixNano())
+}
