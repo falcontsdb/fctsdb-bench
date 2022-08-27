@@ -1,10 +1,12 @@
 package db_client
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"testing"
 
+	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
 	"github.com/valyala/fasthttp"
 )
 
@@ -38,10 +40,10 @@ func TestMysqlClient_ListDatabases(t *testing.T) {
 		Password:  "123456",
 		DebugInfo: "",
 	})
-	defer mc.Close()
 	if err != nil {
 		fmt.Println(err)
 	}
+	defer mc.Close()
 	dbs, err := mc.ListDatabases()
 	if err != nil {
 		fmt.Println(err)
@@ -59,10 +61,10 @@ func TestMysqlClient_Ping(t *testing.T) {
 		Password:  "123456",
 		DebugInfo: "",
 	})
-	defer mc.Close()
 	if err != nil {
 		fmt.Println(err)
 	}
+	defer mc.Close()
 	fmt.Println(mc.Ping())
 }
 
@@ -76,10 +78,10 @@ func TestMysqlClient_Query(t *testing.T) {
 		Password:  "123456",
 		DebugInfo: "",
 	})
-	defer mc.Close()
 	if err != nil {
 		fmt.Println(err)
 	}
+	defer mc.Close()
 	executeTime, err := mc.Query([]byte("select * from datax;"))
 	if err != nil {
 		fmt.Println(err)
@@ -127,4 +129,60 @@ func TestHttpUrl(t *testing.T) {
 
 	// uri, _ := url.Parse("172.17.2.22:8086")
 
+}
+
+func TestInfluxdbv2Client_CreateDb(t *testing.T) {
+	// client := influxdb2.NewClient("http://10.10.2.29:8086", "2ziUmLRFWB_yhaJSS0Wg11hkizyIqzG5QsRvarxxUopbjXl5IoNj8QouthtTpDLdaFWbkYNDTiW8RsyoSfPhWw==")
+	// client.Setup(context.Background(), "root", "Abc_123456", "test", "buck1", 0)
+	// always close client at the end
+	client := influxdb2.NewClient("http://10.10.2.29:8086", "8wW-pwH8qzizqRQrA4E4tL2Kd6YJTaq7xhwJu7CDacZEcfwCbldzQc9GQ3XoEOA1V1GBrDgRkgtw8lGK4y9Omg==")
+	// ok, err := client.Ping(context.Background())
+	// fmt.Println(ok, err)
+
+	orgs, err := client.OrganizationsAPI().GetOrganizations(context.Background())
+	if err != nil {
+		fmt.Println(err.Error())
+	} else {
+		for _, org := range *orgs {
+			fmt.Println(org.Name, *org.Id)
+		}
+	}
+	defer client.Close()
+
+	// userApi := client.UsersAPI()
+	// // err := userApi.SignIn(context.Background(), "root", "Abc_123456")
+	// me, err := userApi.Me(context.Background())
+	// if err != nil {
+	// 	fmt.Println(err.Error())
+	// } else {
+	// 	fmt.Println(me.Name)
+	// }
+	// // userApi.SignOut(context.Background())
+	// authApi := client.AuthorizationsAPI()
+	// resp, err := authApi.GetAuthorizations(context.Background())
+	// fmt.Println(err)
+	// if err == nil {
+	// 	for _, a := range *resp {
+	// 		fmt.Println(*a.Token)
+	// 	}
+	// }
+	// qApi := client.QueryAPI(organization)
+	// qApi.
+
+	// writeAPI := client.WriteAPI("test", "buck1")
+	// writeAPI.WritePoint()
+	// buckAPI := client.BucketsAPI()
+	// buckets, err := buckAPI.GetBuckets(context.Background())
+	// fmt.Println(len(*buckets))
+	// if err == nil {
+	// }
+	// 	for _, buck := range *buckets {
+	// 		fmt.Println(buck.Name)
+	// 	}
+	// }
+
+	// // write line protocol
+	// writeAPI.WriteRecord(fmt.Sprintf("stat,unit=temperature avg=%f,max=%f", 23.5, 45.0))
+	// Flush writes
+	// writeAPI.Flush()
 }

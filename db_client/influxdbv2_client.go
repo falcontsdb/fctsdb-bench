@@ -1,41 +1,33 @@
 package db_client
 
-// This file lifted wholesale from mountainflux by Mark Rushakoff.
-
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
-	"net/url"
 	"time"
 
+	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
 	"github.com/valyala/fasthttp"
 )
 
-const DefaultIdleConnectionTimeout = 90 * time.Second
+var organization = "benchmark"
 
-var (
-	post                = []byte("POST")
-	get                 = []byte("GET")
-	textPlain           = []byte("text/plain")
-	responseMustContain = []byte(`"time"`)
-)
-
-// FctsdbClient is a Writer that writes to a fctsdb HTTP server.
-type FctsdbClient struct {
+// InfluxdbV2Client is a Writer that writes to a fctsdb HTTP server.
+type InfluxdbV2Client struct {
 	client   fasthttp.Client
 	c        ClientConfig
 	writeUrl []byte
 	queryUrl []byte
 	host     []byte
 	buf      *bytes.Buffer
+	token    string
 }
 
 // NewFctsdbClient returns a new HTTPWriter from the supplied HTTPWriterConfig.
-func NewFctsdbClient(c ClientConfig) *FctsdbClient {
+func NewInfluxdbV2Client(c ClientConfig) *InfluxdbV2Client {
 	var host []byte
 	writeUrl := make([]byte, 0)
 	if c.Host[len(c.Host)-1] == '/' {
@@ -44,30 +36,21 @@ func NewFctsdbClient(c ClientConfig) *FctsdbClient {
 		host = []byte(c.Host)
 	}
 	writeUrl = append(writeUrl, host...)
-	writeUrl = append(writeUrl, "/write?db="...)
+	writeUrl = append(writeUrl, "/api/v2/write?bucket="...)
 	writeUrl = fasthttp.AppendQuotedArg(writeUrl, []byte(c.Database))
-	if c.User != "" {
-		writeUrl = append(writeUrl, "&u="...)
-		writeUrl = fasthttp.AppendQuotedArg(writeUrl, []byte(c.User))
-		writeUrl = append(writeUrl, "&p="...)
-		writeUrl = fasthttp.AppendQuotedArg(writeUrl, []byte(c.Password))
-	}
+	writeUrl = append(writeUrl, "&org="...)
+	writeUrl = append(writeUrl, organization...)
+	writeUrl = append(writeUrl, "&precision=ns"...)
 
 	queryUrl := make([]byte, 0)
 	queryUrl = append(queryUrl, host...)
 	queryUrl = append(queryUrl, "/query?db="...)
 	queryUrl = fasthttp.AppendQuotedArg(queryUrl, []byte(c.Database))
-	if c.User != "" {
-		writeUrl = append(writeUrl, "&u="...)
-		writeUrl = fasthttp.AppendQuotedArg(writeUrl, []byte(c.User))
-		writeUrl = append(writeUrl, "&p="...)
-		writeUrl = fasthttp.AppendQuotedArg(writeUrl, []byte(c.Password))
-	}
 	queryUrl = append(queryUrl, "&q="...)
 
-	return &FctsdbClient{
+	return &InfluxdbV2Client{
 		client: fasthttp.Client{
-			Name:                "fctsdb",
+			Name:                "influxdbv2",
 			MaxIdleConnDuration: DefaultIdleConnectionTimeout,
 		},
 		c:        c,
@@ -81,7 +64,7 @@ func NewFctsdbClient(c ClientConfig) *FctsdbClient {
 // Write writes the given byte slice to the HTTP server described in the Writer's HTTPWriterConfig.
 // It returns the latency in nanoseconds and any error received while sending the data over HTTP,
 // or it returns a new error if the HTTP response isn't as expected.
-func (w *FctsdbClient) Write(body []byte) (int64, error) {
+func (w *InfluxdbV2Client) Write(body []byte) (int64, error) {
 	req := fasthttp.AcquireRequest()
 	req.Header.SetContentTypeBytes(textPlain)
 	req.Header.SetMethodBytes(post)
@@ -89,6 +72,7 @@ func (w *FctsdbClient) Write(body []byte) (int64, error) {
 	if w.c.Gzip {
 		req.Header.Add("Content-Encoding", "gzip")
 	}
+	req.Header.Add("Authorization", "Token "+w.token)
 	// fmt.Println(string(body))
 	req.SetBody(body)
 	// fmt.Println("-------------------------------------------------")
@@ -100,12 +84,8 @@ func (w *FctsdbClient) Write(body []byte) (int64, error) {
 	lat := time.Since(start).Nanoseconds()
 	if err == nil {
 		sc := resp.StatusCode()
-		// fmt.Println("status code ", sc)
 		if sc != fasthttp.StatusNoContent {
 			err = fmt.Errorf("[DebugInfo: %s] Invalid write response (status %d): %s", w.c.DebugInfo, sc, resp.Body())
-			if w.c.Debug {
-				log.Println("Write body:", string(body))
-			}
 		}
 	}
 	fasthttp.ReleaseResponse(resp)
@@ -114,7 +94,7 @@ func (w *FctsdbClient) Write(body []byte) (int64, error) {
 	return lat, err
 }
 
-func (w *FctsdbClient) Query(lines []byte) (int64, error) {
+func (w *InfluxdbV2Client) Query(lines []byte) (int64, error) {
 	uri := fasthttp.AppendQuotedArg(w.queryUrl, lines)
 	req := fasthttp.AcquireRequest()
 	req.Header.SetContentTypeBytes(textPlain)
@@ -123,6 +103,7 @@ func (w *FctsdbClient) Query(lines []byte) (int64, error) {
 	if w.c.Gzip {
 		req.Header.Add("Accept-Encoding", "gzip")
 	}
+	req.Header.Add("Authorization", "Token "+w.token)
 	resp := fasthttp.AcquireResponse()
 	start := time.Now()
 	err := w.client.Do(req, resp)
@@ -172,100 +153,108 @@ func (w *FctsdbClient) Query(lines []byte) (int64, error) {
 	return lat, err
 }
 
-func (d *FctsdbClient) CreateDb(name string, withEncryption bool) error {
-	u, _ := url.Parse(string(d.host))
-
-	// serialize params the right way:
-	if name == "" {
-		name = d.c.Database
-	}
-
-	u.Path = "query"
-	v := u.Query()
-	v.Add("u", d.c.User)
-	v.Add("p", d.c.Password)
-	if withEncryption {
-		v.Set("q", fmt.Sprintf("CREATE DATABASE %s with encryption on", name))
-	} else {
-		v.Set("q", fmt.Sprintf("CREATE DATABASE %s", name))
-	}
-	u.RawQuery = v.Encode()
-
-	req, err := http.NewRequest("GET", u.String(), nil)
+func (d *InfluxdbV2Client) Setup() error {
+	client := influxdb2.NewClient(d.c.Host, "")
+	defer client.Close()
+	resp, err := client.Setup(context.Background(), d.c.User, d.c.Password, organization, "nothing", 0)
 	if err != nil {
 		return err
 	}
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	// does the body need to be read into the void?
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("createDb returned status code: %v", resp.StatusCode)
-	}
+	d.token = *resp.Auth.Token
 	return nil
 }
 
-// listDatabases lists the existing databases in InfluxDB.
-func (d *FctsdbClient) ListDatabases() ([]string, error) {
-	//var u url.URL
-	//u.Host = string(d.host)
-	u, err := url.Parse(string(d.host))
+func (d *InfluxdbV2Client) Login() error {
+	client := influxdb2.NewClient(d.c.Host, d.token)
+	defer client.Close()
+	err := client.UsersAPI().SignIn(context.Background(), d.c.User, d.c.Password)
 	if err != nil {
-		return nil, fmt.Errorf(" url parse failed: %s", err.Error())
+		return err
 	}
-
-	u.Path = "/query"
-	q := u.Query()
-	q.Add("u", d.c.User)
-	q.Add("p", d.c.Password)
-	q.Add("q", "show databases")
-	u.RawQuery = q.Encode()
-
-	resp, err := http.Get(u.String())
+	auths, err := client.AuthorizationsAPI().FindAuthorizationsByUserName(context.Background(), d.c.User)
 	if err != nil {
-		return nil, fmt.Errorf("listDatabases get error: %s", err.Error())
-	}
-
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("listDatabases returned status code: %v", resp.StatusCode)
-	}
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("listDatabases readAll error: %s", err.Error())
-	}
-
-	// Do ad-hoc parsing to find existing database names:
-	// {"results":[{"series":[{"name":"databases","columns":["name"],"values":[["_internal"],["benchmark_db"]]}]}]}%
-	// {"results":[{"statement_id":0,"series":[{"name":"databases","columns":["name"],"values":[["_internal"],["benchmark_db"]]}]}]} for 1.8.4
-	type listingType struct {
-		Results []struct {
-			Series []struct {
-				Values [][]interface{}
-			}
+		return err
+	} else {
+		for _, auth := range *auths {
+			d.token = *auth.Token
 		}
 	}
-	var listing listingType
-	err = json.Unmarshal(body, &listing)
+	err = client.UsersAPI().SignOut(context.Background())
+	return err
+}
+
+func (d *InfluxdbV2Client) MapBucket() error {
+	client := influxdb2.NewClient(d.c.Host, d.token)
+	defer client.Close()
+	org, err := client.OrganizationsAPI().FindOrganizationByName(context.Background(), organization)
 	if err != nil {
-		return nil, fmt.Errorf("listDatabases unmarshal error: %s", err.Error())
+		return err
+	}
+	bucket, err := client.BucketsAPI().FindBucketByName(context.Background(), d.c.Database)
+	if err != nil {
+		return err
 	}
 
+	req := fasthttp.AcquireRequest()
+	defer fasthttp.ReleaseRequest(req)
+	req.Header.SetContentTypeBytes(textPlain)
+	req.Header.SetMethodBytes(post)
+	req.Header.SetRequestURIBytes(append(d.host, "/api/v2/dbrps"...))
+	req.Header.Add("Authorization", "token "+d.token)
+	req.Header.Add("Content-type", "application/json")
+	// fmt.Println(string(body))
+	req.SetBody([]byte(fmt.Sprintf(`{
+        "bucketID": "%s",
+        "database": "%s",
+        "default": true,
+        "orgID": "%s",
+        "retention_policy": "default"
+      }`, *bucket.Id, d.c.Database, *org.Id)))
+	resp := fasthttp.AcquireResponse()
+	defer fasthttp.ReleaseResponse(resp)
+	err = d.client.Do(req, resp)
+	if err == nil {
+		sc := resp.StatusCode()
+		if sc != fasthttp.StatusOK {
+			err = fmt.Errorf("map bucket failed, status %d: %s", sc, resp.Body())
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (d *InfluxdbV2Client) CreateDb(name string, withEncryption bool) error {
+
+	client := influxdb2.NewClient(d.c.Host, d.token)
+	defer client.Close()
+	orgID, err := client.OrganizationsAPI().FindOrganizationByName(context.Background(), organization)
+	if err != nil {
+		return err
+	}
+	_, err = client.BucketsAPI().CreateBucketWithNameWithID(context.Background(), *orgID.Id, name)
+	return err
+}
+
+// listDatabases lists the existing databases in InfluxDB.
+func (d *InfluxdbV2Client) ListDatabases() ([]string, error) {
+	//var u url.URL
+	//u.Host = string(d.host)
+	client := influxdb2.NewClient(d.c.Host, d.token)
+	defer client.Close()
+	api := client.BucketsAPI()
+	resp, err := api.GetBuckets(context.Background())
+	if err != nil {
+		return nil, err
+	}
 	ret := make([]string, 0)
-	for _, nestedName := range listing.Results[0].Series[0].Values {
-		ret = append(ret, nestedName[0].(string))
+	for _, bucket := range *resp {
+		ret = append(ret, bucket.Name)
 	}
 	return ret, nil
 }
 
-func (d *FctsdbClient) Ping() error {
+func (d *InfluxdbV2Client) Ping() error {
 	u := fmt.Sprintf("%s/ping", d.host)
 	req, err := http.NewRequest(string(get), u, nil)
 	if err != nil {
@@ -282,31 +271,4 @@ func (d *FctsdbClient) Ping() error {
 		return fmt.Errorf("ping response statues is %d, not 204", resp.StatusCode)
 	}
 	return nil
-}
-
-type Response struct {
-	Results []Result
-	Err     string `json:"error,omitempty"`
-}
-
-// Message represents a user message.
-type Message struct {
-	Level string
-	Text  string
-}
-
-// Result represents a resultset returned from a single statement.
-type Result struct {
-	StatementId int `json:"statement_id"`
-	Series      []Row
-	Messages    []*Message
-	Err         string `json:"error,omitempty"`
-}
-
-type Row struct {
-	Name    string            `json:"name,omitempty"`
-	Tags    map[string]string `json:"tags,omitempty"`
-	Columns []string          `json:"columns,omitempty"`
-	Values  [][]interface{}   `json:"values,omitempty"`
-	Partial bool              `json:"partial,omitempty"`
 }

@@ -97,7 +97,7 @@ func init() {
 	scheduleCmd.Flags().StringVar(&scheduler.configsPath, "config-file", "", "调度器配置文件地址 (默认不使用)")
 	scheduleCmd.Flags().StringSliceVar(&scheduler.agentEndpoints, "agent", nil, "数据库代理服务地址，为空表示不使用 (默认不使用)")
 	scheduleCmd.Flags().StringVar(&scheduler.grafanaEndpoint, "grafana", "", "grafana的dashboard地址，例如: http://124.71.230.36:4000/sources/1/dashboards/4")
-	scheduleCmd.Flags().StringVar(&scheduler.format, "format", "fctsdb", "目标数据库类型，当前仅支持fctsdb和mysql")
+	scheduleCmd.Flags().StringVar(&scheduler.format, "format", "fctsdb", "目标数据库类型，当前仅支持fctsdb、mysql、influxdbv2")
 	scheduleCmd.Flags().BoolVar(&scheduler.withEncryption, "withEncryption", false, "是否采用加密数据库进行测试")
 	scheduleCmd.Flags().StringVar(&scheduler.username, "username", "", "用户名")
 	scheduleCmd.Flags().StringVar(&scheduler.password, "password", "", "密码")

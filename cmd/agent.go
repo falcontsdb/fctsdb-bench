@@ -28,5 +28,5 @@ func BindCmd(s *agent.AgentService, cmd *cobra.Command) {
 	flags.StringVar(&s.Port, "port", "8966", "监听端口")
 	flags.StringVar(&s.BinPath, "fctsdb-path", "./fctsdb", "数据库二进制文件地址")
 	flags.StringVar(&s.ConfigPath, "fctsdb-config", "./config", "数据库config文件地址")
-	flags.StringVar(&s.Format, "format", "fctsdb", "数据库的类型，当前仅支持fctsdb和mysql，默认为fctsdb")
+	flags.StringVar(&s.Format, "format", "fctsdb", "数据库的类型，当前仅支持fctsdb、mysql、influxdbv2，默认为fctsdb")
 }

@@ -73,7 +73,7 @@ type BasicBenchTask struct {
 func (d *BasicBenchTask) Validate() {
 	d.daemonUrls = strings.Split(d.CsvDaemonUrls, ",")
 	d.databaseNames = strings.Split(d.DBName, ",")
-	if d.Format != "fctsdb" && d.Format != "mysql" {
+	if d.Format != "fctsdb" && d.Format != "mysql" && d.Format != "influxdbv2" {
 		log.Fatal("wrong database format, support fctsdb or mysql ")
 	}
 	if len(d.daemonUrls) == 0 {
@@ -154,7 +154,6 @@ func (d *BasicBenchTask) PrepareWorkers() {
 
 	// 建一个最小客户端，检查连接和创建数据库
 	var cli db_client.DBClient
-	var err error
 	miniConfig := db_client.ClientConfig{
 		Host:     d.daemonUrls[0],
 		User:     d.Username,
@@ -164,17 +163,28 @@ func (d *BasicBenchTask) PrepareWorkers() {
 	case "fctsdb":
 		cli = db_client.NewFctsdbClient(miniConfig)
 	case "mysql":
-		cli, err = db_client.NewMysqlClient(miniConfig)
+		client, err := db_client.NewMysqlClient(miniConfig)
 		if err != nil {
 			log.Fatalln("open mysql failed" + err.Error())
 		}
+		cli = client
+	case "influxdbv2":
+		cli = db_client.NewInfluxdbV2Client(miniConfig)
 	}
-	err = d.checkDbConnection(cli)
+	err := d.checkDbConnection(cli)
+
 	if err != nil {
 		log.Fatalln(err.Error())
 	}
-	if d.DoDBCreate {
-		d.createDb(cli)
+
+	if !d.NeedPrePare && d.MixMode == "read_only" {
+	} else {
+		if d.DoDBCreate {
+			if d.Format == "influxdbv2" {
+				cli.(*db_client.InfluxdbV2Client).Setup()
+			}
+			d.createDb(cli)
+		}
 	}
 
 	// 根据dbName准备workers
@@ -267,6 +277,8 @@ func (d *BasicBenchTask) prepareWorkersOnEachDB(dbName string) {
 			worker.serializer = serializers.NewSerializerMysql()
 		case "fctsdb":
 			worker.serializer = serializers.NewSerializerInflux()
+		case "influxdbv2":
+			worker.serializer = serializers.NewSerializerInflux()
 		}
 
 		// 每个worker绑定一个db client
@@ -288,6 +300,13 @@ func (d *BasicBenchTask) prepareWorkersOnEachDB(dbName string) {
 				log.Fatalln("open mysql failed" + err.Error())
 			}
 			worker.writer = cli
+		case "influxdbv2":
+			client := db_client.NewInfluxdbV2Client(c)
+			err := client.Login()
+			if err != nil {
+				log.Fatalln("open influxdb v2 failed" + err.Error())
+			}
+			worker.writer = client
 		}
 
 		// worker的其他必要参数
@@ -353,6 +372,10 @@ func (d *BasicBenchTask) Run() {
 		d.SyncShowStatics("prepare", ctx)
 		wg.Wait()
 		cancel()
+
+		if d.Format == "influxdbv2" {
+			d.workerProcess[0].writer.(*db_client.InfluxdbV2Client).MapBucket()
+		}
 	}
 
 	// cpu profile

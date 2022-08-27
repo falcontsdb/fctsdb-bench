@@ -50,7 +50,9 @@ func (s *AgentService) Validate() error {
 	case "fctsdb":
 		log.Println("start with fctsdb format")
 		s.handlers = NewFctsdbAgent(s.BinPath, s.ConfigPath)
-
+	case "influxdbv2":
+		log.Println("start with influxdbv2 format")
+		s.handlers = NewInfluxdbV2Agent(s.BinPath, s.ConfigPath)
 	}
 	return nil
 }
