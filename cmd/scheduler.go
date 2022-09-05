@@ -355,7 +355,7 @@ func (s *Scheduler) NewBasicBenchTask(conf buildin_testcase.BasicBenchTaskConfig
 		CsvDaemonUrls:     s.csvDaemonUrls,
 		MixMode:           conf.MixMode,
 		UseCase:           conf.UseCase,
-		Workers:           conf.Workers,
+		WorkerCount:       conf.Workers,
 		BatchSize:         conf.BatchSize,
 		ScaleVar:          conf.ScaleVar,
 		SamplingInterval:  sampInter,

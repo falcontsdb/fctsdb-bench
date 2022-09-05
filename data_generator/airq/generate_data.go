@@ -117,11 +117,6 @@ func (s *AirqSimulator) Next(p *common.Point) int64 {
 	p.SetTimestamp(&timestamp)
 
 	// Populate host-specific tags: for example, LSVNV2182E2100001
-	// p.AppendTag(AirqTagKeys[0], Airq.Province)
-	// p.AppendTag(AirqTagKeys[1], Airq.City)
-	// p.AppendTag(AirqTagKeys[2], Airq.County)
-	// p.AppendTag(AirqTagKeys[3], Airq.SiteType)
-	// p.AppendTag(AirqTagKeys[4], Airq.SiteID)
 	for i := range AirqTagKeys {
 		p.AppendTag(AirqTagKeys[i], Airq.TagValues[i])
 	}

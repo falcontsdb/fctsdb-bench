@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"testing"
+	"time"
 
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
 	"github.com/valyala/fasthttp"
@@ -14,8 +15,7 @@ func TestMysqlClient_CreateDb(t *testing.T) {
 	mc, err := NewMysqlClient(ClientConfig{
 		Host:      "172.17.2.22",
 		Database:  "test1",
-		Gzip:      false,
-		Debug:     false,
+		Gzip:      3,
 		User:      "root",
 		Password:  "123456",
 		DebugInfo: "",
@@ -24,7 +24,7 @@ func TestMysqlClient_CreateDb(t *testing.T) {
 		fmt.Println(err)
 	}
 	defer mc.Close()
-	err = mc.CreateDb("test1", true)
+	err = mc.CreateDatabase("test1", true)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -34,8 +34,7 @@ func TestMysqlClient_ListDatabases(t *testing.T) {
 	mc, err := NewMysqlClient(ClientConfig{
 		Host: "172.17.2.22",
 		//Database:  "benchmark_db",
-		Gzip:      false,
-		Debug:     false,
+		Gzip:      3,
 		User:      "root",
 		Password:  "123456",
 		DebugInfo: "",
@@ -44,19 +43,18 @@ func TestMysqlClient_ListDatabases(t *testing.T) {
 		fmt.Println(err)
 	}
 	defer mc.Close()
-	dbs, err := mc.ListDatabases()
+	// dbs, err := mc.ListDatabases()
 	if err != nil {
 		fmt.Println(err)
 	}
-	fmt.Println(dbs)
+	// fmt.Println(dbs)
 }
 
 func TestMysqlClient_Ping(t *testing.T) {
 	mc, err := NewMysqlClient(ClientConfig{
 		Host:      "172.17.2.22:3306",
 		Database:  "test",
-		Gzip:      false,
-		Debug:     false,
+		Gzip:      3,
 		User:      "root",
 		Password:  "123456",
 		DebugInfo: "",
@@ -65,15 +63,14 @@ func TestMysqlClient_Ping(t *testing.T) {
 		fmt.Println(err)
 	}
 	defer mc.Close()
-	fmt.Println(mc.Ping())
+	fmt.Println(mc.CheckConnection(time.Minute))
 }
 
 func TestMysqlClient_Query(t *testing.T) {
 	mc, err := NewMysqlClient(ClientConfig{
 		Host:      "172.17.2.22",
 		Database:  "test",
-		Gzip:      false,
-		Debug:     false,
+		Gzip:      3,
 		User:      "root",
 		Password:  "123456",
 		DebugInfo: "",
@@ -93,8 +90,7 @@ func TestMysqlClient_Write(t *testing.T) {
 	mc, err := NewMysqlClient(ClientConfig{
 		Host:      "172.17.2.22",
 		Database:  "test",
-		Gzip:      false,
-		Debug:     false,
+		Gzip:      3,
 		User:      "root",
 		Password:  "123456",
 		DebugInfo: "",
@@ -185,4 +181,8 @@ func TestInfluxdbv2Client_CreateDb(t *testing.T) {
 	// writeAPI.WriteRecord(fmt.Sprintf("stat,unit=temperature avg=%f,max=%f", 23.5, 45.0))
 	// Flush writes
 	// writeAPI.Flush()
+}
+
+func TestMatrixdb(t *testing.T) {
+
 }

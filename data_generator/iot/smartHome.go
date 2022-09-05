@@ -61,9 +61,9 @@ func NewSmartHome(id int, offset int, start time.Time) *SmartHome {
 
 // TickAll advances all Distributions of a Host.
 func (r *room) TickAll(d time.Duration) {
-	for _, m := range r.SimulatedMeasurements {
-		m.Tick(d)
-	}
+	// for _, m := range r.SimulatedMeasurements {
+	// m.Tick(d)
+	// }
 }
 
 func (r *room) ResetMeasurementCounter() {
@@ -134,14 +134,6 @@ func (h *SmartHome) NewSmartHomeMeasurements(start time.Time) {
 }
 
 // TickAll advances all Distributions of a Host.
-func (h *SmartHome) TickAll(d time.Duration) {
-	for i := range h.SimulatedMeasurements {
-		h.SimulatedMeasurements[i].Tick(d)
-	}
-	for _, room := range h.Rooms {
-		room.TickAll(d)
-	}
-}
 
 func (h *SmartHome) ResetMeasurementCounter() {
 	h.totalMeasurementsGiven = 0

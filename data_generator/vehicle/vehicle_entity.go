@@ -8,8 +8,7 @@ import (
 )
 
 var (
-	EntityByteString      = []byte("vehicle")       // heap optimization
-	EntityTotalByteString = []byte("vehicle-total") // heap optimization
+	EntityByteString = []byte("vehicle") // heap optimization
 )
 
 var (
@@ -91,10 +90,6 @@ func NewEntityMeasurement(start time.Time) *EntityMeasurement {
 		timestamp: start,
 		values:    values,
 	}
-}
-
-func (m *EntityMeasurement) Tick(d time.Duration) {
-	m.timestamp = m.timestamp.Add(d)
 }
 
 func (m *EntityMeasurement) ToPoint(p *common.Point) bool {

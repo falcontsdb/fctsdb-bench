@@ -2,7 +2,6 @@ package common
 
 import (
 	"io"
-	"time"
 )
 
 const (
@@ -48,8 +47,14 @@ type Simulator interface {
 
 // SimulatedMeasurement simulates one measurement (e.g. Redis for DevOps).
 type SimulatedMeasurement interface {
-	Tick(time.Duration)
 	ToPoint(*Point) bool //returns true if point if properly filled, false means, that point should be skipped
 }
 
 // MakeUsablePoint allocates a new Point ready for use by a Simulator.
+
+type MeasurementInfo struct {
+	MeasurementName []byte
+	TagKeys         [][]byte
+	FieldKeys       [][]byte
+	FieldType       []string
+}

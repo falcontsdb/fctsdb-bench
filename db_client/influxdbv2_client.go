@@ -3,13 +3,14 @@ package db_client
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"log"
-	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
+	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/common"
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
+	log "github.com/sirupsen/logrus"
 	"github.com/valyala/fasthttp"
 )
 
@@ -26,7 +27,7 @@ type InfluxdbV2Client struct {
 	token    string
 }
 
-// NewFctsdbClient returns a new HTTPWriter from the supplied HTTPWriterConfig.
+// NewInfluxdbV2Client returns a new HTTPWriter from the supplied HTTPWriterConfig.
 func NewInfluxdbV2Client(c ClientConfig) *InfluxdbV2Client {
 	var host []byte
 	writeUrl := make([]byte, 0)
@@ -64,28 +65,29 @@ func NewInfluxdbV2Client(c ClientConfig) *InfluxdbV2Client {
 // Write writes the given byte slice to the HTTP server described in the Writer's HTTPWriterConfig.
 // It returns the latency in nanoseconds and any error received while sending the data over HTTP,
 // or it returns a new error if the HTTP response isn't as expected.
-func (w *InfluxdbV2Client) Write(body []byte) (int64, error) {
+func (f *InfluxdbV2Client) Write(body []byte) (int64, error) {
+	log.Debug("Write body", string(body))
 	req := fasthttp.AcquireRequest()
 	req.Header.SetContentTypeBytes(textPlain)
 	req.Header.SetMethodBytes(post)
-	req.Header.SetRequestURIBytes(w.writeUrl)
-	if w.c.Gzip {
+	req.Header.SetRequestURIBytes(f.writeUrl)
+	req.Header.Add("Authorization", "Token "+f.token)
+	if f.c.Gzip > 0 {
 		req.Header.Add("Content-Encoding", "gzip")
+		compressedBatch := bytes.NewBuffer(make([]byte, 0, 4*1024*1024))
+		fasthttp.WriteGzipLevel(compressedBatch, body, f.c.Gzip)
+		req.SetBody(compressedBatch.Bytes())
+	} else {
+		req.SetBody(body)
 	}
-	req.Header.Add("Authorization", "Token "+w.token)
-	// fmt.Println(string(body))
-	req.SetBody(body)
-	// fmt.Println("-------------------------------------------------")
-	// fmt.Println(string(body))
-
 	resp := fasthttp.AcquireResponse()
 	start := time.Now()
-	err := w.client.Do(req, resp)
+	err := f.client.Do(req, resp)
 	lat := time.Since(start).Nanoseconds()
 	if err == nil {
 		sc := resp.StatusCode()
 		if sc != fasthttp.StatusNoContent {
-			err = fmt.Errorf("[DebugInfo: %s] Invalid write response (status %d): %s", w.c.DebugInfo, sc, resp.Body())
+			err = fmt.Errorf("invalid write response (status %d): %s", sc, string(resp.Body()))
 		}
 	}
 	fasthttp.ReleaseResponse(resp)
@@ -94,57 +96,41 @@ func (w *InfluxdbV2Client) Write(body []byte) (int64, error) {
 	return lat, err
 }
 
-func (w *InfluxdbV2Client) Query(lines []byte) (int64, error) {
-	uri := fasthttp.AppendQuotedArg(w.queryUrl, lines)
+func (f *InfluxdbV2Client) Query(body []byte) (int64, error) {
+	uri := fasthttp.AppendQuotedArg(f.queryUrl, body)
 	req := fasthttp.AcquireRequest()
 	req.Header.SetContentTypeBytes(textPlain)
 	req.Header.SetMethodBytes(get)
 	req.Header.SetRequestURIBytes(uri)
-	if w.c.Gzip {
+	req.Header.Add("Authorization", "Token "+f.token)
+	if f.c.Gzip > 0 {
 		req.Header.Add("Accept-Encoding", "gzip")
 	}
-	req.Header.Add("Authorization", "Token "+w.token)
+
+	log.Debug("Query url:", string(uri))
+
 	resp := fasthttp.AcquireResponse()
 	start := time.Now()
-	err := w.client.Do(req, resp)
+	err := f.client.Do(req, resp)
 	lat := time.Since(start).Nanoseconds()
 	if err == nil {
 		sc := resp.StatusCode()
 		var body []byte
 		if string(resp.Header.Peek("Content-Encoding")) == "gzip" {
-			_, err := fasthttp.WriteGunzip(w.buf, resp.Body())
+			_, err := fasthttp.WriteGunzip(f.buf, resp.Body())
 			if err != nil {
-				log.Printf("[ParseGzip] NewReader error: %v, maybe data is ungzip\n", err)
+				log.Error("[ParseGzip] NewReader error: %v, maybe data is ungzip\n", err)
 			}
-			body = w.buf.Bytes()
-			w.buf.Reset()
+			body = f.buf.Bytes()
+			f.buf.Reset()
 		} else {
 			body = resp.Body()
 		}
-		if sc != fasthttp.StatusOK {
-			err = fmt.Errorf("[DebugInfo: %s] Invalid query response (status %d): %s", w.c.DebugInfo, sc, string(body))
-		} else {
-			if !bytes.Contains(body, responseMustContain) {
-				err = fmt.Errorf("[DebugInfo: %s] Invalid query response (status %d): %s", w.c.DebugInfo, sc, string(body))
-			}
-		}
-		if w.c.Debug {
-			fmt.Println(string(uri))
-			var r Response
-			err := json.Unmarshal(body, &r)
-			if err != nil {
-				log.Println("unmarshal response error", err.Error())
-				log.Println(string(body))
-			} else {
-				if len(r.Results) == 0 {
-					log.Println("result is 0:", string(uri))
-				} else {
-					if len(r.Results[0].Series) == 0 {
-						log.Println("row is 0:", string(uri))
-					}
-				}
-			}
-			// fmt.Fprintln(os.Stdout, string(resp.Body()))
+
+		log.Debug("Query response body", string(body))
+
+		if sc != fasthttp.StatusOK || !bytes.Contains(body, responseMustContain) {
+			err = fmt.Errorf("invalid query response (status %d, db %s): %s", sc, f.c.Database, string(body))
 		}
 	}
 	fasthttp.ReleaseResponse(resp)
@@ -153,8 +139,9 @@ func (w *InfluxdbV2Client) Query(lines []byte) (int64, error) {
 	return lat, err
 }
 
-func (d *InfluxdbV2Client) Setup() error {
-	client := influxdb2.NewClient(d.c.Host, "")
+func (d *InfluxdbV2Client) InitUser() error {
+
+	client := influxdb2.NewClient(string(d.host), "")
 	defer client.Close()
 	resp, err := client.Setup(context.Background(), d.c.User, d.c.Password, organization, "nothing", 0)
 	if err != nil {
@@ -164,8 +151,9 @@ func (d *InfluxdbV2Client) Setup() error {
 	return nil
 }
 
-func (d *InfluxdbV2Client) Login() error {
-	client := influxdb2.NewClient(d.c.Host, d.token)
+func (d *InfluxdbV2Client) LoginUser() error {
+
+	client := influxdb2.NewClient(string(d.host), d.token)
 	defer client.Close()
 	err := client.UsersAPI().SignIn(context.Background(), d.c.User, d.c.Password)
 	if err != nil {
@@ -179,12 +167,13 @@ func (d *InfluxdbV2Client) Login() error {
 			d.token = *auth.Token
 		}
 	}
+	log.Debug("token: ", d.token)
 	err = client.UsersAPI().SignOut(context.Background())
 	return err
 }
 
 func (d *InfluxdbV2Client) MapBucket() error {
-	client := influxdb2.NewClient(d.c.Host, d.token)
+	client := influxdb2.NewClient(string(d.host), d.token)
 	defer client.Close()
 	org, err := client.OrganizationsAPI().FindOrganizationByName(context.Background(), organization)
 	if err != nil {
@@ -224,9 +213,21 @@ func (d *InfluxdbV2Client) MapBucket() error {
 	return nil
 }
 
-func (d *InfluxdbV2Client) CreateDb(name string, withEncryption bool) error {
+func (d *InfluxdbV2Client) CreateDatabase(name string, withEncryption bool) error {
 
-	client := influxdb2.NewClient(d.c.Host, d.token)
+	existingDatabases, err := d.listDatabases()
+	if err != nil {
+		return err
+	}
+
+	for _, existingDatabase := range existingDatabases {
+		if name == existingDatabase {
+			log.Warn("The following database \"%s\" already exist in the data store, do'not need create.", name)
+			return nil
+		}
+	}
+
+	client := influxdb2.NewClient(string(d.host), d.token)
 	defer client.Close()
 	orgID, err := client.OrganizationsAPI().FindOrganizationByName(context.Background(), organization)
 	if err != nil {
@@ -237,38 +238,126 @@ func (d *InfluxdbV2Client) CreateDb(name string, withEncryption bool) error {
 }
 
 // listDatabases lists the existing databases in InfluxDB.
-func (d *InfluxdbV2Client) ListDatabases() ([]string, error) {
-	//var u url.URL
-	//u.Host = string(d.host)
-	client := influxdb2.NewClient(d.c.Host, d.token)
+func (d *InfluxdbV2Client) listDatabases() ([]string, error) {
+
+	client := influxdb2.NewClient(string(d.host), d.token)
 	defer client.Close()
 	api := client.BucketsAPI()
 	resp, err := api.GetBuckets(context.Background())
 	if err != nil {
 		return nil, err
 	}
-	ret := make([]string, 0)
+	databases := make([]string, 0)
 	for _, bucket := range *resp {
-		ret = append(ret, bucket.Name)
+		databases = append(databases, bucket.Name)
 	}
-	return ret, nil
+	log.Info("The following databases already exist in the data store: ", strings.Join(databases, ", "))
+	return databases, nil
 }
 
-func (d *InfluxdbV2Client) Ping() error {
-	u := fmt.Sprintf("%s/ping", d.host)
-	req, err := http.NewRequest(string(get), u, nil)
-	if err != nil {
-		return err
-	}
-	client := http.Client{
-		Timeout: time.Second * 2,
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	if resp.StatusCode != 204 {
-		return fmt.Errorf("ping response statues is %d, not 204", resp.StatusCode)
-	}
+func (f *InfluxdbV2Client) CreateMeasurement(p *common.Point) error {
 	return nil
+}
+
+func (f *InfluxdbV2Client) CheckConnection(timeout time.Duration) bool {
+	req := fasthttp.AcquireRequest()
+	defer fasthttp.ReleaseRequest(req)
+
+	req.Header.SetMethodBytes(get)
+	req.Header.SetRequestURI(fmt.Sprintf("%s/ping", f.host))
+
+	resp := fasthttp.AcquireResponse()
+	defer fasthttp.ReleaseResponse(resp)
+
+	// client := http.Client{}
+	clientWithTimeout := fasthttp.Client{WriteTimeout: time.Second, ReadTimeout: time.Second, MaxConnWaitTimeout: time.Second}
+	endTime := time.Now().Add(timeout)
+	log.Info("checking connection ")
+	fmt.Print("checking .")
+	defer fmt.Println()
+	for time.Now().Before(endTime) {
+		err := clientWithTimeout.DoTimeout(req, resp, time.Second)
+		if err == nil && resp.StatusCode() == fasthttp.StatusNoContent {
+			return true
+		}
+		time.Sleep(2 * time.Second)
+		fmt.Print(".")
+	}
+
+	return false
+}
+
+// SerializeInfluxBulk writes Point data to the given writer, conforming to the
+// InfluxDB wire protocol.
+//
+// This function writes output that looks like:
+// <measurement>,<tag key>=<tag value> <field name>=<field value> <timestamp>\n
+//
+// For example:
+// foo,tag0=bar baz=-1.0 100\n
+//
+func (m *InfluxdbV2Client) BeforeSerializePoints(buf []byte, p *common.Point) []byte {
+	return buf
+}
+
+func (s *InfluxdbV2Client) SerializeAndAppendPoint(buf []byte, p *common.Point) []byte {
+	// buf := make([]byte, 0, 4*1024)
+	buf = append(buf, p.MeasurementName...)
+
+	for i := 0; i < len(p.TagKeys); i++ {
+		buf = append(buf, ',')
+		buf = append(buf, p.TagKeys[i]...)
+		buf = append(buf, '=')
+		buf = append(buf, p.TagValues[i]...)
+	}
+
+	if len(p.FieldKeys)+len(p.Int64FiledKeys) > 0 {
+		buf = append(buf, ' ')
+	}
+
+	var i int
+	for i = 0; i < len(p.FieldKeys); i++ {
+		buf = append(buf, p.FieldKeys[i]...)
+		buf = append(buf, '=')
+
+		v := p.FieldValues[i]
+		buf = fastFormatAppend(v, buf, false)
+
+		// Influx uses 'i' to indicate integers:
+		switch v.(type) {
+		case int, int64:
+			buf = append(buf, 'i')
+		}
+
+		if i+1 < len(p.FieldKeys) {
+			buf = append(buf, ',')
+		}
+	}
+
+	if i > 0 && len(p.Int64FiledKeys) > 0 {
+		buf = append(buf, ',')
+	}
+
+	for i = 0; i < len(p.Int64FiledKeys); i++ {
+		buf = append(buf, p.Int64FiledKeys[i]...)
+		buf = append(buf, '=')
+
+		v := p.Int64FiledValues[i]
+		buf = strconv.AppendInt(buf, v, 10)
+		// Influx uses 'i' to indicate integers:
+		buf = append(buf, 'i')
+		if i+1 < len(p.Int64FiledKeys) {
+			buf = append(buf, ',')
+		}
+	}
+
+	buf = append(buf, ' ')
+	buf = fastFormatAppend(p.Timestamp.UTC().UnixNano(), buf, true)
+	buf = append(buf, '\n')
+
+	return buf
+}
+
+func (m *InfluxdbV2Client) AfterSerializePoints(buf []byte, p *common.Point) []byte {
+	return buf
 }

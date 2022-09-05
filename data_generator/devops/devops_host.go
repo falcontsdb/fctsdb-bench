@@ -184,10 +184,3 @@ func NewHost(i int, offset int, start time.Time) Host {
 
 	return h
 }
-
-// TickAll advances all Distributions of a Host.
-func (h *Host) TickAll(d time.Duration) {
-	for i := range h.SimulatedMeasurements {
-		h.SimulatedMeasurements[i].Tick(d)
-	}
-}

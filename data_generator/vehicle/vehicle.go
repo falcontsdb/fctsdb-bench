@@ -46,13 +46,6 @@ func NewVehicle(i int, offset int, start time.Time) Vehicle {
 	return h
 }
 
-// TickAll advances all Distributions of a Host.
-func (v *Vehicle) TickAll(d time.Duration) {
-	for i := range v.SimulatedMeasurements {
-		v.SimulatedMeasurements[i].Tick(d)
-	}
-}
-
 func (v *Vehicle) NumMeasurements() int {
 	return len(v.SimulatedMeasurements)
 }

@@ -29,17 +29,12 @@ var (
 
 type CityAirQualityMeasurement struct {
 	timestamp time.Time
-	// rand      rand.RNG
 }
 
 func NewCityAirQualityMeasurement(start time.Time) *CityAirQualityMeasurement {
 	return &CityAirQualityMeasurement{
 		timestamp: start,
 	}
-}
-
-func (m *CityAirQualityMeasurement) Tick(d time.Duration) {
-	m.timestamp = m.timestamp.Add(d)
 }
 
 func (m *CityAirQualityMeasurement) ToPoint(p *common.Point) bool {

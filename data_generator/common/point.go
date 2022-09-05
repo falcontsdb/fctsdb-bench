@@ -53,6 +53,7 @@ func (p *Point) AppendField(key []byte, value interface{}) {
 	p.FieldValues = append(p.FieldValues, value)
 }
 
+// int64 特例化，加快速度
 func (p *Point) AppendInt64Field(key []byte, value int64) {
 	p.Int64FiledKeys = append(p.Int64FiledKeys, key)
 	p.Int64FiledValues = append(p.Int64FiledValues, value)

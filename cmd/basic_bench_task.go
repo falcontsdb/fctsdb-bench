@@ -4,9 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"log"
 	"math/rand"
 	"os"
 	"runtime/pprof"
@@ -22,8 +20,7 @@ import (
 	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/vehicle"
 	"git.querycap.com/falcontsdb/fctsdb-bench/db_client"
 	fctsdb "git.querycap.com/falcontsdb/fctsdb-bench/query_generator"
-	"git.querycap.com/falcontsdb/fctsdb-bench/serializers"
-	"github.com/valyala/fasthttp"
+	log "github.com/sirupsen/logrus"
 )
 
 var bufferPool = sync.Pool{
@@ -36,7 +33,7 @@ type BasicBenchTask struct {
 	// Program option vars:
 	CsvDaemonUrls     string
 	UseGzip           int
-	Workers           int
+	WorkerCount       int
 	BatchSize         int
 	DBName            string
 	TimeLimit         time.Duration
@@ -71,6 +68,10 @@ type BasicBenchTask struct {
 }
 
 func (d *BasicBenchTask) Validate() {
+	if d.Debug {
+		log.SetLevel(log.DebugLevel)
+	}
+	log.SetFormatter(&log.TextFormatter{TimestampFormat: "2006/01/02 15:04:05", FullTimestamp: true})
 	d.daemonUrls = strings.Split(d.CsvDaemonUrls, ",")
 	d.databaseNames = strings.Split(d.DBName, ",")
 	if d.Format != "fctsdb" && d.Format != "mysql" && d.Format != "influxdbv2" {
@@ -79,14 +80,14 @@ func (d *BasicBenchTask) Validate() {
 	if len(d.daemonUrls) == 0 {
 		log.Fatal("missing 'urls' flag")
 	}
-	log.Printf("daemon URLs: %v\n", d.daemonUrls)
-	log.Println("Using mix mode", d.MixMode)
+	log.Info("daemon URLs: ", d.daemonUrls)
+	log.Info("Using mix mode: ", d.MixMode)
 
 	// the default seed is the current timestamp:
 	if d.Seed == 0 {
 		d.Seed = int64(time.Now().Nanosecond())
 	}
-	log.Printf("using random seed %d\n", d.Seed)
+	log.Info("using random seed: ", d.Seed)
 	rand.Seed(d.Seed)
 
 	// Parse timestamps:
@@ -106,18 +107,18 @@ func (d *BasicBenchTask) Validate() {
 	if d.SamplingInterval <= 0 {
 		log.Fatal("Invalid sampling interval")
 	}
-	log.Printf("Using sampling interval %v\n", d.SamplingInterval)
+	log.Info("Using sampling interval: ", d.SamplingInterval)
 	if d.UseGzip < 0 || d.UseGzip > 9 {
 		log.Fatal("Invalid gzip level, must bu in 0-9")
 	}
 	if d.UseGzip == 0 {
-		log.Println("Close the gzip")
+		log.Info("Close the gzip")
 	} else {
-		log.Println("Using gzip: level", d.UseGzip)
+		log.Info("Using gzip: level", d.UseGzip)
 	}
 
 	// query命令case和id对应相关处理
-	log.Println("Use case", d.UseCase)
+	log.Info("Use case: ", d.UseCase)
 	if d.MixMode != "write_only" {
 		var queryCase *fctsdb.QueryCase
 		switch d.UseCase {
@@ -141,7 +142,7 @@ func (d *BasicBenchTask) Validate() {
 			log.Fatalln("the sql template is empty")
 		} else {
 			for _, sql := range d.sqlTemplate {
-				log.Println("Use sql:", sql)
+				log.Info("Use sql: ", sql)
 			}
 		}
 	}
@@ -171,19 +172,17 @@ func (d *BasicBenchTask) PrepareWorkers() {
 	case "influxdbv2":
 		cli = db_client.NewInfluxdbV2Client(miniConfig)
 	}
-	err := d.checkDbConnection(cli)
-
-	if err != nil {
-		log.Fatalln(err.Error())
+	if !cli.CheckConnection(2 * time.Minute) {
+		log.Fatalln("Check connection timeout...")
 	}
 
 	if !d.NeedPrePare && d.MixMode == "read_only" {
 	} else {
-		if d.DoDBCreate {
-			if d.Format == "influxdbv2" {
-				cli.(*db_client.InfluxdbV2Client).Setup()
+		if d.Username != "" {
+			err := cli.InitUser()
+			if err != nil {
+				log.Fatal(err.Error())
 			}
-			d.createDb(cli)
 		}
 	}
 
@@ -191,12 +190,14 @@ func (d *BasicBenchTask) PrepareWorkers() {
 	for _, dbName := range d.databaseNames {
 		d.prepareWorkersOnEachDB(dbName)
 	}
+
+	time.Sleep(time.Second)
 }
 
 func (d *BasicBenchTask) prepareWorkersOnEachDB(dbName string) {
 
 	// 每个database有Workers个线程
-	workersEachDB := make([]Worker, d.Workers)
+	workersEachDB := make([]Worker, d.WorkerCount)
 
 	// 每个database共享一个生成器
 	var simulator common.Simulator
@@ -267,29 +268,17 @@ func (d *BasicBenchTask) prepareWorkersOnEachDB(dbName string) {
 
 	// 创建workers
 	for j := 0; j < len(workersEachDB); j++ {
-		// fmt.Println(j)
+
 		worker := Worker{}
 		worker.simulator = simulator // 共享生成器
 
-		// 每个worker绑定一个序列化器
-		switch d.Format {
-		case "mysql":
-			worker.serializer = serializers.NewSerializerMysql()
-		case "fctsdb":
-			worker.serializer = serializers.NewSerializerInflux()
-		case "influxdbv2":
-			worker.serializer = serializers.NewSerializerInflux()
-		}
-
 		// 每个worker绑定一个db client
 		c := db_client.ClientConfig{
-			Host:      d.daemonUrls[j%len(d.daemonUrls)],
-			Database:  dbName,
-			Gzip:      d.UseGzip > 0,
-			Debug:     d.Debug,
-			DebugInfo: fmt.Sprintf("worker #%d", j),
-			User:      d.Username,
-			Password:  d.Password,
+			Host:     d.daemonUrls[j%len(d.daemonUrls)],
+			Database: dbName,
+			Gzip:     d.UseGzip,
+			User:     d.Username,
+			Password: d.Password,
 		}
 		switch d.Format {
 		case "fctsdb":
@@ -302,7 +291,7 @@ func (d *BasicBenchTask) prepareWorkersOnEachDB(dbName string) {
 			worker.writer = cli
 		case "influxdbv2":
 			client := db_client.NewInfluxdbV2Client(c)
-			err := client.Login()
+			err := client.LoginUser()
 			if err != nil {
 				log.Fatalln("open influxdb v2 failed" + err.Error())
 			}
@@ -320,7 +309,7 @@ func (d *BasicBenchTask) prepareWorkersOnEachDB(dbName string) {
 		case "read_only":
 			worker.Mode = "query"
 		case "parallel":
-			if j >= d.QueryPercent*d.Workers/100 {
+			if j >= d.QueryPercent*d.WorkerCount/100 {
 				worker.Mode = "write"
 			} else {
 				worker.Mode = "query"
@@ -331,20 +320,21 @@ func (d *BasicBenchTask) prepareWorkersOnEachDB(dbName string) {
 		workersEachDB[j] = worker
 	}
 
-	// 如果是mysql还需要创建表
-	if d.DoDBCreate && d.Format == "mysql" {
-		w := workersEachDB[0].writer.(*db_client.MysqlClient)
-		s := serializers.NewSerializerMysql()
+	// 是否创建数据库和数据表，目前仅实现了不同数据写入的数据都是相同的
+	if d.DoDBCreate {
+		writer := workersEachDB[0].writer
+		err := writer.CreateDatabase(dbName, d.WithEncryption)
+		if err != nil {
+			log.Fatalln(err)
+		}
 		point := common.MakeUsablePoint()
 		createdMeasurement := make(map[string]bool)
-		buf := make([]byte, 0, 1024)
 		for {
 			simulator.Next(point)
 			if _, ok := createdMeasurement[string(point.MeasurementName)]; ok {
 				break
 			}
-			buf = s.CreateTableFromPoint(buf, point)
-			_, err := w.Write(buf)
+			err := writer.CreateMeasurement(point)
 			if err != nil {
 				log.Fatalln(err)
 			}
@@ -353,7 +343,6 @@ func (d *BasicBenchTask) prepareWorkersOnEachDB(dbName string) {
 	}
 
 	d.workerProcess = append(d.workerProcess, workersEachDB...)
-
 }
 
 func (d *BasicBenchTask) Run() {
@@ -441,7 +430,7 @@ func (d *BasicBenchTask) Report() map[string]string {
 	result["UseCase"] = d.UseCase
 	result["Mod"] = d.MixMode
 	result["BatchSize"] = fmt.Sprintf("%d", d.BatchSize)
-	result["Workers"] = fmt.Sprintf("%d", d.Workers)
+	result["Workers"] = fmt.Sprintf("%d", d.WorkerCount)
 	result["QueryPercent"] = fmt.Sprintf("%d", d.QueryPercent)
 	result["Cardinality"] = fmt.Sprintf("%d", d.ScaleVar)
 	result["SamplingTime"] = d.SamplingInterval.String()
@@ -504,52 +493,11 @@ func (d *BasicBenchTask) CleanUp() {
 	}
 }
 
-func (d *BasicBenchTask) createDb(writer db_client.DBClient) {
-	// this also test db connection
-	existingDatabases, err := writer.ListDatabases()
-	if err != nil {
-		log.Println(err)
-	}
-
-	if len(existingDatabases) > 0 {
-		dbs_string := strings.Join(existingDatabases, ", ")
-		log.Printf("The following databases already exist in the data store: %s", dbs_string)
-	}
-	for _, name := range d.databaseNames {
-		for _, existingDatabase := range existingDatabases {
-			if existingDatabase == name {
-				log.Printf("Database %s already exists", name)
-				return
-			}
-		}
-		err = writer.CreateDb(name, d.WithEncryption)
-		if err != nil {
-			log.Fatal(err)
-		}
-		log.Printf("Database %s created", name)
-	}
-	time.Sleep(1000 * time.Millisecond)
-}
-
-func (d *BasicBenchTask) checkDbConnection(w db_client.DBClient) error {
-	for i := 0; i < 30; i++ {
-		err := w.Ping()
-		if err != nil {
-			log.Println("Ping DB error:", err.Error())
-		} else {
-			return nil
-		}
-		time.Sleep(5 * time.Second)
-	}
-	return errors.New("can not connect DB in 60s")
-}
-
 // 最小运行单位，包含一个模拟器、序列化器、写入器、结果收集器
 type Worker struct {
 	writer          db_client.DBClient
 	simulator       common.Simulator
 	resultCollector *ResultCollector
-	serializer      serializers.Serializer
 	Debug           bool
 	Mode            string
 	UseGzip         int
@@ -577,15 +525,15 @@ func (w *Worker) StartRun(timeLimit time.Duration, waitGroup *sync.WaitGroup) {
 		if timeLimit > 0 {
 			for time.Now().Before(endTime) {
 				err := w.runBatchAndWrite(w.BatchSize, false, point)
-				if err != nil && w.Debug {
-					log.Println(err.Error())
+				if err != nil {
+					log.Error(err.Error())
 				}
 			}
 		} else {
 			for !w.simulator.Finished() {
 				err := w.runBatchAndWrite(w.BatchSize, true, point)
-				if err != nil && w.Debug {
-					log.Println(err.Error())
+				if err != nil {
+					log.Error(err.Error())
 				}
 			}
 		}
@@ -593,15 +541,15 @@ func (w *Worker) StartRun(timeLimit time.Duration, waitGroup *sync.WaitGroup) {
 		if timeLimit > 0 {
 			for time.Now().Before(endTime) {
 				err := w.runBatchAndQuery(w.BatchSize, false)
-				if err != nil && w.Debug {
-					log.Println(err.Error())
+				if err != nil {
+					log.Error(err.Error())
 				}
 			}
 		} else {
 			for w.resultCollector.GetQueries() < w.QueryCount {
 				err := w.runBatchAndQuery(w.BatchSize, true)
-				if err != nil && w.Debug {
-					log.Println(err.Error())
+				if err != nil {
+					log.Error(err.Error())
 				}
 			}
 		}
@@ -619,8 +567,8 @@ func (d *Worker) runBatchAndWrite(batchSize int, useCountLimit bool, point *comm
 	var pointMadeIndex int64
 	point.Reset()
 	pointMadeIndex = d.simulator.Next(point)
-	buf = d.serializer.SerializePrepare(buf, point)
-	buf = d.serializer.SerializePoint(buf, point)
+	buf = d.writer.BeforeSerializePoints(buf, point)
+	buf = d.writer.SerializeAndAppendPoint(buf, point)
 	vaulesWritten += (len(point.FieldValues) + len(point.Int64FiledValues))
 	for batchItemCount < batchSize {
 		if pointMadeIndex > d.simulator.Total() && useCountLimit { // 以simulator.Finished()结束为结束
@@ -628,13 +576,13 @@ func (d *Worker) runBatchAndWrite(batchSize int, useCountLimit bool, point *comm
 		}
 		point.Reset()
 		pointMadeIndex = d.simulator.Next(point)
-		buf = d.serializer.SerializePoint(buf, point)
+		buf = d.writer.SerializeAndAppendPoint(buf, point)
 		batchItemCount++
 		vaulesWritten += (len(point.FieldValues) + len(point.Int64FiledValues))
 	}
 
 	if batchItemCount > 0 {
-		buf = d.serializer.SerializeEnd(buf, point)
+		buf = d.writer.AfterSerializePoints(buf, point)
 		err = d.writeToDb(buf)
 		if err == nil {
 			d.resultCollector.AddBytes(int64(len(buf)))
@@ -650,21 +598,7 @@ func (d *Worker) runBatchAndWrite(batchSize int, useCountLimit bool, point *comm
 func (d *Worker) writeToDb(buf []byte) error {
 	// var batchesSeen int64
 	// 发送http write
-	var err error
-	var lat int64
-	if d.UseGzip > 0 {
-		compressedBatch := bufferPool.Get().(*bytes.Buffer)
-		fasthttp.WriteGzipLevel(compressedBatch, buf, d.UseGzip)
-		//bodySize = len(compressedBatch.Bytes())
-		lat, err = d.writer.Write(compressedBatch.Bytes())
-		// Return the compressed batch buffer to the pool.
-		compressedBatch.Reset()
-		bufferPool.Put(compressedBatch)
-	} else {
-		//bodySize = len(batch.Bytes())
-		// fmt.Println(string(buf.Bytes()))
-		lat, err = d.writer.Write(buf)
-	}
+	lat, err := d.writer.Write(buf)
 
 	if err != nil {
 		d.resultCollector.AddOneResponTime("write", lat, false)

@@ -87,7 +87,7 @@ func (d *DashboardSimulator) Next(p *Point) int64 {
 	if d.hostIndex == len(d.hosts) {
 		d.hostIndex = 0
 		for i := 0; i < len(d.hosts); i++ {
-			d.hosts[i].TickAll(devops.EpochDuration)
+			// d.hosts[i].TickAll(devops.EpochDuration)
 		}
 	}
 

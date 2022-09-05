@@ -96,7 +96,7 @@ func (g *IotSimulator) Next(p *Point) int64 {
 
 		if !homeFound {
 			for i := 0; i < len(g.homes); i++ {
-				g.homes[i].TickAll(EpochDuration)
+				// g.homes[i].TickAll(EpochDuration)
 				g.homes[i].ResetMeasurementCounter()
 			}
 			g.currentHomeIndex = 0

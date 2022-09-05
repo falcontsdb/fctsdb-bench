@@ -26,7 +26,7 @@ type QueryLoad struct {
 	dataFile        string
 	timeLimit       time.Duration
 	debug           bool
-	useGzip         bool
+	useGzip         int
 
 	//runtime vars
 	bufPool               sync.Pool
@@ -123,7 +123,7 @@ func (q *QueryLoad) Init(cmd *cobra.Command) {
 	writeFlag.StringVar(&q.dataFile, "file", "", "Input file")
 	writeFlag.DurationVar(&q.timeLimit, "time-limit", -1, "Maximum duration to run (-1 is the default: no limit).")
 	writeFlag.BoolVar(&q.debug, "debug", false, "Debug printing (default false).")
-	writeFlag.BoolVar(&q.useGzip, "gzip", false, "Whether to gzip encode requests (default false).")
+	writeFlag.IntVar(&q.useGzip, "gzip", 3, "Whether to gzip encode requests (default false).")
 }
 
 func (q *QueryLoad) Validate() {
@@ -158,7 +158,6 @@ func (q *QueryLoad) PrepareProcess(i int) {
 	c := &db_client.ClientConfig{
 		Host:      q.daemonUrls[i%len(q.daemonUrls)],
 		Database:  q.dbName,
-		Debug:     q.debug,
 		Gzip:      q.useGzip,
 		DebugInfo: fmt.Sprintf("worker #%d", i),
 	}

@@ -73,9 +73,13 @@ func BenchmarkNewPointVehicleEasy(b *testing.B) {
 	sim := cfg.ToSimulator()
 
 	point := common.MakeUsablePoint()
+	out := make([]byte, 0, 4*1024)
+	ser := serializers.NewSerializerInflux()
 	for i := 0; i < b.N; i++ {
 		sim.Next(point)
+		out = ser.SerializePoint(out, point)
 		point.Reset()
+		out = out[:0]
 	}
 }
 

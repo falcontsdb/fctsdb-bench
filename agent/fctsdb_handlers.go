@@ -290,7 +290,6 @@ func (f *FctsdbAgent) CheckTelegrafHandler(w http.ResponseWriter, r *http.Reques
 		} else if pid == "" {
 			w.WriteHeader(http.StatusInternalServerError)
 		} else {
-			w.Write([]byte("OK"))
 			w.WriteHeader(http.StatusOK)
 		}
 	}

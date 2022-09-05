@@ -9,6 +9,7 @@ require (
 	github.com/influxdata/influxdb-client-go/v2 v2.9.2
 	github.com/pelletier/go-toml v1.9.3
 	github.com/shirou/gopsutil v3.21.8+incompatible
+	github.com/sirupsen/logrus v1.9.0
 	github.com/spf13/cobra v1.2.1
 	github.com/tklauser/go-sysconf v0.3.9 // indirect
 	github.com/valyala/fasthttp v1.31.0

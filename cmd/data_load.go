@@ -23,7 +23,6 @@ import (
 	"git.querycap.com/falcontsdb/fctsdb-bench/db_client"
 	"git.querycap.com/falcontsdb/fctsdb-bench/serializers"
 	"github.com/spf13/cobra"
-	"github.com/valyala/fasthttp"
 )
 
 // TODO AP: Maybe useless
@@ -34,7 +33,7 @@ type DataLoad struct {
 	// Program option vars:
 	csvDaemonUrls string
 	daemonUrls    []string
-	useGzip       bool
+	useGzip       int
 	workers       int
 	batchSize     int
 	dbName        string
@@ -159,7 +158,7 @@ func (l *DataLoad) Init(cmd *cobra.Command) {
 	writeFlag := cmd.Flags()
 	writeFlag.BoolVar(&l.doDBCreate, "do-db-create", true, "是否创建数据库")
 	writeFlag.StringVar(&l.csvDaemonUrls, "urls", "http://localhost:8086", "InfluxDB URLs, comma-separated. Will be used in a round-robin fashion.")
-	writeFlag.BoolVar(&l.useGzip, "gzip", true, "Whether to gzip encode requests (default true).")
+	writeFlag.IntVar(&l.useGzip, "gzip", 3, "Whether to gzip encode requests (default true).")
 	writeFlag.StringVar(&l.dbName, "db", "benchmark_db", "Database name.")
 	writeFlag.IntVar(&l.batchSize, "batch-size", 100, "Batch size (1 line of input = 1 item).")
 	writeFlag.IntVar(&l.workers, "workers", 1, "Number of parallel requests to make.")
@@ -263,7 +262,6 @@ func (l *DataLoad) PrepareProcess(i int) {
 	c := &db_client.ClientConfig{
 		Host:      l.daemonUrls[i%len(l.daemonUrls)],
 		Database:  l.dbName,
-		Debug:     l.debug,
 		Gzip:      l.useGzip,
 		DebugInfo: fmt.Sprintf("worker #%d", i),
 	}
@@ -380,19 +378,10 @@ outer:
 func (l *DataLoad) processBatches(w *db_client.FctsdbClient, telemetryWorkerLabel string, workersGroup *sync.WaitGroup) error {
 	defer workersGroup.Done()
 	for batch := range l.batchChan {
-		var err error
-		if l.useGzip {
-			compressedBatch := l.bufPool.Get().(*bytes.Buffer)
-			fasthttp.WriteGzip(compressedBatch, batch.Buffer.Bytes())
-			//bodySize = len(compressedBatch.Bytes())
-			_, err = w.Write(compressedBatch.Bytes())
-			// Return the compressed batch buffer to the pool.
-			compressedBatch.Reset()
-			l.bufPool.Put(compressedBatch)
-		} else {
-			//bodySize = len(batch.Bytes())
-			_, err = w.Write(batch.Buffer.Bytes())
-		}
+
+		//bodySize = len(batch.Bytes())
+		_, err := w.Write(batch.Buffer.Bytes())
+
 		if err != nil {
 			return fmt.Errorf("error writing: %s", err.Error())
 		}

@@ -71,10 +71,3 @@ func NewAirqDevice(i int, offset int, start time.Time) AirqDevice {
 func (air *AirqDevice) NumMeasurements() int {
 	return len(air.SimulatedMeasurements)
 }
-
-// TickAll advances all Distributions of a Host.
-func (air *AirqDevice) TickAll(d time.Duration) {
-	for i := range air.SimulatedMeasurements {
-		air.SimulatedMeasurements[i].Tick(d)
-	}
-}

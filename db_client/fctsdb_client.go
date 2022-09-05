@@ -6,12 +6,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"log"
 	"net/http"
-	"net/url"
+	"strconv"
+	"strings"
 	"time"
 
+	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/common"
+	log "github.com/sirupsen/logrus"
 	"github.com/valyala/fasthttp"
 )
 
@@ -43,6 +44,8 @@ func NewFctsdbClient(c ClientConfig) *FctsdbClient {
 	} else {
 		host = []byte(c.Host)
 	}
+
+	// example: http://localhost:8086/write?db=db&u=user&p=password
 	writeUrl = append(writeUrl, host...)
 	writeUrl = append(writeUrl, "/write?db="...)
 	writeUrl = fasthttp.AppendQuotedArg(writeUrl, []byte(c.Database))
@@ -53,6 +56,7 @@ func NewFctsdbClient(c ClientConfig) *FctsdbClient {
 		writeUrl = fasthttp.AppendQuotedArg(writeUrl, []byte(c.Password))
 	}
 
+	// example: http://localhost:8086/query?db=db&u=user&p=password&q=select * from cpu
 	queryUrl := make([]byte, 0)
 	queryUrl = append(queryUrl, host...)
 	queryUrl = append(queryUrl, "/query?db="...)
@@ -81,31 +85,29 @@ func NewFctsdbClient(c ClientConfig) *FctsdbClient {
 // Write writes the given byte slice to the HTTP server described in the Writer's HTTPWriterConfig.
 // It returns the latency in nanoseconds and any error received while sending the data over HTTP,
 // or it returns a new error if the HTTP response isn't as expected.
-func (w *FctsdbClient) Write(body []byte) (int64, error) {
+func (f *FctsdbClient) Write(body []byte) (int64, error) {
+	log.Debug("Write body", string(body))
 	req := fasthttp.AcquireRequest()
 	req.Header.SetContentTypeBytes(textPlain)
 	req.Header.SetMethodBytes(post)
-	req.Header.SetRequestURIBytes(w.writeUrl)
-	if w.c.Gzip {
+	req.Header.SetRequestURIBytes(f.writeUrl)
+	if f.c.Gzip > 0 {
 		req.Header.Add("Content-Encoding", "gzip")
+		compressedBatch := bytes.NewBuffer(make([]byte, 0, 4*1024*1024))
+		fasthttp.WriteGzipLevel(compressedBatch, body, f.c.Gzip)
+		req.SetBody(compressedBatch.Bytes())
+	} else {
+		req.SetBody(body)
 	}
-	// fmt.Println(string(body))
-	req.SetBody(body)
-	// fmt.Println("-------------------------------------------------")
-	// fmt.Println(string(body))
 
 	resp := fasthttp.AcquireResponse()
 	start := time.Now()
-	err := w.client.Do(req, resp)
+	err := f.client.Do(req, resp)
 	lat := time.Since(start).Nanoseconds()
 	if err == nil {
 		sc := resp.StatusCode()
-		// fmt.Println("status code ", sc)
 		if sc != fasthttp.StatusNoContent {
-			err = fmt.Errorf("[DebugInfo: %s] Invalid write response (status %d): %s", w.c.DebugInfo, sc, resp.Body())
-			if w.c.Debug {
-				log.Println("Write body:", string(body))
-			}
+			err = fmt.Errorf("invalid write response (status %d): %s", sc, string(resp.Body()))
 		}
 	}
 	fasthttp.ReleaseResponse(resp)
@@ -114,56 +116,40 @@ func (w *FctsdbClient) Write(body []byte) (int64, error) {
 	return lat, err
 }
 
-func (w *FctsdbClient) Query(lines []byte) (int64, error) {
-	uri := fasthttp.AppendQuotedArg(w.queryUrl, lines)
+func (f *FctsdbClient) Query(body []byte) (int64, error) {
+	uri := fasthttp.AppendQuotedArg(f.queryUrl, body)
 	req := fasthttp.AcquireRequest()
 	req.Header.SetContentTypeBytes(textPlain)
 	req.Header.SetMethodBytes(get)
 	req.Header.SetRequestURIBytes(uri)
-	if w.c.Gzip {
+	if f.c.Gzip > 0 {
 		req.Header.Add("Accept-Encoding", "gzip")
 	}
+
+	log.Debug("Query url:", string(uri))
+
 	resp := fasthttp.AcquireResponse()
 	start := time.Now()
-	err := w.client.Do(req, resp)
+	err := f.client.Do(req, resp)
 	lat := time.Since(start).Nanoseconds()
 	if err == nil {
 		sc := resp.StatusCode()
 		var body []byte
 		if string(resp.Header.Peek("Content-Encoding")) == "gzip" {
-			_, err := fasthttp.WriteGunzip(w.buf, resp.Body())
+			_, err := fasthttp.WriteGunzip(f.buf, resp.Body())
 			if err != nil {
-				log.Printf("[ParseGzip] NewReader error: %v, maybe data is ungzip\n", err)
+				log.Error("[ParseGzip] NewReader error: %v, maybe data is ungzip\n", err)
 			}
-			body = w.buf.Bytes()
-			w.buf.Reset()
+			body = f.buf.Bytes()
+			f.buf.Reset()
 		} else {
 			body = resp.Body()
 		}
-		if sc != fasthttp.StatusOK {
-			err = fmt.Errorf("[DebugInfo: %s] Invalid query response (status %d): %s", w.c.DebugInfo, sc, string(body))
-		} else {
-			if !bytes.Contains(body, responseMustContain) {
-				err = fmt.Errorf("[DebugInfo: %s] Invalid query response (status %d): %s", w.c.DebugInfo, sc, string(body))
-			}
-		}
-		if w.c.Debug {
-			fmt.Println(string(uri))
-			var r Response
-			err := json.Unmarshal(body, &r)
-			if err != nil {
-				log.Println("unmarshal response error", err.Error())
-				log.Println(string(body))
-			} else {
-				if len(r.Results) == 0 {
-					log.Println("result is 0:", string(uri))
-				} else {
-					if len(r.Results[0].Series) == 0 {
-						log.Println("row is 0:", string(uri))
-					}
-				}
-			}
-			// fmt.Fprintln(os.Stdout, string(resp.Body()))
+
+		log.Debug("Query response body", string(body))
+
+		if sc != fasthttp.StatusOK || !bytes.Contains(body, responseMustContain) {
+			err = fmt.Errorf("invalid query response (status %d, db %s): %s", sc, f.c.Database, string(body))
 		}
 	}
 	fasthttp.ReleaseResponse(resp)
@@ -172,74 +158,78 @@ func (w *FctsdbClient) Query(lines []byte) (int64, error) {
 	return lat, err
 }
 
-func (d *FctsdbClient) CreateDb(name string, withEncryption bool) error {
-	u, _ := url.Parse(string(d.host))
+func (f *FctsdbClient) otherQuery(body []byte) (int, []byte, error) {
+	uri := fasthttp.AppendQuotedArg(f.queryUrl, body)
+	log.Debug(string(uri))
+	req := fasthttp.AcquireRequest()
+	defer fasthttp.ReleaseRequest(req)
 
-	// serialize params the right way:
-	if name == "" {
-		name = d.c.Database
+	req.Header.SetContentTypeBytes(textPlain)
+	req.Header.SetMethodBytes(get)
+	req.Header.SetRequestURIBytes(uri)
+
+	resp := fasthttp.AcquireResponse()
+	defer fasthttp.ReleaseResponse(resp)
+
+	err := f.client.Do(req, resp)
+	if err != nil {
+		return 0, nil, err
+	}
+	code := resp.StatusCode()
+	respBody := resp.Body()
+
+	return code, respBody, nil
+}
+
+func (f *FctsdbClient) InitUser() error {
+	return nil
+}
+
+func (f *FctsdbClient) LoginUser() error {
+	return nil
+}
+
+func (f *FctsdbClient) CreateDatabase(name string, withEncryption bool) error {
+
+	log.Infof("create database %s", name)
+	existingDatabases, err := f.listDatabases()
+	if err != nil {
+		return err
 	}
 
-	u.Path = "query"
-	v := u.Query()
-	v.Add("u", d.c.User)
-	v.Add("p", d.c.Password)
+	for _, existingDatabase := range existingDatabases {
+		if name == existingDatabase {
+			log.Warn("The following database \"%s\" already exist in the data store, do'not need create.", name)
+			return nil
+		}
+	}
+
+	var statusCode int
+	var response []byte
+
 	if withEncryption {
-		v.Set("q", fmt.Sprintf("CREATE DATABASE %s with encryption on", name))
+		statusCode, response, err = f.otherQuery([]byte(fmt.Sprintf("CREATE DATABASE %s with encryption on", f.c.Database)))
 	} else {
-		v.Set("q", fmt.Sprintf("CREATE DATABASE %s", name))
+		statusCode, response, err = f.otherQuery([]byte(fmt.Sprintf("CREATE DATABASE %s", f.c.Database)))
 	}
-	u.RawQuery = v.Encode()
-
-	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
-		return err
+		return fmt.Errorf("create database error: %s", err.Error())
 	}
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	// does the body need to be read into the void?
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("createDb returned status code: %v", resp.StatusCode)
+	if statusCode != http.StatusOK {
+		return fmt.Errorf("create database returned status code: %d, body: %s", statusCode, string(response))
 	}
 	return nil
 }
 
 // listDatabases lists the existing databases in InfluxDB.
-func (d *FctsdbClient) ListDatabases() ([]string, error) {
-	//var u url.URL
-	//u.Host = string(d.host)
-	u, err := url.Parse(string(d.host))
+func (f *FctsdbClient) listDatabases() ([]string, error) {
+
+	statusCode, response, err := f.otherQuery([]byte("SHOW DATABASES"))
 	if err != nil {
-		return nil, fmt.Errorf(" url parse failed: %s", err.Error())
+		return nil, err
 	}
-
-	u.Path = "/query"
-	q := u.Query()
-	q.Add("u", d.c.User)
-	q.Add("p", d.c.Password)
-	q.Add("q", "show databases")
-	u.RawQuery = q.Encode()
-
-	resp, err := http.Get(u.String())
-	if err != nil {
-		return nil, fmt.Errorf("listDatabases get error: %s", err.Error())
-	}
-
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("listDatabases returned status code: %v", resp.StatusCode)
-	}
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("listDatabases readAll error: %s", err.Error())
+	if statusCode != http.StatusOK {
+		return nil, fmt.Errorf("list databases returned status code: %v", statusCode)
 	}
 
 	// Do ad-hoc parsing to find existing database names:
@@ -252,61 +242,124 @@ func (d *FctsdbClient) ListDatabases() ([]string, error) {
 			}
 		}
 	}
+
 	var listing listingType
-	err = json.Unmarshal(body, &listing)
+	err = json.Unmarshal(response, &listing)
 	if err != nil {
-		return nil, fmt.Errorf("listDatabases unmarshal error: %s", err.Error())
+		return nil, fmt.Errorf("list databases unmarshal error: %s", err.Error())
 	}
 
-	ret := make([]string, 0)
+	databases := make([]string, 0)
 	for _, nestedName := range listing.Results[0].Series[0].Values {
-		ret = append(ret, nestedName[0].(string))
+		databases = append(databases, nestedName[0].(string))
 	}
-	return ret, nil
+
+	log.Info("The following databases already exist in the data store: ", strings.Join(databases, ", "))
+	return databases, nil
 }
 
-func (d *FctsdbClient) Ping() error {
-	u := fmt.Sprintf("%s/ping", d.host)
-	req, err := http.NewRequest(string(get), u, nil)
-	if err != nil {
-		return err
-	}
-	client := http.Client{
-		Timeout: time.Second * 2,
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	if resp.StatusCode != 204 {
-		return fmt.Errorf("ping response statues is %d, not 204", resp.StatusCode)
-	}
+func (f *FctsdbClient) CreateMeasurement(p *common.Point) error {
 	return nil
 }
 
-type Response struct {
-	Results []Result
-	Err     string `json:"error,omitempty"`
+func (f *FctsdbClient) CheckConnection(timeout time.Duration) bool {
+	req := fasthttp.AcquireRequest()
+	defer fasthttp.ReleaseRequest(req)
+
+	req.Header.SetMethodBytes(get)
+	req.Header.SetRequestURI(fmt.Sprintf("%s/ping", f.host))
+
+	resp := fasthttp.AcquireResponse()
+	defer fasthttp.ReleaseResponse(resp)
+
+	clientWithTimeout := fasthttp.Client{ReadTimeout: time.Second, WriteTimeout: time.Second}
+
+	endTime := time.Now().Add(timeout)
+	log.Info("checking connection ")
+	fmt.Print("checking .")
+	defer fmt.Println()
+	for time.Now().Before(endTime) {
+		err := clientWithTimeout.Do(req, resp)
+		if err == nil && resp.StatusCode() == fasthttp.StatusNoContent {
+			return true
+		}
+		time.Sleep(2 * time.Second)
+		fmt.Print(".")
+	}
+	return false
 }
 
-// Message represents a user message.
-type Message struct {
-	Level string
-	Text  string
+// SerializeInfluxBulk writes Point data to the given writer, conforming to the
+// InfluxDB wire protocol.
+//
+// This function writes output that looks like:
+// <measurement>,<tag key>=<tag value> <field name>=<field value> <timestamp>\n
+//
+// For example:
+// foo,tag0=bar baz=-1.0 100\n
+//
+func (m *FctsdbClient) BeforeSerializePoints(buf []byte, p *common.Point) []byte {
+	return buf
 }
 
-// Result represents a resultset returned from a single statement.
-type Result struct {
-	StatementId int `json:"statement_id"`
-	Series      []Row
-	Messages    []*Message
-	Err         string `json:"error,omitempty"`
+func (s *FctsdbClient) SerializeAndAppendPoint(buf []byte, p *common.Point) []byte {
+	// buf := make([]byte, 0, 4*1024)
+	buf = append(buf, p.MeasurementName...)
+
+	for i := 0; i < len(p.TagKeys); i++ {
+		buf = append(buf, ',')
+		buf = append(buf, p.TagKeys[i]...)
+		buf = append(buf, '=')
+		buf = append(buf, p.TagValues[i]...)
+	}
+
+	if len(p.FieldKeys)+len(p.Int64FiledKeys) > 0 {
+		buf = append(buf, ' ')
+	}
+
+	var i int
+	for i = 0; i < len(p.FieldKeys); i++ {
+		buf = append(buf, p.FieldKeys[i]...)
+		buf = append(buf, '=')
+
+		v := p.FieldValues[i]
+		buf = fastFormatAppend(v, buf, false)
+
+		// Influx uses 'i' to indicate integers:
+		switch v.(type) {
+		case int, int64:
+			buf = append(buf, 'i')
+		}
+
+		if i+1 < len(p.FieldKeys) {
+			buf = append(buf, ',')
+		}
+	}
+
+	if i > 0 && len(p.Int64FiledKeys) > 0 {
+		buf = append(buf, ',')
+	}
+
+	for i = 0; i < len(p.Int64FiledKeys); i++ {
+		buf = append(buf, p.Int64FiledKeys[i]...)
+		buf = append(buf, '=')
+
+		v := p.Int64FiledValues[i]
+		buf = strconv.AppendInt(buf, v, 10)
+		// Influx uses 'i' to indicate integers:
+		buf = append(buf, 'i')
+		if i+1 < len(p.Int64FiledKeys) {
+			buf = append(buf, ',')
+		}
+	}
+
+	buf = append(buf, ' ')
+	buf = fastFormatAppend(p.Timestamp.UTC().UnixNano(), buf, true)
+	buf = append(buf, '\n')
+
+	return buf
 }
 
-type Row struct {
-	Name    string            `json:"name,omitempty"`
-	Tags    map[string]string `json:"tags,omitempty"`
-	Columns []string          `json:"columns,omitempty"`
-	Values  [][]interface{}   `json:"values,omitempty"`
-	Partial bool              `json:"partial,omitempty"`
+func (m *FctsdbClient) AfterSerializePoints(buf []byte, p *common.Point) []byte {
+	return buf
 }

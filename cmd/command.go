@@ -66,7 +66,7 @@ func InitMixed(task *BasicBenchTask, cmd *cobra.Command) {
 	// 运行参数
 	cmdFlags.IntVar(&task.BatchSize, "batch-size", 100, "1个http请求中携带Point个数")
 	cmdFlags.IntVar(&task.UseGzip, "gzip", 1, "是否使用gzip,level[0-9],小于0表示不使用")
-	cmdFlags.IntVar(&task.Workers, "workers", 1, "并发的http个数")
+	cmdFlags.IntVar(&task.WorkerCount, "workers", 1, "并发的http个数")
 	cmdFlags.StringVar(&task.MixMode, "mix-mode", "parallel", "混合模式，支持parallel(按线程比例混合)、request(按请求比例混合)")
 	cmdFlags.IntVar(&task.QueryType, "query-type", 1, "查询类型")
 	cmdFlags.IntVar(&task.QueryPercent, "query-percent", 50, "查询请求所占百分比")
@@ -100,7 +100,7 @@ func InitWrite(task *BasicBenchTask, cmd *cobra.Command) {
 	// 运行参数
 	cmdFlags.IntVar(&task.BatchSize, "batch-size", 100, "1个http请求中携带Point个数")
 	cmdFlags.IntVar(&task.UseGzip, "gzip", 1, "是否使用gzip,level[0-9],小于0表示不使用")
-	cmdFlags.IntVar(&task.Workers, "workers", 1, "并发的http个数")
+	cmdFlags.IntVar(&task.WorkerCount, "workers", 1, "并发的http个数")
 	cmdFlags.DurationVar(&task.TimeLimit, "time-limit", -1, "最大测试时间")
 	cmdFlags.BoolVar(&task.Debug, "debug", false, "是否打印详细日志(default false).")
 	cmdFlags.StringVar(&task.Format, "format", "fctsdb", "目标数据库类型，当前仅支持fctsdb和mysql")
@@ -131,7 +131,7 @@ func InitQuery(task *BasicBenchTask, cmd *cobra.Command) {
 	// 运行参数
 	cmdFlags.IntVar(&task.BatchSize, "batch-size", 1, "1个http请求中携带查询语句个数")
 	cmdFlags.IntVar(&task.UseGzip, "gzip", 1, "是否使用gzip,level[0-9],小于0表示不使用")
-	cmdFlags.IntVar(&task.Workers, "workers", 1, "并发的http个数")
+	cmdFlags.IntVar(&task.WorkerCount, "workers", 1, "并发的http个数")
 	cmdFlags.IntVar(&task.QueryType, "query-type", 1, "查询类型")
 	cmdFlags.Int64Var(&task.QueryCount, "query-count", 1000, "生成的查询语句数量")
 	cmdFlags.DurationVar(&task.TimeLimit, "time-limit", -1, "最大测试时间(-1表示不生效)，>0会使query-count参数失效")
