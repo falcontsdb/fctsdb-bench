@@ -31,24 +31,26 @@ type InfluxdbV2Client struct {
 func NewInfluxdbV2Client(c ClientConfig) *InfluxdbV2Client {
 	var host []byte
 	writeUrl := make([]byte, 0)
-	if c.Host[len(c.Host)-1] == '/' {
-		host = []byte(c.Host)[:len(c.Host)-1]
-	} else {
-		host = []byte(c.Host)
-	}
-	writeUrl = append(writeUrl, host...)
-	writeUrl = append(writeUrl, "/api/v2/write?bucket="...)
-	writeUrl = fasthttp.AppendQuotedArg(writeUrl, []byte(c.Database))
-	writeUrl = append(writeUrl, "&org="...)
-	writeUrl = append(writeUrl, organization...)
-	writeUrl = append(writeUrl, "&precision=ns"...)
-
 	queryUrl := make([]byte, 0)
-	queryUrl = append(queryUrl, host...)
-	queryUrl = append(queryUrl, "/query?db="...)
-	queryUrl = fasthttp.AppendQuotedArg(queryUrl, []byte(c.Database))
-	queryUrl = append(queryUrl, "&q="...)
 
+	if c.Host != "" {
+		if c.Host[len(c.Host)-1] == '/' {
+			host = []byte(c.Host)[:len(c.Host)-1]
+		} else {
+			host = []byte(c.Host)
+		}
+		writeUrl = append(writeUrl, host...)
+		writeUrl = append(writeUrl, "/api/v2/write?bucket="...)
+		writeUrl = fasthttp.AppendQuotedArg(writeUrl, []byte(c.Database))
+		writeUrl = append(writeUrl, "&org="...)
+		writeUrl = append(writeUrl, organization...)
+		writeUrl = append(writeUrl, "&precision=ns"...)
+
+		queryUrl = append(queryUrl, host...)
+		queryUrl = append(queryUrl, "/query?db="...)
+		queryUrl = fasthttp.AppendQuotedArg(queryUrl, []byte(c.Database))
+		queryUrl = append(queryUrl, "&q="...)
+	}
 	return &InfluxdbV2Client{
 		client: fasthttp.Client{
 			Name:                "influxdbv2",

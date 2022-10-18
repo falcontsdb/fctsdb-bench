@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/common"
-	"git.querycap.com/falcontsdb/fctsdb-bench/serializers"
+	"git.querycap.com/falcontsdb/fctsdb-bench/db_client"
 )
 
 func TestNewPointDevopsEasy(t *testing.T) {
@@ -24,14 +24,14 @@ func TestNewPointDevopsEasy(t *testing.T) {
 		FieldsDefine:     [3]int64{2, 3, 1},
 	}
 	sim := cfg.ToSimulator()
-	ser := serializers.NewSerializerInflux()
+	ser := db_client.NewFctsdbClient(db_client.ClientConfig{})
 	point := common.MakeUsablePoint()
 	out := make([]byte, 0, 4*1024)
 	for i := 0; i < 20; i++ {
 		// host := sim.Hosts[i%len(sim.Hosts)]
 		// _ = string(host.SiteID)
 		sim.Next(point)
-		out = ser.SerializePoint(out, point)
+		out = ser.SerializeAndAppendPoint(out, point)
 		fmt.Println(string(out))
 		out = out[:0]
 		point.Reset()

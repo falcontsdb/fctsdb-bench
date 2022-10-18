@@ -13,7 +13,7 @@ import (
 	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/common"
 	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/devops"
 	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/vehicle"
-	"git.querycap.com/falcontsdb/fctsdb-bench/serializers"
+	"git.querycap.com/falcontsdb/fctsdb-bench/db_client"
 	"git.querycap.com/falcontsdb/fctsdb-bench/util/gbt2260"
 )
 
@@ -74,10 +74,10 @@ func BenchmarkNewPointVehicleEasy(b *testing.B) {
 
 	point := common.MakeUsablePoint()
 	out := make([]byte, 0, 4*1024)
-	ser := serializers.NewSerializerInflux()
+	ser := db_client.NewFctsdbClient(db_client.ClientConfig{})
 	for i := 0; i < b.N; i++ {
 		sim.Next(point)
-		out = ser.SerializePoint(out, point)
+		out = ser.SerializeAndAppendPoint(out, point)
 		point.Reset()
 		out = out[:0]
 	}
@@ -97,10 +97,10 @@ func TestNewPointVehicleEasy(t *testing.T) {
 
 	point := common.MakeUsablePoint()
 	out := make([]byte, 0, 4*1024)
-	ser := serializers.NewSerializerInflux()
+	ser := db_client.NewFctsdbClient(db_client.ClientConfig{})
 	for i := 0; i < 10; i++ {
 		sim.Next(point)
-		out = ser.SerializePoint(out, point)
+		out = ser.SerializeAndAppendPoint(out, point)
 		fmt.Println(string(out))
 		out = out[:0]
 		point.Reset()
@@ -124,13 +124,13 @@ func BenchmarkNewPointAirqEasy(b *testing.B) {
 	// ser := common.NewSerializerInflux()
 	// out := Printer{}
 	out := make([]byte, 0, 4*1024)
-	ser := serializers.NewSerializerInflux()
+	ser := db_client.NewFctsdbClient(db_client.ClientConfig{})
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// host := sim.Hosts[i%len(sim.Hosts)]
 		// _ = string(host.SiteID)
 		sim.Next(point)
-		out = ser.SerializePoint(out, point)
+		out = ser.SerializeAndAppendPoint(out, point)
 		point.Reset()
 		out = out[:0]
 	}
@@ -148,7 +148,7 @@ func TestNewPointAirqEasy(t *testing.T) {
 		DeviceOffset:     0,
 	}
 	sim := cfg.ToSimulator()
-	ser := serializers.NewSerializerInflux()
+	ser := db_client.NewFctsdbClient(db_client.ClientConfig{})
 	point := common.MakeUsablePoint()
 	out := make([]byte, 0, 4*1024)
 	// for i := 0; i < 10; i++ {
@@ -159,7 +159,7 @@ func TestNewPointAirqEasy(t *testing.T) {
 		// host := sim.Hosts[i%len(sim.Hosts)]
 		// _ = string(host.SiteID)
 		sim.Next(point)
-		out = ser.SerializePoint(out, point)
+		out = ser.SerializeAndAppendPoint(out, point)
 		point.Reset()
 		out = out[:0]
 		i += 1
@@ -181,7 +181,7 @@ func TestNewPointDevposEasy(t *testing.T) {
 	}
 	devops.EpochDuration = time.Second
 	sim := cfg.ToSimulator()
-	ser := serializers.NewSerializerInflux()
+	ser := db_client.NewFctsdbClient(db_client.ClientConfig{})
 	point := common.MakeUsablePoint()
 	out := make([]byte, 0, 4*1024)
 	// for i := 0; i < 10; i++ {
@@ -192,7 +192,7 @@ func TestNewPointDevposEasy(t *testing.T) {
 		// host := sim.Hosts[i%len(sim.Hosts)]
 		// _ = string(host.SiteID)
 		sim.Next(point)
-		out = ser.SerializePoint(out, point)
+		out = ser.SerializeAndAppendPoint(out, point)
 		out = out[:0]
 		point.Reset()
 		i += 1
@@ -221,14 +221,14 @@ func TestNewPointDevopsEasy(t *testing.T) {
 		HostOffset: 0,
 	}
 	sim := cfg.ToSimulator()
-	ser := serializers.NewSerializerInflux()
+	ser := db_client.NewFctsdbClient(db_client.ClientConfig{})
 	point := common.MakeUsablePoint()
 	out := make([]byte, 0, 4*1024)
 	for i := 0; i < 20; i++ {
 		// host := sim.Hosts[i%len(sim.Hosts)]
 		// _ = string(host.SiteID)
 		sim.Next(point)
-		out = ser.SerializePoint(out, point)
+		out = ser.SerializeAndAppendPoint(out, point)
 		out = out[:0]
 		point.Reset()
 	}

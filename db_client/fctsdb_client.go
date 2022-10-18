@@ -39,36 +39,37 @@ type FctsdbClient struct {
 func NewFctsdbClient(c ClientConfig) *FctsdbClient {
 	var host []byte
 	writeUrl := make([]byte, 0)
-	if c.Host[len(c.Host)-1] == '/' {
-		host = []byte(c.Host)[:len(c.Host)-1]
-	} else {
-		host = []byte(c.Host)
-	}
-
-	// example: http://localhost:8086/write?db=db&u=user&p=password
-	writeUrl = append(writeUrl, host...)
-	writeUrl = append(writeUrl, "/write?db="...)
-	writeUrl = fasthttp.AppendQuotedArg(writeUrl, []byte(c.Database))
-	if c.User != "" {
-		writeUrl = append(writeUrl, "&u="...)
-		writeUrl = fasthttp.AppendQuotedArg(writeUrl, []byte(c.User))
-		writeUrl = append(writeUrl, "&p="...)
-		writeUrl = fasthttp.AppendQuotedArg(writeUrl, []byte(c.Password))
-	}
-
-	// example: http://localhost:8086/query?db=db&u=user&p=password&q=select * from cpu
 	queryUrl := make([]byte, 0)
-	queryUrl = append(queryUrl, host...)
-	queryUrl = append(queryUrl, "/query?db="...)
-	queryUrl = fasthttp.AppendQuotedArg(queryUrl, []byte(c.Database))
-	if c.User != "" {
-		writeUrl = append(writeUrl, "&u="...)
-		writeUrl = fasthttp.AppendQuotedArg(writeUrl, []byte(c.User))
-		writeUrl = append(writeUrl, "&p="...)
-		writeUrl = fasthttp.AppendQuotedArg(writeUrl, []byte(c.Password))
-	}
-	queryUrl = append(queryUrl, "&q="...)
+	if c.Host != "" {
+		if c.Host[len(c.Host)-1] == '/' {
+			host = []byte(c.Host)[:len(c.Host)-1]
+		} else {
+			host = []byte(c.Host)
+		}
 
+		// example: http://localhost:8086/write?db=db&u=user&p=password
+		writeUrl = append(writeUrl, host...)
+		writeUrl = append(writeUrl, "/write?db="...)
+		writeUrl = fasthttp.AppendQuotedArg(writeUrl, []byte(c.Database))
+		if c.User != "" {
+			writeUrl = append(writeUrl, "&u="...)
+			writeUrl = fasthttp.AppendQuotedArg(writeUrl, []byte(c.User))
+			writeUrl = append(writeUrl, "&p="...)
+			writeUrl = fasthttp.AppendQuotedArg(writeUrl, []byte(c.Password))
+		}
+
+		// example: http://localhost:8086/query?db=db&u=user&p=password&q=select * from cpu
+		queryUrl = append(queryUrl, host...)
+		queryUrl = append(queryUrl, "/query?db="...)
+		queryUrl = fasthttp.AppendQuotedArg(queryUrl, []byte(c.Database))
+		if c.User != "" {
+			writeUrl = append(writeUrl, "&u="...)
+			writeUrl = fasthttp.AppendQuotedArg(writeUrl, []byte(c.User))
+			writeUrl = append(writeUrl, "&p="...)
+			writeUrl = fasthttp.AppendQuotedArg(writeUrl, []byte(c.Password))
+		}
+		queryUrl = append(queryUrl, "&q="...)
+	}
 	return &FctsdbClient{
 		client: fasthttp.Client{
 			Name:                "fctsdb",

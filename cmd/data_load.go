@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"git.querycap.com/falcontsdb/fctsdb-bench/db_client"
-	"git.querycap.com/falcontsdb/fctsdb-bench/serializers"
 	"github.com/spf13/cobra"
 )
 
@@ -310,14 +309,11 @@ func (l *DataLoad) RunScanner(r io.Reader, syncChanDone chan int) {
 outer:
 	for scanner.Scan() {
 		line := scanner.Text()
-		totalPoints, totalValues, err = serializers.CheckTotalValues(line)
-		if totalPoints > 0 || totalValues > 0 {
-			continue
-		} else {
-			fieldCnt := countFields(line)
-			values += fieldCnt
-			totalValuesCounted += int64(fieldCnt)
-		}
+
+		fieldCnt := countFields(line)
+		values += fieldCnt
+		totalValuesCounted += int64(fieldCnt)
+
 		if err != nil {
 			log.Fatal(err)
 		}

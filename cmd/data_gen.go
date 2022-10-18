@@ -29,7 +29,7 @@ import (
 	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/common"
 	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/devops"
 	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/vehicle"
-	"git.querycap.com/falcontsdb/fctsdb-bench/serializers"
+	"git.querycap.com/falcontsdb/fctsdb-bench/db_client"
 	"github.com/spf13/cobra"
 )
 
@@ -205,10 +205,10 @@ func (g *DataGenerator) RunProcess() {
 		log.Fatalln("the case is not supported")
 	}
 
-	var serializer serializers.Serializer
+	var serializer db_client.DBClient
 	switch g.format {
 	case "influx-bulk":
-		serializer = serializers.NewSerializerInflux()
+		serializer = db_client.NewFctsdbClient(db_client.ClientConfig{})
 	// case "es-bulk":
 	// serializer = serializers.NewSerializerElastic("5x")
 	// case "es-bulk6x":
@@ -240,7 +240,9 @@ func (g *DataGenerator) RunProcess() {
 	for !sim.Finished() {
 		sim.Next(point)
 		n++
-		buf = serializer.SerializePoint(buf, point)
+		buf = serializer.BeforeSerializePoints(buf, point)
+		buf = serializer.SerializeAndAppendPoint(buf, point)
+		buf = serializer.AfterSerializePoints(buf, point)
 		out.Write(buf)
 		buf = buf[:0]
 		point.Reset()
