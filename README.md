@@ -1,5 +1,5 @@
 # fctsdb-bench
-fctsdb场景性能测试工具基于开源的[influxdb-comparisons](https://github.com/influxdata/influxdb-comparisons)工具改编而来。
+fctsdb场景性能测试工具基于开源的[influxdb-comparisons](https://github.com/influxdata/influxdb-comparisons)工具重构而来。
 用于实现[海东青性能测试用例设计](https://rockontrol.yuque.com/gtoifn/zd5mco/erg0pp))的内容.
 
 influxdb-comparisons工具数据生成、写入、查询等所有过程分开，每个过程一套工具。
@@ -35,7 +35,7 @@ Available Commands:
   data-gen(隐藏命令)    生成不同场景（case）的数据，输出到stdout，搭配data-load使用
   data-load(隐藏命令)   从文件或者stdin载入数据，并发送数据到数据库，需要先使用data-gen命令
 ```
-###  2.1 数据测试
+###  2.1 数据写入测试
 使用fcbench write命令可以进行数据写入测试
 -h查看帮助信息，支持的flags如下：
 ```
@@ -157,7 +157,7 @@ fcbench  mixed --query-type 1  write --use-case vehicle --scale-var 1000 --times
 经过调优，4核情况下，vehicle场景能支撑480 000 points/s的生成速度。air-quality场景能支撑1 000 000 points/s 
 
 我们注意到influxdb-comparisons是先生成数据到文件或者stdout，再由另一个工具写入到数据库。
-因此参照influxdb-comparisons工具，提供以下类似的命令进行方式对比。
+因此参照influxdb-comparisons工具，也提供以下类似的命令，仅用来进行对比, 已经隐藏, 不对外展示。
 
 数据生成：
 ```
@@ -185,15 +185,23 @@ fcbench query-load --urls http://localhost:8086 --file query.txt
 测试机（fcbench-schedule） ------- 被测机（fctsdb数据库+fcbench-agent）
 
 为了支持两次测试间清理数据库：fcbench agent命令提供了一种方式，可以在被测机上，开启、关闭、清理数据库。
+按照以下步骤进行测试：
 
-可以查看调度器内置的配置文件，写入到testcase.txt：
+1、被测机启动agent
+```
+fcbench agent --fctsdb-path /root/fctsdb/v16n/fctsdb --fctsdb-config /root/fctsdb/configs/test.conf
+```
+
+2、可以查看调度器内置的配置文件，写入到testcase.txt：
 ```
 fcbench schedule list > testcase.txt
 ```
-根据配置文件运行多次测试：
+根据需求修改testcase.txt, 根据配置文件运行多次测试, 结果会记录在一个最新时间为名字的csv中，例如benchmark_1013_173901.csv：
 ```
-fchench schedule --agent http://{被测机ip}:端口  --config-path testcase.txt
+fchench schedule --agent http://{被测机ip}:端口 --grafana http://10.10.2.30:8888/sources/1/dashboards/3 --config-path testcase.txt 
 ```
+
+其中--grafana是监控前端地址, 用来拼接完整的监控地址:  http://10.10.2.30:8888/sources/1/dashboards/3?refresh=Paused&tempVars%5Bhost%5D=10.10.2.29&lower=2022-09-07T10%3A36%3A53Z&upper=2022-09-07T10%3A41%3A53Z
 
 <b>新增功能</b>
 
@@ -206,9 +214,67 @@ testcase.txt文件支持动态设置agent端的fctsdb数据库路径和config文
 $Set {"BinPath":"/root/fctsdb/fctsdb", "ConfigPath":"/root/fctsdb/config"}
 {"Group":"车载Series变化","MixMode":"write_only","UseCase":"vehicle","Workers":64,"BatchSize":1000,"ScaleVar":1000,"SamplingInterval":"1s","TimeLimit":"5s","UseGzip":1,"QueryPercent":0,"PrePareData":"","NeedPrePare":false,"Clean":true,"SqlTemplate":null}
 ```
+
+3、使用以下命令可以将两次测试生成的csv进行对比, 并生成对比html测试报告：
+```
+./fcbench schedule create ~/result/fctsdb-amd/v15n.csv ~/result/fctsdb-amd/v16n.csv --out write-v15n-v16n.html
+```
+
 ###  2.6 高级功能-mock
 使用fcbench mock支持mock一个海东青数据库，用以测试环境是否达标。
 
-
+## 3 代码结构
+```
+.
+├── agent                       agent功能的client和service代码目录
+│   ├── client.go                  agent功能client代码
+│   ├── fctsdb_handlers.go         agent功能service中fctsdb的handle
+│   ├── influxdbv2_handlers.go     agent功能service中influxdbv2的handle
+│   ├── matrixdb_handlers.go       agent功能service中matrixdb的handle
+│   ├── mysql_handlers.go          agent功能service中mysql的handle
+│   ├── opentsdb_handlers.go       agent功能service中opentsdb的handle
+│   └── service.go                 agent功能service中外层代码
+├── buildin_testcase            schedule命令内置测试用例以及这些用例的html对比测试报告生成器
+│   ├── report.go                  对比报告生成器   
+│   ├── testcase.go                内置用例定义文件
+├── cmd                         命令行、运行框架文件
+│   ├── agent.go                   agent命令的实现
+│   ├── basic_bench_task.go        benchmark运行框架，定义了基础的一次性能测试的全部流程，关联write、query、mixed三个命令
+│   ├── command.go                 write、query、mixed三个命令的定义文件
+│   ├── data_gen.go                data_gen隐藏命令的实现
+│   ├── data_load.go               data_load隐藏命令的实现                
+│   ├── main.go                    程序入口文件
+│   ├── qps.go                     basic_bench_task所需的qps处理文件
+│   ├── query_gen.go               query_gen命令的实现
+│   ├── query_load.go              query_load命令的实现
+│   └── scheduler.go               scheduler命令的实现
+├── data_generator              不同场景数据生成模块，生成的结果对象为common子模块的point对象
+│   ├── airq                       空气质量场景的数据与sql生成器模块
+│   ├── common                     所有场景所需的通用抽象
+│   ├── dashboard                  dashboard场景，来源于influxdb-comparisons，暂未完全适配我们框架
+│   ├── devops                     devops场景，来源于influxdb-comparisons，暂未完全适配我们框架
+│   ├── iot                        iot场景，来源于influxdb-comparisons，暂未完全适配我们框架
+│   ├── live                       生活消费场景，临时测试
+│   ├── metaqueries                metaqueries场景，来源于influxdb-comparisons，暂未完全适配我们框架
+│   ├── universal                  universal--万能场景, 根据一些关键数量生成数据, 例如"{\"MeasurementCount\":2000,\"TagKeyCount\":1,\"FieldsDefine\":[40,40,20]}"
+│   └── vehicle                    车载场景的数据与sql生成器模块
+├── db_client                   数据库初始化、创建db、写入、查询、序列化器的模块
+│   ├── common.go
+│   ├── fctsdb_client.go
+│   ├── influxdbv2_client.go
+│   ├── matrixdb_client.go
+│   ├── mysql_client.go
+│   └── opentsdb_client.go
+├── query_generator             内置的场景查询语句模板
+├── report                      对比测试报告中需要用的简单组件渲染抽象
+│   ├── page.go                    页面渲染，包括标题、测试组等
+│   ├── picture                    图形组件渲染，折线图、柱形图等等
+│   ├── src                        渲染所需js等资源文件
+│   └── table                      表格组件渲染
+└── util                        存放一些用到的小模块
+    ├── fastrand                   一个快速的rand模块，使用golang runtime中的相关函数，协程安全且性能极高
+    ├── gbt2260                    中国地理位置编码
+    └── keydriver                  关键字驱动，未实现
+```
 
 
