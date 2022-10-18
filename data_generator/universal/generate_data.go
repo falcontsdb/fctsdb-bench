@@ -22,8 +22,9 @@ type UniversalSimulatorConfig struct {
 }
 
 type UniversalCase struct {
-	TagKeyCount  int64
-	FieldsDefine [3]int64
+	MeasurementCount int64
+	TagKeyCount      int64
+	FieldsDefine     [3]int64
 }
 
 func (d *UniversalSimulatorConfig) ToSimulator() *UniversalSimulator {
@@ -31,7 +32,7 @@ func (d *UniversalSimulatorConfig) ToSimulator() *UniversalSimulator {
 	var measNum int64
 
 	for i := 0; i < len(devices); i++ {
-		devices[i] = NewDevice(d.DeviceOffset+int64(i), d.TagKeyCount, d.FieldsDefine)
+		devices[i] = NewDevice(d.DeviceOffset+int64(i), d.MeasurementCount, d.TagKeyCount, d.FieldsDefine)
 		measNum += int64(devices[i].NumMeasurements())
 	}
 
@@ -44,6 +45,7 @@ func (d *UniversalSimulatorConfig) ToSimulator() *UniversalSimulator {
 		madeSql:          0,
 		maxPoints:        maxPoints,
 		Hosts:            devices,
+		measurementCount: d.MeasurementCount,
 		writtenPoints:    0,
 		SamplingInterval: d.SamplingInterval,
 		TimestampStart:   d.Start,
@@ -55,11 +57,12 @@ func (d *UniversalSimulatorConfig) ToSimulator() *UniversalSimulator {
 // A IotSimulator generates data similar to telemetry from Telegraf.
 // It fulfills the Simulator interface.
 type UniversalSimulator struct {
-	madePoints    int64
-	maxPoints     int64
-	madeValues    int64
-	madeSql       int64
-	writtenPoints int64
+	madePoints       int64
+	maxPoints        int64
+	madeValues       int64
+	madeSql          int64
+	writtenPoints    int64
+	measurementCount int64
 
 	Hosts            []Device
 	SamplingInterval time.Duration
@@ -108,12 +111,12 @@ func (s *UniversalSimulator) Next(p *common.Point) int64 {
 
 	madePoint := atomic.AddInt64(&s.madePoints, 1)
 	pointIndex := madePoint - 1
-	hostIndex := pointIndex % int64(len(s.Hosts))
+	hostIndex := pointIndex / s.measurementCount % int64(len(s.Hosts))
 
 	host := &s.Hosts[hostIndex]
-	// vehicle.SimulatedMeasurements[0].Tick(v.SamplingInterval)
+
 	// 为了多协程下不混乱, 且由于这里只有一张表，这里不使用Tick方法
-	timestamp := s.TimestampStart.Add(s.SamplingInterval * time.Duration(pointIndex/int64(len(s.Hosts))))
+	timestamp := s.TimestampStart.Add(s.SamplingInterval * time.Duration(pointIndex/int64(len(s.Hosts))/s.measurementCount))
 	p.SetTimestamp(&timestamp)
 
 	for i := range host.TagKeys {
@@ -121,7 +124,7 @@ func (s *UniversalSimulator) Next(p *common.Point) int64 {
 	}
 
 	// Populate measurement-specific tags and fields:
-	host.SimulatedMeasurements[0].ToPoint(p)
+	host.SimulatedMeasurements[pointIndex%int64(len(host.SimulatedMeasurements))].ToPoint(p)
 	atomic.AddInt64(&s.madeValues, int64(len(p.FieldValues)))
 	return madePoint //方便另一种线程安全的结束方式，for sim.next(point) <= sim.total() {...} 保证产生的总点数正确，注意最后一次{...}里面的代码不执行
 }

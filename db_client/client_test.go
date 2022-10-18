@@ -7,7 +7,11 @@ import (
 	"testing"
 	"time"
 
+	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/airq"
+	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/common"
+	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/vehicle"
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
+	_ "github.com/lib/pq"
 	"github.com/valyala/fasthttp"
 )
 
@@ -184,5 +188,109 @@ func TestInfluxdbv2Client_CreateDb(t *testing.T) {
 }
 
 func TestMatrixdb(t *testing.T) {
+	mc := NewMatrixdbClient(ClientConfig{
+		Host:     "10.10.2.29",
+		Database: "benchmark_db",
+		Gzip:     3,
+		User:     "mxadmin",
+		Password: "Abc_123456",
+	})
+	err := mc.LoginUser()
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+
+	mc.DropDatabase("benchmark_db")
+	mc.CreateDatabase("benchmark_db", true)
+
+	// err = mc.CreateDatabase("testdb", true)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+
+	now := time.Now()
+	cfg := &airq.AirqSimulatorConfig{
+		Start:            now.Add(time.Hour * -24000),
+		End:              now,
+		SamplingInterval: time.Second,
+		DeviceCount:      1000,
+		DeviceOffset:     1,
+	}
+	sim := cfg.ToSimulator()
+
+	point := common.MakeUsablePoint()
+	// // buf := make([]byte, 0, 4*1024)
+	sim.Next(point)
+	err = mc.CreateMeasurement(point)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	// buf = mc.BeforeSerializePoints(buf, point)
+	// buf = mc.SerializeAndAppendPoint(buf, point)
+	// point.Reset()
+
+	// for i := 0; i < 10; i++ {
+	// 	sim.Next(point)
+	// 	buf = mc.SerializeAndAppendPoint(buf, point)
+	// 	point.Reset()
+	// }
+	// buf = mc.AfterSerializePoints(buf, point)
+	// // fmt.Println(string(buf))
+
+	// lat, err := mc.Write(buf)
+	// if err != nil {
+	// 	fmt.Println(err.Error())
+	// }
+	// fmt.Println(lat)
+
+	// mc.Query([]byte("select aqi from city_air_quality where site_id = 'DEV000000980' order by time desc limit 1;"))
+	// mc.Close()
+	// err = mc.CreateMeasurement(point)
+	// if err != nil {
+	// 	fmt.Println(err.Error())
+	// }
+
+	// mc.listDatabases()
+	// err = mc.DropDatabase("testdb")
+	// if err != nil {
+	// 	fmt.Println(err.Error())
+	// }
+
+}
+
+func BenchmarkOpentsdb(b *testing.B) {
+	oc := NewOpentsdbClient(ClientConfig{
+		Host:     "http://10.10.2.29:8087/",
+		Database: "benchmark_db",
+		Gzip:     3,
+		User:     "mxadmin",
+		Password: "Abc_123456",
+	})
+	// fmt.Println(oc.CheckConnection(time.Second * 10))
+	now := time.Now()
+	cfg := &vehicle.VehicleSimulatorConfig{
+		Start:            now.Add(time.Hour * -24000),
+		End:              now,
+		SamplingInterval: time.Second,
+		DeviceCount:      1000,
+		DeviceOffset:     1,
+	}
+	sim := cfg.ToSimulator()
+
+	point := common.MakeUsablePoint()
+
+	buf := make([]byte, 0, 4*1024)
+	buf = oc.BeforeSerializePoints(buf, point)
+	buf = oc.SerializeAndAppendPoint(buf, point)
+	point.Reset()
+
+	for i := 0; i < b.N; i++ {
+		sim.Next(point)
+		buf = oc.SerializeAndAppendPoint(buf, point)
+		point.Reset()
+		buf = buf[:0]
+	}
+	// buf = oc.AfterSerializePoints(buf, point)
+	// fmt.Println(string(buf))
 
 }

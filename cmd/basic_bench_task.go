@@ -19,7 +19,7 @@ import (
 	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/universal"
 	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/vehicle"
 	"git.querycap.com/falcontsdb/fctsdb-bench/db_client"
-	fctsdb "git.querycap.com/falcontsdb/fctsdb-bench/query_generator"
+	queryTemplate "git.querycap.com/falcontsdb/fctsdb-bench/query_generator"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -74,8 +74,8 @@ func (d *BasicBenchTask) Validate() {
 	log.SetFormatter(&log.TextFormatter{TimestampFormat: "2006/01/02 15:04:05", FullTimestamp: true})
 	d.daemonUrls = strings.Split(d.CsvDaemonUrls, ",")
 	d.databaseNames = strings.Split(d.DBName, ",")
-	if d.Format != "fctsdb" && d.Format != "mysql" && d.Format != "influxdbv2" {
-		log.Fatal("wrong database format, support fctsdb or mysql ")
+	if !db_client.IsSupportedFormat(d.Format) {
+		log.Fatal("wrong database format, support: ", strings.Join(db_client.SupportedFormat, " "))
 	}
 	if len(d.daemonUrls) == 0 {
 		log.Fatal("missing 'urls' flag")
@@ -120,12 +120,12 @@ func (d *BasicBenchTask) Validate() {
 	// query命令case和id对应相关处理
 	log.Info("Use case: ", d.UseCase)
 	if d.MixMode != "write_only" {
-		var queryCase *fctsdb.QueryCase
+		var queryCase *queryTemplate.QueryCase
 		switch d.UseCase {
-		case fctsdb.AirQuality.CaseName:
-			queryCase = fctsdb.AirQuality
-		case fctsdb.Vehicle.CaseName:
-			queryCase = fctsdb.Vehicle
+		case queryTemplate.AirQuality.CaseName:
+			queryCase = queryTemplate.AirQuality
+		case queryTemplate.Vehicle.CaseName:
+			queryCase = queryTemplate.Vehicle
 		default:
 			log.Fatal("the use-case is unsupported")
 		}
@@ -168,10 +168,18 @@ func (d *BasicBenchTask) PrepareWorkers() {
 		if err != nil {
 			log.Fatalln("open mysql failed" + err.Error())
 		}
+		defer client.Close()
 		cli = client
 	case "influxdbv2":
 		cli = db_client.NewInfluxdbV2Client(miniConfig)
+	case "matrixdb":
+		client := db_client.NewMatrixdbClient(miniConfig)
+		defer client.Close()
+		cli = client
+	case "opentsdb":
+		cli = db_client.NewOpentsdbClient(miniConfig)
 	}
+
 	if !cli.CheckConnection(2 * time.Minute) {
 		log.Fatalln("Check connection timeout...")
 	}
@@ -255,6 +263,7 @@ func (d *BasicBenchTask) prepareWorkersOnEachDB(dbName string) {
 			SamplingInterval: d.SamplingInterval,
 			DeviceCount:      d.ScaleVar,
 			DeviceOffset:     d.ScaleVarOffset,
+			MeasurementCount: ucase.MeasurementCount,
 			TagKeyCount:      ucase.TagKeyCount,
 			FieldsDefine:     ucase.FieldsDefine,
 		}
@@ -296,6 +305,15 @@ func (d *BasicBenchTask) prepareWorkersOnEachDB(dbName string) {
 				log.Fatalln("open influxdb v2 failed" + err.Error())
 			}
 			worker.writer = client
+		case "matrixdb":
+			client := db_client.NewMatrixdbClient(c)
+			err := client.LoginUser()
+			if err != nil {
+				log.Fatalln("open influxdb v2 failed" + err.Error())
+			}
+			worker.writer = client
+		case "opentsdb":
+			worker.writer = db_client.NewOpentsdbClient(c)
 		}
 
 		// worker的其他必要参数
@@ -485,9 +503,15 @@ func (d *BasicBenchTask) SyncShowStatics(status string, ctx context.Context) {
 }
 
 func (d *BasicBenchTask) CleanUp() {
-	if d.Format == "mysql" {
+	switch d.Format {
+	case "mysql":
 		for _, worker := range d.workerProcess {
 			w := worker.writer.(*db_client.MysqlClient)
+			w.Close()
+		}
+	case "matrixdb":
+		for _, worker := range d.workerProcess {
+			w := worker.writer.(*db_client.MatrixdbWithMxgateClient)
 			w.Close()
 		}
 	}

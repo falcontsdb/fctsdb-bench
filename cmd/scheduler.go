@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net/http"
 	"net/url"
 	"os"
 	"strconv"
@@ -223,6 +224,7 @@ func (s *Scheduler) checkConfigsFile() []Action {
 			actions = append(actions, Action{act: "set", object: param})
 		} else if bytes.HasPrefix(line, []byte("$Stop")) {
 			actions = append(actions, Action{act: "stop"})
+		} else if bytes.HasPrefix(line, []byte("#")) {
 		} else {
 			config := buildin_testcase.BasicBenchTaskConfig{}
 			err := json.Unmarshal(line, &config)
@@ -267,7 +269,15 @@ func (s *Scheduler) runBenchTaskByConfig(index int, fileName string, config buil
 	if err != nil {
 		return err
 	}
-	result := RunBenchTask(basicBenchTask)
+	// result := RunBenchTask(basicBenchTask)
+	basicBenchTask.Validate()
+	basicBenchTask.PrepareWorkers()
+	if s.format == "matrixdb" {
+		http.Get(s.agentEndpoints[0] + "/startMxgate")
+	}
+	basicBenchTask.Run()
+	result := basicBenchTask.Report()
+	basicBenchTask.CleanUp()
 	var writeHead = true
 	if index > 1 {
 		writeHead = false
@@ -365,7 +375,7 @@ func (s *Scheduler) NewBasicBenchTask(conf buildin_testcase.BasicBenchTaskConfig
 		TimestampStartStr: common.DefaultDateTimeStart,
 		TimestampEndStr:   timestampEndStr,
 		Seed:              12345678,
-		DoDBCreate:        true,
+		DoDBCreate:        conf.NeedPrePare || conf.MixMode == "write_only",
 		QueryPercent:      conf.QueryPercent,
 		QueryCount:        100,
 		Debug:             s.debug,

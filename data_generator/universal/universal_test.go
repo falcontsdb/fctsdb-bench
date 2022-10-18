@@ -19,6 +19,7 @@ func TestNewPointDevopsEasy(t *testing.T) {
 		SamplingInterval: time.Second,
 		DeviceCount:      2,
 		DeviceOffset:     0,
+		MeasurementCount: 3,
 		TagKeyCount:      3,
 		FieldsDefine:     [3]int64{2, 3, 1},
 	}

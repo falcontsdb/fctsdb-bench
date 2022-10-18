@@ -1,6 +1,7 @@
 package universal
 
 import (
+	"fmt"
 	"strconv"
 	"time"
 
@@ -18,15 +19,17 @@ type Device struct {
 	TagValues [][]byte
 }
 
-func NewDeviceMeasurements(fieldDefine [3]int64) []common.SimulatedMeasurement {
-	sm := []common.SimulatedMeasurement{
-		NewMeasurement("table_0", fieldDefine),
+func NewDeviceMeasurements(fieldDefine [3]int64, count int) []common.SimulatedMeasurement {
+	sm := []common.SimulatedMeasurement{}
+
+	for i := 0; i < count; i++ {
+		sm = append(sm, NewMeasurement(fmt.Sprintf("table_%d", i), fieldDefine))
 	}
 	return sm
 }
 
-func NewDevice(id int64, tagKeyCount int64, fieldDefine [3]int64) Device {
-	sm := NewDeviceMeasurements(fieldDefine)
+func NewDevice(id int64, measurementCount, tagKeyCount int64, fieldDefine [3]int64) Device {
+	sm := NewDeviceMeasurements(fieldDefine, int(measurementCount))
 	d := Device{
 		SimulatedMeasurements: sm,
 	}

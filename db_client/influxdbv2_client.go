@@ -119,7 +119,7 @@ func (f *InfluxdbV2Client) Query(body []byte) (int64, error) {
 		if string(resp.Header.Peek("Content-Encoding")) == "gzip" {
 			_, err := fasthttp.WriteGunzip(f.buf, resp.Body())
 			if err != nil {
-				log.Error("[ParseGzip] NewReader error: %v, maybe data is ungzip\n", err)
+				log.Errorf("[ParseGzip] NewReader error: %v, maybe data is ungzip\n", err)
 			}
 			body = f.buf.Bytes()
 			f.buf.Reset()
@@ -222,7 +222,7 @@ func (d *InfluxdbV2Client) CreateDatabase(name string, withEncryption bool) erro
 
 	for _, existingDatabase := range existingDatabases {
 		if name == existingDatabase {
-			log.Warn("The following database \"%s\" already exist in the data store, do'not need create.", name)
+			log.Warnf("The following database \"%s\" already exist in the data store, do'not need create.", name)
 			return nil
 		}
 	}

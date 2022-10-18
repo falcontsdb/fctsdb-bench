@@ -206,7 +206,9 @@ testcase.txt文件支持动态设置agent端的fctsdb数据库路径和config文
 $Set {"BinPath":"/root/fctsdb/fctsdb", "ConfigPath":"/root/fctsdb/config"}
 {"Group":"车载Series变化","MixMode":"write_only","UseCase":"vehicle","Workers":64,"BatchSize":1000,"ScaleVar":1000,"SamplingInterval":"1s","TimeLimit":"5s","UseGzip":1,"QueryPercent":0,"PrePareData":"","NeedPrePare":false,"Clean":true,"SqlTemplate":null}
 ```
-
 ###  2.6 高级功能-mock
 使用fcbench mock支持mock一个海东青数据库，用以测试环境是否达标。
+
+
+
 

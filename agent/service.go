@@ -53,6 +53,14 @@ func (s *AgentService) Validate() error {
 	case "influxdbv2":
 		log.Println("start with influxdbv2 format")
 		s.handlers = NewInfluxdbV2Agent(s.BinPath, s.ConfigPath)
+	case "matrixdb":
+		log.Println("start with matrixdb format")
+		handlers := NewMatrixdbAgent(s.BinPath, s.ConfigPath)
+		s.handlers = handlers
+		http.HandleFunc("/startMxgate", handlers.StartMxgateHandler)
+	case "opentsdb":
+		log.Println("start with opentsdb format")
+		s.handlers = NewOpentsdbAgent(s.BinPath, s.ConfigPath)
 	}
 	return nil
 }

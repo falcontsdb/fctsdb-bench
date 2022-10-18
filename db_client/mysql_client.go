@@ -85,7 +85,7 @@ func (m *MysqlClient) CreateDatabase(name string, withEncryption bool) error {
 
 	for _, existingDatabase := range existingDatabases {
 		if name == existingDatabase {
-			log.Warn("The following database \"%s\" already exist in the data store, do'not need create.", name)
+			log.Warnf("The following database \"%s\" already exist in the data store, do'not need create.", name)
 			return nil
 		}
 	}

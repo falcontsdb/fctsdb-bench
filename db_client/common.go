@@ -8,6 +8,8 @@ import (
 	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/common"
 )
 
+var SupportedFormat []string = []string{"fctsdb", "mysql", "influxdbv2", "matrixdb", "opentsdb"}
+
 type ClientConfig struct {
 	Host     string
 	Database string
@@ -63,4 +65,13 @@ func fastFormatAppend(v interface{}, buf []byte, singleQuotesForString bool) []b
 	default:
 		panic(fmt.Sprintf("unknown field type for %v", v))
 	}
+}
+
+func IsSupportedFormat(format string) bool {
+	for _, f := range SupportedFormat {
+		if format == f {
+			return true
+		}
+	}
+	return false
 }
