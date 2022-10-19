@@ -224,6 +224,10 @@ $Set {"BinPath":"/root/fctsdb/fctsdb", "ConfigPath":"/root/fctsdb/config"}
 使用fcbench mock支持mock一个海东青数据库，用以测试环境是否达标。
 
 ## 3 代码结构
+
+
+
+###  3.1 文档目录
 ```
 .
 ├── agent                       agent功能的client和service代码目录
@@ -276,5 +280,88 @@ $Set {"BinPath":"/root/fctsdb/fctsdb", "ConfigPath":"/root/fctsdb/config"}
     ├── gbt2260                    中国地理位置编码
     └── keydriver                  关键字驱动，未实现
 ```
+
+
+###  3.2 写入数据核心设计思路
+
+1、data_generator模块生成数据，产出对象为data_generator/common/point.go中的point对象
+```
+type Point struct {
+	MeasurementName  []byte                 #表名字
+	TagKeys          [][]byte               #tag名字
+	TagValues        [][]byte               #tag的值
+	FieldKeys        [][]byte               #field名字
+	FieldValues      []interface{}          #field值
+	Int64FiledKeys   [][]byte               #int64类型field名字，特例化，加速int64类型的转换
+	Int64FiledValues []int64                #int64类型field值，特例化，加速int64类型的转换
+	Timestamp        *time.Time             #时间搓
+}
+```
+其中，对int64这种类型单独存储，是为了减少vehicle这种场景在大量int64的field情况下，转换成interface{}的时间消耗，提升性能。
+
+2、point对象由db_client中不同的数据库进行序列化，主要是db_client/common.go的DBClient对象的以下三个方法。
+```
+      // 序列化器，序列化一个batch为目标，分为三个阶段。返回结果是append到一个bytes数组中。
+	// 1、准备阶段，添加一些头信息或者类似mysql的列信息
+	BeforeSerializePoints(buf []byte, p *common.Point) []byte
+	// 2、序列化一个point对象，并把添加到bytes数组中
+	SerializeAndAppendPoint(buf []byte, p *common.Point) []byte
+	// 3、batch的尾部内容，例如一些结束符;等等
+	AfterSerializePoints(buf []byte, p *common.Point) []byte
+```
+通过这三个方法，最后生成的结果一个是byte数组，包含一个batch的数据。
+
+3、将步骤2中序列化后的byte数组进行发送，调用的db_client/common.go的DBClient对象的write方法。
+```
+      Write(body []byte) (int64, error) 
+```
+###  3.3 查询数据核心设计思路
+1、在data_generator/common/sql_temlate.go文件中，设计了一种简单的模板替换。
+```
+// 举个例子：
+// "select mean(aqi) as aqi from city_air_quality where city in '{city*6}' and time >= '{now}'-30d group by time(1d)"
+// 将被分割成base段: "select mean(aqi) as aqi from city_air_quality where city in '"、"' and time >= '"、"'-30d group by time(1d)"三个
+// 关键字: city、now
+// 重复次数: 6、1
+```
+
+对应这个例子，在air场景中的data_generator/airq/generate_data.go文件的nextSql方法进行关键字替换，下列这个方法
+```
+func (s *AirqSimulator) NextSql(wr io.Writer) int64
+```
+
+最终生成下面这个完整sql：
+```
+select mean(aqi) as aqi from city_air_quality where city in '百色市','德宏傣族景颇族自治州','大连市','济宁市','佳木斯市','石家庄市' and time >= '2021-01-01T00:01:40+08:00'-30d group by time(1d)
+```
+完整的例子可见data_generator/airq/airq_test.go
+
+
+2、将步骤1中得到sql进行发送，调用的db_client/common.go的DBClient对象的query方法。
+```
+      Query(body []byte) (int64, error) 
+```
+
+###  3.4 主要流程调用链
+最主要的测试流程的调用链如下图：
+```
+cmd/main.go
+  │ 
+  ├── cmd/command.go   ───┐
+  │                       ├──> basic_bench_task.go 
+  ├── cmd/scheduler.go ───┘            ├──> data_generator(*.go) ──> util(*.go)
+  │              │                     └──> db_clent(*.go)
+  │              └──> agent/client.go  
+  │                                   
+  └── cmd/agent.go ───> agent/serivce.go ───> agent/*_handlers.go
+```
+
+html测试报告生成功能调用链
+```
+cmd/main.go 
+  └── cmd/scheduler.go  ───> buildin_testcase/report.go ───>  reprot/*.go                                  
+```
+
+新加数据库，主要添加一个db_client文件
 
 

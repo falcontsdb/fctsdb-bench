@@ -31,8 +31,12 @@ type DBClient interface {
 	CreateMeasurement(p *common.Point) error
 	CheckConnection(timeout time.Duration) bool
 
+	// 序列化器，序列化一个batch为目标，分为三个阶段。返回结果是append到一个bytes数组中。
+	// 1、准备阶段，添加一些头信息或者类似mysql的列信息
 	BeforeSerializePoints(buf []byte, p *common.Point) []byte
+	// 2、序列化一个point对象，并把添加到bytes数组中
 	SerializeAndAppendPoint(buf []byte, p *common.Point) []byte
+	// 3、batch的尾部内容，例如一些结束符;等等
 	AfterSerializePoints(buf []byte, p *common.Point) []byte
 }
 

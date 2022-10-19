@@ -6,12 +6,19 @@ import (
 	"strings"
 )
 
+// SqlTemplate对象用于记录sql文本被分割后的内容信息
 type SqlTemplate struct {
-	Base      [][]byte
-	KeyWords  []string
-	KeyRepeat []int
+	Base      [][]byte //记录sql文本中不用替换的分段文本
+	KeyWords  []string //记录sql文本中需要替换的关键字
+	KeyRepeat []int    //记录对应关键字需要重复替换的次数
 }
 
+// 根据文本进行分割，生成SqlTemplate对象
+// 举个例子：
+// "select mean(aqi) as aqi from city_air_quality where city in '{city*6}' and time >= '{now}'-30d group by time(1d)"
+// 将被分割成base段: "select mean(aqi) as aqi from city_air_quality where city in '"、"' and time >= '"、"'-30d group by time(1d)"三个
+// 关键字: city、now
+// 重复次数: 6、1
 func NewSqlTemplate(tql string) (*SqlTemplate, error) {
 	tqlBytes := []byte(tql)
 	tmp := &SqlTemplate{}
@@ -58,14 +65,6 @@ func NewSqlTemplate(tql string) (*SqlTemplate, error) {
 	if len(base) > 0 {
 		tmp.Base = append(tmp.Base, base)
 	}
-
-	// tmp.TimeStart = append(tmp.TimeStart, '\'')
-	// tmp.TimeStart = append(tmp.TimeStart, []byte(start.UTC().String())...)
-	// tmp.TimeStart = append(tmp.TimeStart, '\'')
-
-	// tmp.TimeEnd = append(tmp.TimeEnd, '\'')
-	// tmp.TimeEnd = append(tmp.TimeEnd, []byte(end.UTC().String())...)
-	// tmp.TimeEnd = append(tmp.TimeEnd, '\'')
 
 	return tmp, nil
 }
