@@ -318,7 +318,7 @@ func (s *Scheduler) writeResultToFctsdb(dbUrl string, startTime time.Time, info 
 	if err == nil {
 		sc := resp.StatusCode()
 		if sc != fasthttp.StatusNoContent {
-			err = fmt.Errorf("invalid write response (status %d): %s", sc, string(resp.Body()))
+			log.Error(fmt.Sprintf("invalid write response (status %d): %s", sc, string(resp.Body())))
 		}
 	}
 	fasthttp.ReleaseResponse(resp)
