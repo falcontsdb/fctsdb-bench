@@ -22,7 +22,7 @@ var (
 	post                = []byte("POST")
 	get                 = []byte("GET")
 	textPlain           = []byte("text/plain")
-	responseMustContain = []byte(`"time"`)
+	responseMustContain = []byte(`"values"`)
 )
 
 // FctsdbClient is a Writer that writes to a fctsdb HTTP server.
