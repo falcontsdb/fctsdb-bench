@@ -311,6 +311,7 @@ func (s *Scheduler) writeResultToFctsdb(dbUrl string, startTime time.Time, info 
 	}
 	body = append(body, fmt.Sprintf(" %d", startTime.Nanosecond())...)
 	req.SetBody(body)
+	fmt.Println(string(body))
 
 	resp := fasthttp.AcquireResponse()
 	client := fasthttp.Client{}
