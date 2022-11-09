@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -18,7 +17,9 @@ import (
 	"git.querycap.com/falcontsdb/fctsdb-bench/agent"
 	"git.querycap.com/falcontsdb/fctsdb-bench/buildin_testcase"
 	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/common"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/valyala/fasthttp"
 )
 
 var (
@@ -111,8 +112,8 @@ func init() {
 }
 
 func (s *Scheduler) ScheduleBenchTask() {
-
-	fileName := time.Now().Format("benchmark_0102_150405")
+	startTime := time.Now()
+	// fileName := time.Now().Format("benchmark_0102_150405")
 	// 开始时还原agent的配置并检查是否正确
 	if len(s.agentEndpoints) != 0 {
 		for _, agentEndpoint := range s.agentEndpoints {
@@ -146,7 +147,7 @@ func (s *Scheduler) ScheduleBenchTask() {
 				}
 			case "run":
 				index += 1
-				err := s.runBenchTaskByConfig(index, fileName, action.object.(buildin_testcase.BasicBenchTaskConfig))
+				err := s.runBenchTaskByConfig(index, startTime, action.object.(buildin_testcase.BasicBenchTaskConfig))
 				if err != nil {
 					log.Fatalln("run testcase failed:", err.Error())
 				}
@@ -154,7 +155,7 @@ func (s *Scheduler) ScheduleBenchTask() {
 		}
 	} else { // 执行内置测试
 		for i, config := range buildin_testcase.BuildinConfigs {
-			err := s.runBenchTaskByConfig(i+1, fileName, config)
+			err := s.runBenchTaskByConfig(i+1, startTime, config)
 			if err != nil {
 				log.Println(err)
 				continue
@@ -166,6 +167,7 @@ func (s *Scheduler) ScheduleBenchTask() {
 		envBytes, err := agent.GetEnvironment(s.agentEndpoints[0])
 		log.Println(string(envBytes))
 		if err == nil {
+			fileName := startTime.Format("benchmark_0102_150405")
 			csvFile, err := os.OpenFile(fileName+".csv", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0666)
 			if err != nil {
 				log.Println("open result csv failed, error:", err.Error())
@@ -181,6 +183,7 @@ func (s *Scheduler) ScheduleBenchTask() {
 	}
 	// 如果是执行内置测试，生成测试报告，根据配置文件执行的测试，需要手动生成测试报告
 	if s.configsPath == "" {
+		fileName := startTime.Format("benchmark_0102_150405")
 		report := buildin_testcase.CreateReport(fileName)
 		f, _ := os.Create(fileName + ".html")
 		defer f.Close()
@@ -237,7 +240,7 @@ func (s *Scheduler) checkConfigsFile() []Action {
 	return actions
 }
 
-func (s *Scheduler) runBenchTaskByConfig(index int, fileName string, config buildin_testcase.BasicBenchTaskConfig) error {
+func (s *Scheduler) runBenchTaskByConfig(index int, startTime time.Time, config buildin_testcase.BasicBenchTaskConfig) error {
 	log.Printf("---index %d ------------------------------------------------------------\n", index)
 	if len(s.agentEndpoints) != 0 {
 		for _, agentEndpoint := range s.agentEndpoints {
@@ -283,9 +286,44 @@ func (s *Scheduler) runBenchTaskByConfig(index int, fileName string, config buil
 		writeHead = false
 	}
 	result["Group"] = config.Group
+	fileName := startTime.Format("benchmark_0102_150405")
+	s.writeResultToFctsdb("10.10.2.30:8086", startTime, result)
 	s.writeResultToCsv(fileName, result, writeHead)
 
 	return nil
+}
+
+func (s *Scheduler) writeResultToFctsdb(dbUrl string, startTime time.Time, info map[string]string) {
+	log.Info("write testcase result into fctsdb", dbUrl)
+	writeUrl := fmt.Sprintf("http://%s/write?db=results", dbUrl)
+	req := fasthttp.AcquireRequest()
+	req.Header.SetContentTypeBytes([]byte("text/plain"))
+	req.Header.SetMethodBytes([]byte("POST"))
+	req.Header.SetRequestURIBytes([]byte(writeUrl))
+	body := make([]byte, 0)
+	body = append(body, "m,t=1 "...)
+	for k, v := range info {
+		body = append(body, fmt.Sprintf("%s=%s,", k, v)...)
+	}
+	l := len(body)
+	if body[l-1] == ',' {
+		body = body[:l-2]
+	}
+	body = append(body, fmt.Sprintf(" %d", startTime.Nanosecond())...)
+	req.SetBody(body)
+
+	resp := fasthttp.AcquireResponse()
+	client := fasthttp.Client{}
+	err := client.Do(req, resp)
+	if err == nil {
+		sc := resp.StatusCode()
+		if sc != fasthttp.StatusNoContent {
+			err = fmt.Errorf("invalid write response (status %d): %s", sc, string(resp.Body()))
+		}
+	}
+	fasthttp.ReleaseResponse(resp)
+	fasthttp.ReleaseRequest(req)
+
 }
 
 func (s *Scheduler) writeResultToCsv(fileName string, info map[string]string, writeHead bool) {
