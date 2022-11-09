@@ -287,7 +287,7 @@ func (s *Scheduler) runBenchTaskByConfig(index int, startTime time.Time, config 
 	}
 	result["Group"] = config.Group
 	fileName := startTime.Format("benchmark_0102_150405")
-	s.writeResultToFctsdb("10.10.2.30:8086", startTime, result)
+	s.writeResultToFctsdb("10.10.2.30:3086", startTime, result)
 	s.writeResultToCsv(fileName, result, writeHead)
 
 	return nil
