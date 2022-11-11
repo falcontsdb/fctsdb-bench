@@ -272,7 +272,8 @@ func (f *FctsdbAgent) ResetHandler(w http.ResponseWriter, r *http.Request) {
 
 func (f *FctsdbAgent) GetEnvHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
-		version, _ := GetFctsdbVersion(f.BinPath)
+		// version, _ := GetFctsdbVersion(f.BinPath)
+		version := "fxxx"
 		msg := getEnv()
 		msg = append(msg, "**数据库版本: "...)
 		msg = append(msg, version...)
