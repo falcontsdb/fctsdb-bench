@@ -417,6 +417,7 @@ func (d *BasicBenchTask) Run() {
 	for i := range d.workerProcess {
 		wg.Add(1)
 		go func(i int) {
+			defer wg.Done()
 			d.workerProcess[i].StartRun(d.TimeLimit, &wg)
 		}(i)
 	}
