@@ -115,7 +115,7 @@ func (s *Scheduler) ScheduleBenchTask() {
 	go func() {
 		runtime.SetBlockProfileRate(int(1 * time.Second))
 		runtime.SetMutexProfileFraction(1)
-		err := http.ListenAndServe(":6060", nil)
+		err := http.ListenAndServe("0.0.0.0:6060", nil)
 		if err != nil {
 			log.Fatalln("pprof start failed", err.Error())
 		}
