@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -111,6 +112,14 @@ func init() {
 }
 
 func (s *Scheduler) ScheduleBenchTask() {
+	go func() {
+		runtime.SetBlockProfileRate(int(1 * time.Second))
+		runtime.SetMutexProfileFraction(1)
+		err := http.ListenAndServe(":6060", nil)
+		if err != nil {
+			log.Fatalln("pprof start failed", err.Error())
+		}
+	}()
 
 	fileName := time.Now().Format("benchmark_0102_150405")
 	// 开始时还原agent的配置并检查是否正确
