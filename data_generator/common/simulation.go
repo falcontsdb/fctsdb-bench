@@ -18,6 +18,7 @@ const (
 	UseCaseVehicle              = "vehicle"
 	UseCaseAirQuality           = "air-quality"
 	UseCaseLiveCharge           = "live"
+	UseCaseScene                = "scene"
 )
 
 // Use case choices:
