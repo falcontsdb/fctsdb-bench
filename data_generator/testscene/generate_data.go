@@ -21,7 +21,7 @@ type SceneConfig struct {
 	SqlTemplates     []string
 }
 
-func (c *SceneConfig) ToSimulator() *AirqSimulator {
+func (c *SceneConfig) ToSimulator() *SceneSimulator {
 	series := make([]Series, c.SeriesCount)
 	var measNum int64
 
@@ -33,7 +33,7 @@ func (c *SceneConfig) ToSimulator() *AirqSimulator {
 	epochs := c.End.Sub(c.Start).Nanoseconds() / c.SamplingInterval.Nanoseconds()
 	maxPoints := epochs * measNum
 
-	dg := &AirqSimulator{
+	dg := &SceneSimulator{
 		madePoints:       0, //保证madePoint在next方法中被使用时的初始值是0
 		madeValues:       0,
 		madeSql:          0,
@@ -52,9 +52,8 @@ func (c *SceneConfig) ToSimulator() *AirqSimulator {
 	return dg
 }
 
-// A IotSimulator generates data similar to telemetry from Telegraf.
 // It fulfills the Simulator interface.
-type AirqSimulator struct {
+type SceneSimulator struct {
 	madePoints    int64
 	maxPoints     int64
 	madeValues    int64
@@ -68,29 +67,29 @@ type AirqSimulator struct {
 	sqlTemplates     []*common.SqlTemplate
 }
 
-func (s *AirqSimulator) SeenPoints() int64 {
+func (s *SceneSimulator) SeenPoints() int64 {
 	return s.madePoints
 }
 
-func (s *AirqSimulator) SeenValues() int64 {
+func (s *SceneSimulator) SeenValues() int64 {
 	return s.madeValues
 }
 
-func (s *AirqSimulator) Total() int64 {
+func (s *SceneSimulator) Total() int64 {
 	return s.maxPoints
 }
 
-func (s *AirqSimulator) Finished() bool {
+func (s *SceneSimulator) Finished() bool {
 	return s.madePoints >= s.maxPoints
 }
 
-func (s *AirqSimulator) SetWrittenPoints(num int64) {
+func (s *SceneSimulator) SetWrittenPoints(num int64) {
 	if num > s.writtenPoints {
 		atomic.StoreInt64(&s.writtenPoints, num)
 	}
 }
 
-func (s *AirqSimulator) SetSqlTemplate(sqlTemplates []string) error {
+func (s *SceneSimulator) SetSqlTemplate(sqlTemplates []string) error {
 	templates := make([]*common.SqlTemplate, len(sqlTemplates))
 	for i := range sqlTemplates {
 		temp, err := common.NewSqlTemplate(sqlTemplates[i])
@@ -104,7 +103,7 @@ func (s *AirqSimulator) SetSqlTemplate(sqlTemplates []string) error {
 }
 
 // Next advances a Point to the next state in the generator.
-func (s *AirqSimulator) Next(p *common.Point) int64 {
+func (s *SceneSimulator) Next(p *common.Point) int64 {
 
 	madePoint := atomic.AddInt64(&s.madePoints, 1)
 	pointIndex := madePoint - 1
@@ -127,7 +126,7 @@ func (s *AirqSimulator) Next(p *common.Point) int64 {
 	return madePoint //方便另一种线程安全的结束方式，for sim.next(point) <= sim.total() {...} 保证产生的总点数正确，注意最后一次{...}里面的代码不执行
 }
 
-func (s *AirqSimulator) NextSql(wr io.Writer) int64 {
+func (s *SceneSimulator) NextSql(wr io.Writer) int64 {
 	madeSql := atomic.AddInt64(&s.madeSql, 1)
 	tmp := s.sqlTemplates[madeSql%int64(len(s.sqlTemplates))]
 
@@ -139,17 +138,17 @@ func (s *AirqSimulator) NextSql(wr io.Writer) int64 {
 		if i < len(tmp.KeyWords) {
 			repeat := tmp.KeyRepeat[i]
 			for k := 0; k < repeat; k++ {
-				Airq := s.Hosts[(randomHostsIndex+k)%len(s.Hosts)]
+				scene := s.Hosts[(randomHostsIndex+k)%len(s.Hosts)]
 				key := tmp.KeyWords[i]
 				switch key {
 				case string(TagKeys[0]):
-					wr.Write(Airq.TagValues[0])
+					wr.Write(scene.TagValues[0])
 				case string(TagKeys[1]):
-					wr.Write(Airq.TagValues[1])
+					wr.Write(scene.TagValues[1])
 				case string(TagKeys[2]):
-					wr.Write(Airq.TagValues[2])
+					wr.Write(scene.TagValues[2])
 				case string(TagKeys[3]):
-					wr.Write(Airq.TagValues[3])
+					wr.Write(scene.TagValues[3])
 				case "start":
 					wr.Write([]byte(s.TimestampStart.Format(time.RFC3339)))
 				case "end":

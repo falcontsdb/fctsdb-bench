@@ -16,6 +16,7 @@ import (
 	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/common"
 	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/devops"
 	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/live"
+	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/testscene"
 	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/universal"
 	"git.querycap.com/falcontsdb/fctsdb-bench/data_generator/vehicle"
 	"git.querycap.com/falcontsdb/fctsdb-bench/db_client"
@@ -126,6 +127,8 @@ func (d *BasicBenchTask) Validate() {
 			queryCase = queryTemplate.AirQuality
 		case queryTemplate.Vehicle.CaseName:
 			queryCase = queryTemplate.Vehicle
+		case queryTemplate.Scene.CaseName:
+			queryCase = queryTemplate.Scene
 		default:
 			log.Fatal("the use-case is unsupported")
 		}
@@ -230,6 +233,16 @@ func (d *BasicBenchTask) prepareWorkersOnEachDB(dbName string) {
 			SqlTemplates:     d.sqlTemplate,
 		}
 		simulator = cfg.ToSimulator()
+	case common.UseCaseScene:
+		cfg := testscene.SceneConfig{
+			Start:            d.timestampStart,
+			End:              d.timestampEnd,
+			SamplingInterval: d.SamplingInterval,
+			SeriesCount:      d.ScaleVar,
+			SeriesOffset:     d.ScaleVarOffset,
+			SqlTemplates:     d.sqlTemplate,
+		}
+		simulator = cfg.ToSimulator()
 	case common.UseCaseLiveCharge:
 		cfg := live.LiveChargeSimulatorConfig{
 			Start:            d.timestampStart,
@@ -251,7 +264,6 @@ func (d *BasicBenchTask) prepareWorkersOnEachDB(dbName string) {
 		}
 		simulator = cfg.ToSimulator()
 	default:
-
 		ucase := universal.UniversalCase{}
 		err := json.Unmarshal([]byte(d.UseCase), &ucase)
 		if err != nil {
