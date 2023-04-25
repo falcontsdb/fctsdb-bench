@@ -427,10 +427,15 @@ func (d *BasicBenchTask) Run() {
 	d.resultCollector.SetStartTime(time.Now())
 	wg := sync.WaitGroup{}
 	ctx, cancel := context.WithCancel(context.Background())
+
+	serializePoint := common.MakeUsablePoint()
+	d.workerProcess[0].simulator.Next(serializePoint)
+	d.workerProcess[0].simulator.ClearMadePointNum()
+
 	for i := range d.workerProcess {
 		wg.Add(1)
 		go func(i int) {
-			d.workerProcess[i].StartRun(d.TimeLimit, &wg)
+			d.workerProcess[i].StartRun(d.TimeLimit, &wg, serializePoint)
 		}(i)
 	}
 	d.SyncShowStatics(d.MixMode, ctx)
@@ -555,25 +560,21 @@ func (w *Worker) Prepare(wg *sync.WaitGroup) {
 	}
 }
 
-func (w *Worker) StartRun(timeLimit time.Duration, waitGroup *sync.WaitGroup) {
+func (w *Worker) StartRun(timeLimit time.Duration, waitGroup *sync.WaitGroup, serializePoint *common.Point) {
 	defer waitGroup.Done()
 	endTime := time.Now().Add(timeLimit)
 	switch w.Mode {
 	case "write":
-		point := common.MakeUsablePoint()
-		w.simulator.Next(point)
-		w.simulator.ClearMadePointNum()
-
 		if timeLimit > 0 {
 			for time.Now().Before(endTime) {
-				err := w.runBatchAndWrite(w.BatchSize, false, point)
+				err := w.runBatchAndWrite(w.BatchSize, false, serializePoint)
 				if err != nil {
 					log.Error(err.Error())
 				}
 			}
 		} else {
 			for !w.simulator.Finished() {
-				err := w.runBatchAndWrite(w.BatchSize, true, point)
+				err := w.runBatchAndWrite(w.BatchSize, true, serializePoint)
 				if err != nil {
 					log.Error(err.Error())
 				}
