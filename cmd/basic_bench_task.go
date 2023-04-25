@@ -545,6 +545,8 @@ type Worker struct {
 func (w *Worker) Prepare(wg *sync.WaitGroup) {
 	defer wg.Done()
 	point := common.MakeUsablePoint()
+	w.simulator.Next(point)
+	w.simulator.ClearMadePointNum()
 	for !w.simulator.Finished() {
 		err := w.runBatchAndWrite(2000, true, point)
 		if err != nil && w.Debug {
@@ -559,6 +561,9 @@ func (w *Worker) StartRun(timeLimit time.Duration, waitGroup *sync.WaitGroup) {
 	switch w.Mode {
 	case "write":
 		point := common.MakeUsablePoint()
+		w.simulator.Next(point)
+		w.simulator.ClearMadePointNum()
+
 		if timeLimit > 0 {
 			for time.Now().Before(endTime) {
 				err := w.runBatchAndWrite(w.BatchSize, false, point)
@@ -593,7 +598,7 @@ func (w *Worker) StartRun(timeLimit time.Duration, waitGroup *sync.WaitGroup) {
 	}
 }
 
-func (d *Worker) runBatchAndWrite(batchSize int, useCountLimit bool, point *common.Point) error {
+func (d *Worker) runBatchAndWrite(batchSize int, useCountLimit bool, serializePoint *common.Point) error {
 	// var batchesSeen int64
 	// 发送http write
 
@@ -602,9 +607,10 @@ func (d *Worker) runBatchAndWrite(batchSize int, useCountLimit bool, point *comm
 	var batchItemCount int = 0
 	var vaulesWritten int = 0
 	var pointMadeIndex int64
-	point.Reset()
-	buf = d.writer.BeforeSerializePoints(buf, point)
-	buf = d.writer.SerializeAndAppendPoint(buf, point)
+	buf = d.writer.BeforeSerializePoints(buf, serializePoint)
+
+	var point = common.MakeUsablePoint()
+
 	for batchItemCount < batchSize {
 		if pointMadeIndex > d.simulator.Total() && useCountLimit { // 以simulator.Finished()结束为结束
 			break
@@ -617,7 +623,7 @@ func (d *Worker) runBatchAndWrite(batchSize int, useCountLimit bool, point *comm
 	}
 
 	if batchItemCount > 0 {
-		buf = d.writer.AfterSerializePoints(buf, point)
+		buf = d.writer.AfterSerializePoints(buf, serializePoint)
 		err = d.writeToDb(buf)
 		if err == nil {
 			d.resultCollector.AddBytes(int64(len(buf)))
