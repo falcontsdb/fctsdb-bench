@@ -612,9 +612,12 @@ func (d *Worker) runBatchAndWrite(batchSize int, useCountLimit bool, serializePo
 	var point = common.MakeUsablePoint()
 
 	// 以simulator.Finished()结束为结束
-	for batchItemCount < batchSize && (!useCountLimit || pointMadeIndex < d.simulator.Total()) {
+	for batchItemCount < batchSize {
 		point.Reset()
 		pointMadeIndex = d.simulator.Next(point)
+		if pointMadeIndex > d.simulator.Total() && useCountLimit { // 以simulator.Finished()结束为结束
+			break
+		}
 		buf = d.writer.SerializeAndAppendPoint(buf, point)
 		batchItemCount++
 		vaulesWritten += (len(point.FieldValues) + len(point.Int64FiledValues))
