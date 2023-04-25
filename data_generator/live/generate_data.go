@@ -103,6 +103,10 @@ func (s *LiveChargeSimulator) SetSqlTemplate(sqlTemplates []string) error {
 	return nil
 }
 
+func (s *LiveChargeSimulator) ClearMadePointNum() {
+	atomic.StoreInt64(&s.madePoints, 0)
+}
+
 // Next advances a Point to the next state in the generator.
 func (s *LiveChargeSimulator) Next(p *common.Point) int64 {
 

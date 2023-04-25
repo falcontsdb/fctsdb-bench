@@ -370,6 +370,7 @@ func (d *BasicBenchTask) prepareWorkersOnEachDB(dbName string) {
 			}
 			createdMeasurement[string(point.MeasurementName)] = true
 		}
+		simulator.ClearMadePointNum()
 	}
 
 	d.workerProcess = append(d.workerProcess, workersEachDB...)
@@ -598,14 +599,12 @@ func (d *Worker) runBatchAndWrite(batchSize int, useCountLimit bool, point *comm
 
 	buf := make([]byte, 0, 1024)
 	var err error
-	var batchItemCount int = 1
+	var batchItemCount int = 0
 	var vaulesWritten int = 0
 	var pointMadeIndex int64
 	point.Reset()
-	pointMadeIndex = d.simulator.Next(point)
 	buf = d.writer.BeforeSerializePoints(buf, point)
 	buf = d.writer.SerializeAndAppendPoint(buf, point)
-	vaulesWritten += (len(point.FieldValues) + len(point.Int64FiledValues))
 	for batchItemCount < batchSize {
 		if pointMadeIndex > d.simulator.Total() && useCountLimit { // 以simulator.Finished()结束为结束
 			break

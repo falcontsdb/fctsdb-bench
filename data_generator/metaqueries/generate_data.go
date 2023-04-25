@@ -3,6 +3,7 @@ package metaqueries
 import (
 	"fmt"
 	"io"
+	"sync/atomic"
 	"time"
 
 	"math/rand"
@@ -85,6 +86,10 @@ func (g *MetaquerySimulator) Total() int64 {
 
 func (g *MetaquerySimulator) Finished() bool {
 	return g.madePoints >= g.maxPoints
+}
+
+func (q *MetaquerySimulator) ClearMadePointNum() {
+	atomic.StoreInt64(&q.madePoints, 0)
 }
 
 // Next advances a Point to the next state in the generator.

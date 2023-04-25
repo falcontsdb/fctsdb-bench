@@ -104,6 +104,10 @@ func (g *VehicleSimulator) SetSqlTemplate(sqlTemplates []string) error {
 	return nil
 }
 
+func (q *VehicleSimulator) ClearMadePointNum() {
+	atomic.StoreInt64(&q.madePoints, 0)
+}
+
 // Next advances a Point to the next state in the generator.
 func (g *VehicleSimulator) Next(p *common.Point) int64 {
 	// switch to the next metric if needed

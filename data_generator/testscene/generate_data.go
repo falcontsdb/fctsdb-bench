@@ -102,6 +102,10 @@ func (s *SceneSimulator) SetSqlTemplate(sqlTemplates []string) error {
 	return nil
 }
 
+func (s *SceneSimulator) ClearMadePointNum() {
+	atomic.StoreInt64(&s.madePoints, 0)
+}
+
 // Next advances a Point to the next state in the generator.
 func (s *SceneSimulator) Next(p *common.Point) int64 {
 

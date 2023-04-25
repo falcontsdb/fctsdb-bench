@@ -2,6 +2,7 @@ package dashboard
 
 import (
 	"io"
+	"sync/atomic"
 	"time"
 
 	. "git.querycap.com/falcontsdb/fctsdb-bench/data_generator/common"
@@ -74,6 +75,10 @@ func (d *DashboardSimulatorConfig) ToSimulator() *DashboardSimulator {
 	}
 
 	return dg
+}
+
+func (d *DashboardSimulator) ClearMadePointNum() {
+	atomic.StoreInt64(&d.madePoints, 0)
 }
 
 // Next advances a Point to the next state in the generator.

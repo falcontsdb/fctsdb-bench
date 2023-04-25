@@ -75,6 +75,10 @@ func (d *DevopsSimulatorConfig) ToSimulator() *DevopsSimulator {
 	return dg
 }
 
+func (d *DevopsSimulator) ClearMadePointNum() {
+	atomic.StoreInt64(&d.madePoints, 0)
+}
+
 // Next advances a Point to the next state in the generator.
 func (d *DevopsSimulator) Next(p *Point) int64 {
 	// // switch to the next host if needed
