@@ -82,7 +82,7 @@ func (g *VehicleSimulator) Total() int64 {
 }
 
 func (g *VehicleSimulator) Finished() bool {
-	return g.madePoints >= g.maxPoints
+	return atomic.LoadInt64(&g.madePoints) >= g.maxPoints
 }
 
 func (g *VehicleSimulator) SetWrittenPoints(num int64) {
