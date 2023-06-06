@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -29,8 +30,7 @@ var (
 		Short: "模仿海东青数据库，测试本工具能力上限",
 		Run: func(cmd *cobra.Command, args []string) {
 			mockFctsdb()
-		},
-		// Hidden: true,
+		}, // Hidden: true,
 		// helpCommand:       helpCmd,
 	}
 )
@@ -94,6 +94,7 @@ func mockFctsdb() {
 
 func main() {
 	cobra.EnableCommandSorting = false
+	fmt.Println("多源异构数据融合分析与处理技术V2.0")
 	rootCmd.Flags().BoolP("version", "v", false, "查看版本信息")
 	rootCmd.PersistentFlags().BoolP("help", "h", false, "查看帮助信息")
 

@@ -343,7 +343,7 @@ func (f *FctsdbAgent) startDB() error {
 		log.Println("Start db failed, error: " + err.Error())
 		return err
 	} else {
-		cmd := `nohup ` + f.BinPath + ` -config ` + f.ConfigPath + ` 1>/dev/null 2>&1 &`
+		cmd := `nohup ` + f.BinPath + ` -config ` + f.ConfigPath + ` -password ` + ` Abc_123456 ` + ` 1>/dev/null 2>&1 &`
 		log.Println(cmd)
 		execCmd := exec.Command("bash", "-c", cmd)
 		execCmd.SysProcAttr = &syscall.SysProcAttr{
