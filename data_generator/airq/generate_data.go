@@ -103,6 +103,10 @@ func (s *AirqSimulator) SetSqlTemplate(sqlTemplates []string) error {
 	return nil
 }
 
+func (a *AirqSimulator) ClearMadePointNum() {
+	atomic.StoreInt64(&a.madePoints, 0)
+}
+
 // Next advances a Point to the next state in the generator.
 func (s *AirqSimulator) Next(p *common.Point) int64 {
 

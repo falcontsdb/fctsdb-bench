@@ -370,6 +370,7 @@ func (d *BasicBenchTask) prepareWorkersOnEachDB(dbName string) {
 			}
 			createdMeasurement[string(point.MeasurementName)] = true
 		}
+		simulator.ClearMadePointNum()
 	}
 
 	d.workerProcess = append(d.workerProcess, workersEachDB...)
@@ -426,10 +427,15 @@ func (d *BasicBenchTask) Run() {
 	d.resultCollector.SetStartTime(time.Now())
 	wg := sync.WaitGroup{}
 	ctx, cancel := context.WithCancel(context.Background())
+
+	serializePoint := common.MakeUsablePoint()
+	d.workerProcess[0].simulator.Next(serializePoint)
+	d.workerProcess[0].simulator.ClearMadePointNum()
+
 	for i := range d.workerProcess {
 		wg.Add(1)
 		go func(i int) {
-			d.workerProcess[i].StartRun(d.TimeLimit, &wg)
+			d.workerProcess[i].StartRun(d.TimeLimit, &wg, serializePoint)
 		}(i)
 	}
 	d.SyncShowStatics(d.MixMode, ctx)
@@ -544,6 +550,8 @@ type Worker struct {
 func (w *Worker) Prepare(wg *sync.WaitGroup) {
 	defer wg.Done()
 	point := common.MakeUsablePoint()
+	w.simulator.Next(point)
+	w.simulator.ClearMadePointNum()
 	for !w.simulator.Finished() {
 		err := w.runBatchAndWrite(2000, true, point)
 		if err != nil && w.Debug {
@@ -552,22 +560,21 @@ func (w *Worker) Prepare(wg *sync.WaitGroup) {
 	}
 }
 
-func (w *Worker) StartRun(timeLimit time.Duration, waitGroup *sync.WaitGroup) {
+func (w *Worker) StartRun(timeLimit time.Duration, waitGroup *sync.WaitGroup, serializePoint *common.Point) {
 	defer waitGroup.Done()
 	endTime := time.Now().Add(timeLimit)
 	switch w.Mode {
 	case "write":
-		point := common.MakeUsablePoint()
 		if timeLimit > 0 {
 			for time.Now().Before(endTime) {
-				err := w.runBatchAndWrite(w.BatchSize, false, point)
+				err := w.runBatchAndWrite(w.BatchSize, false, serializePoint)
 				if err != nil {
 					log.Error(err.Error())
 				}
 			}
 		} else {
 			for !w.simulator.Finished() {
-				err := w.runBatchAndWrite(w.BatchSize, true, point)
+				err := w.runBatchAndWrite(w.BatchSize, true, serializePoint)
 				if err != nil {
 					log.Error(err.Error())
 				}
@@ -592,33 +599,33 @@ func (w *Worker) StartRun(timeLimit time.Duration, waitGroup *sync.WaitGroup) {
 	}
 }
 
-func (d *Worker) runBatchAndWrite(batchSize int, useCountLimit bool, point *common.Point) error {
+func (d *Worker) runBatchAndWrite(batchSize int, useCountLimit bool, serializePoint *common.Point) error {
 	// var batchesSeen int64
 	// 发送http write
 
 	buf := make([]byte, 0, 1024)
 	var err error
-	var batchItemCount int = 1
+	var batchItemCount int = 0
 	var vaulesWritten int = 0
 	var pointMadeIndex int64
-	point.Reset()
-	pointMadeIndex = d.simulator.Next(point)
-	buf = d.writer.BeforeSerializePoints(buf, point)
-	buf = d.writer.SerializeAndAppendPoint(buf, point)
-	vaulesWritten += (len(point.FieldValues) + len(point.Int64FiledValues))
+	buf = d.writer.BeforeSerializePoints(buf, serializePoint)
+
+	var point = common.MakeUsablePoint()
+
+	// 以simulator.Finished()结束为结束
 	for batchItemCount < batchSize {
+		point.Reset()
+		pointMadeIndex = d.simulator.Next(point)
 		if pointMadeIndex > d.simulator.Total() && useCountLimit { // 以simulator.Finished()结束为结束
 			break
 		}
-		point.Reset()
-		pointMadeIndex = d.simulator.Next(point)
 		buf = d.writer.SerializeAndAppendPoint(buf, point)
 		batchItemCount++
 		vaulesWritten += (len(point.FieldValues) + len(point.Int64FiledValues))
 	}
 
 	if batchItemCount > 0 {
-		buf = d.writer.AfterSerializePoints(buf, point)
+		buf = d.writer.AfterSerializePoints(buf, serializePoint)
 		err = d.writeToDb(buf)
 		if err == nil {
 			d.resultCollector.AddBytes(int64(len(buf)))

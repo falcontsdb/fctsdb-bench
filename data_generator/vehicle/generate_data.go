@@ -82,7 +82,7 @@ func (g *VehicleSimulator) Total() int64 {
 }
 
 func (g *VehicleSimulator) Finished() bool {
-	return g.madePoints >= g.maxPoints
+	return atomic.LoadInt64(&g.madePoints) >= g.maxPoints
 }
 
 func (g *VehicleSimulator) SetWrittenPoints(num int64) {
@@ -102,6 +102,10 @@ func (g *VehicleSimulator) SetSqlTemplate(sqlTemplates []string) error {
 	}
 	g.sqlTemplates = templates
 	return nil
+}
+
+func (q *VehicleSimulator) ClearMadePointNum() {
+	atomic.StoreInt64(&q.madePoints, 0)
 }
 
 // Next advances a Point to the next state in the generator.

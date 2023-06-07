@@ -106,6 +106,10 @@ func (s *UniversalSimulator) SetSqlTemplate(sqlTemplates []string) error {
 	return nil
 }
 
+func (s *UniversalSimulator) ClearMadePointNum() {
+	atomic.StoreInt64(&s.madePoints, 0)
+}
+
 // Next advances a Point to the next state in the generator.
 func (s *UniversalSimulator) Next(p *common.Point) int64 {
 

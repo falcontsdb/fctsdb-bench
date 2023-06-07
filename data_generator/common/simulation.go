@@ -44,6 +44,7 @@ type Simulator interface {
 	NextSql(io.Writer) int64
 	SetWrittenPoints(int64)
 	SetSqlTemplate([]string) error
+	ClearMadePointNum()
 }
 
 // SimulatedMeasurement simulates one measurement (e.g. Redis for DevOps).

@@ -3,6 +3,7 @@ package iot
 import (
 	"fmt"
 	"io"
+	"sync/atomic"
 	"time"
 
 	. "git.querycap.com/falcontsdb/fctsdb-bench/data_generator/common"
@@ -74,6 +75,10 @@ func (g *IotSimulator) Total() int64 {
 
 func (g *IotSimulator) Finished() bool {
 	return (g.madePoints + g.skippedPoints) >= g.maxPoints
+}
+
+func (q *IotSimulator) ClearMadePointNum() {
+	atomic.StoreInt64(&q.madePoints, 0)
 }
 
 // Next advances a Point to the next state in the generator.
