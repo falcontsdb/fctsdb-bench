@@ -38,6 +38,28 @@ type DBClient interface {
 	SerializeAndAppendPoint(buf []byte, p *common.Point) []byte
 	// 3、batch的尾部内容，例如一些结束符;等等
 	AfterSerializePoints(buf []byte, p *common.Point) []byte
+
+	Close()
+}
+
+func NewDBClient(dbclientType string, conf ClientConfig) DBClient {
+	switch dbclientType {
+	case "fctsdb":
+		return NewFctsdbClient(conf)
+	case "mysql":
+		cli, err := NewMysqlClient(conf)
+		if err != nil {
+			return nil
+		}
+		return cli
+	case "influxdbv2":
+		return NewInfluxdbV2Client(conf)
+	case "matrixdb":
+		return NewMatrixdbClient(conf)
+	case "opentsdb":
+		return NewOpentsdbClient(conf)
+	}
+	return nil
 }
 
 func fastFormatAppend(v interface{}, buf []byte, singleQuotesForString bool) []byte {

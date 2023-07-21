@@ -163,28 +163,15 @@ func (d *BasicBenchTask) PrepareWorkers() {
 		User:     d.Username,
 		Password: d.Password,
 	}
-	switch d.Format {
-	case "fctsdb":
-		cli = db_client.NewFctsdbClient(miniConfig)
-	case "mysql":
-		client, err := db_client.NewMysqlClient(miniConfig)
-		if err != nil {
-			log.Fatalln("open mysql failed" + err.Error())
-		}
-		defer client.Close()
-		cli = client
-	case "influxdbv2":
-		cli = db_client.NewInfluxdbV2Client(miniConfig)
-	case "matrixdb":
-		client := db_client.NewMatrixdbClient(miniConfig)
-		defer client.Close()
-		cli = client
-	case "opentsdb":
-		cli = db_client.NewOpentsdbClient(miniConfig)
+	cli = db_client.NewDBClient(d.Format, miniConfig)
+	if cli == nil {
+		log.Fatal("create database client error")
 	}
+	defer cli.Close()
 
-	if !cli.CheckConnection(2 * time.Minute) {
-		log.Fatalln("Check connection timeout...")
+	if !cli.CheckConnection(time.Minute) {
+		log.Fatal("check connection failed")
+		os.Exit(1)
 	}
 
 	if !d.NeedPrePare && d.MixMode == "read_only" {
@@ -301,33 +288,11 @@ func (d *BasicBenchTask) prepareWorkersOnEachDB(dbName string) {
 			User:     d.Username,
 			Password: d.Password,
 		}
-		switch d.Format {
-		case "fctsdb":
-			worker.writer = db_client.NewFctsdbClient(c)
-		case "mysql":
-			cli, err := db_client.NewMysqlClient(c)
-			if err != nil {
-				log.Fatalln("open mysql failed" + err.Error())
-			}
-			worker.writer = cli
-		case "influxdbv2":
-			client := db_client.NewInfluxdbV2Client(c)
-			err := client.LoginUser()
-			if err != nil {
-				log.Fatalln("open influxdb v2 failed" + err.Error())
-			}
-			worker.writer = client
-		case "matrixdb":
-			client := db_client.NewMatrixdbClient(c)
-			err := client.LoginUser()
-			if err != nil {
-				log.Fatalln("open influxdb v2 failed" + err.Error())
-			}
-			worker.writer = client
-		case "opentsdb":
-			worker.writer = db_client.NewOpentsdbClient(c)
+		worker.writer = db_client.NewDBClient(d.Format, c)
+		if worker.writer == nil {
+			log.Fatal("create writer failed")
 		}
-
+		defer worker.writer.Close()
 		// worker的其他必要参数
 		worker.resultCollector = d.resultCollector
 		worker.Debug = d.Debug

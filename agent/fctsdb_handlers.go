@@ -10,6 +10,7 @@ import (
 	"path"
 	"runtime"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -343,7 +344,17 @@ func (f *FctsdbAgent) startDB() error {
 		log.Println("Start db failed, error: " + err.Error())
 		return err
 	} else {
-		cmd := `nohup ` + f.BinPath + ` -config ` + f.ConfigPath + ` -password ` + ` Abc_123456 ` + ` 1>/dev/null 2>&1 &`
+		version, err := GetFctsdbVersion(f.BinPath)
+		if err != nil {
+			log.Fatalln(err.Error())
+		}
+		var cmd string
+		if strings.Contains(string(version), "1.5") {
+			log.Println("当前版本为1.5")
+			cmd = `nohup ` + f.BinPath + ` -config ` + f.ConfigPath + ` 1>/dev/null 2>&1 &`
+		} else {
+			cmd = `nohup ` + f.BinPath + ` -config ` + f.ConfigPath + ` -password ` + ` Abc_123456 ` + ` 1>/dev/null 2>&1 &`
+		}
 		log.Println(cmd)
 		execCmd := exec.Command("bash", "-c", cmd)
 		execCmd.SysProcAttr = &syscall.SysProcAttr{

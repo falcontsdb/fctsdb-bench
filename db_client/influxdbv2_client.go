@@ -363,3 +363,5 @@ func (s *InfluxdbV2Client) SerializeAndAppendPoint(buf []byte, p *common.Point) 
 func (m *InfluxdbV2Client) AfterSerializePoints(buf []byte, p *common.Point) []byte {
 	return buf
 }
+
+func (m *InfluxdbV2Client) Close() {}

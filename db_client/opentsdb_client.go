@@ -256,3 +256,5 @@ func (m *OpentsdbClient) AfterSerializePoints(buf []byte, p *common.Point) []byt
 	buf = buf[:len(buf)-2]
 	return append(buf, "]\n"...)
 }
+
+func (m *OpentsdbClient) Close() {}

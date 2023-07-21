@@ -27,12 +27,13 @@ var (
 
 // FctsdbClient is a Writer that writes to a fctsdb HTTP server.
 type FctsdbClient struct {
-	client   fasthttp.Client
-	c        ClientConfig
-	writeUrl []byte
-	queryUrl []byte
-	host     []byte
-	buf      *bytes.Buffer
+	client    fasthttp.Client
+	c         ClientConfig
+	writeUrl  []byte
+	queryUrl  []byte
+	manageUrl []byte
+	host      []byte
+	buf       *bytes.Buffer
 }
 
 // NewFctsdbClient returns a new HTTPWriter from the supplied HTTPWriterConfig.
@@ -40,6 +41,7 @@ func NewFctsdbClient(c ClientConfig) *FctsdbClient {
 	var host []byte
 	writeUrl := make([]byte, 0)
 	queryUrl := make([]byte, 0)
+	manageUrl := make([]byte, 0)
 	if c.Host != "" {
 		if c.Host[len(c.Host)-1] == '/' {
 			host = []byte(c.Host)[:len(c.Host)-1]
@@ -63,23 +65,34 @@ func NewFctsdbClient(c ClientConfig) *FctsdbClient {
 		queryUrl = append(queryUrl, "/query?db="...)
 		queryUrl = fasthttp.AppendQuotedArg(queryUrl, []byte(c.Database))
 		if c.User != "" {
-			writeUrl = append(writeUrl, "&u="...)
-			writeUrl = fasthttp.AppendQuotedArg(writeUrl, []byte(c.User))
-			writeUrl = append(writeUrl, "&p="...)
-			writeUrl = fasthttp.AppendQuotedArg(writeUrl, []byte(c.Password))
+			queryUrl = append(queryUrl, "&u="...)
+			queryUrl = fasthttp.AppendQuotedArg(queryUrl, []byte(c.User))
+			queryUrl = append(queryUrl, "&p="...)
+			queryUrl = fasthttp.AppendQuotedArg(queryUrl, []byte(c.Password))
 		}
 		queryUrl = append(queryUrl, "&q="...)
+		manageUrl = append(manageUrl, host...)
+		manageUrl = append(manageUrl, "/query?"...)
+		if c.User != "" {
+			manageUrl = append(manageUrl, "u="...)
+			manageUrl = fasthttp.AppendQuotedArg(manageUrl, []byte(c.User))
+			manageUrl = append(manageUrl, "&p="...)
+			manageUrl = fasthttp.AppendQuotedArg(manageUrl, []byte(c.Password))
+			manageUrl = append(manageUrl, "&"...)
+		}
+		manageUrl = append(manageUrl, "q="...)
 	}
 	return &FctsdbClient{
 		client: fasthttp.Client{
 			Name:                "fctsdb",
 			MaxIdleConnDuration: DefaultIdleConnectionTimeout,
 		},
-		c:        c,
-		queryUrl: queryUrl,
-		writeUrl: writeUrl,
-		host:     host,
-		buf:      bytes.NewBuffer(make([]byte, 0, 8*1024)),
+		c:         c,
+		queryUrl:  queryUrl,
+		writeUrl:  writeUrl,
+		manageUrl: manageUrl,
+		host:      host,
+		buf:       bytes.NewBuffer(make([]byte, 0, 8*1024)),
 	}
 }
 
@@ -160,7 +173,7 @@ func (f *FctsdbClient) Query(body []byte) (int64, error) {
 }
 
 func (f *FctsdbClient) otherQuery(body []byte) (int, []byte, error) {
-	uri := fasthttp.AppendQuotedArg(f.queryUrl, body)
+	uri := fasthttp.AppendQuotedArg(f.manageUrl, body)
 	log.Debug(string(uri))
 	req := fasthttp.AcquireRequest()
 	defer fasthttp.ReleaseRequest(req)
@@ -298,7 +311,6 @@ func (f *FctsdbClient) CheckConnection(timeout time.Duration) bool {
 //
 // For example:
 // foo,tag0=bar baz=-1.0 100\n
-//
 func (m *FctsdbClient) BeforeSerializePoints(buf []byte, p *common.Point) []byte {
 	return buf
 }
@@ -364,3 +376,5 @@ func (s *FctsdbClient) SerializeAndAppendPoint(buf []byte, p *common.Point) []by
 func (m *FctsdbClient) AfterSerializePoints(buf []byte, p *common.Point) []byte {
 	return buf
 }
+
+func (m *FctsdbClient) Close() {}

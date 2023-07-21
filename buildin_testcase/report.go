@@ -144,6 +144,11 @@ func init() {
 	}
 
 	// 空气质量查询性能
+	performances["空气质量查询-新语句"] = &fcbenchCaseDefine{
+		Title:        "空气质量查询-新语句",
+		Document:     "测试空气质量（5个tag，8个field），v2.0版本后新加入的语句",
+		TableColumns: []interface{}{"并发数", "Sql", DataDefine{"查询(q/s)", true, false}, DataDefine{"P95(r)", false, false}},
+	}
 	performances["空气质量查询-Series变化"] = &fcbenchCaseDefine{
 		Title:        "空气质量查询-Series变化",
 		Document:     "测试空气质量（5个tag，8个field），tag in查询语句中不同series数量的性能",
