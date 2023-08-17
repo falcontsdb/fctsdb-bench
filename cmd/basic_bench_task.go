@@ -127,8 +127,6 @@ func (d *BasicBenchTask) Validate() {
 			queryCase = queryTemplate.AirQuality
 		case queryTemplate.Vehicle.CaseName:
 			queryCase = queryTemplate.Vehicle
-		case queryTemplate.Scene.CaseName:
-			queryCase = queryTemplate.Scene
 		default:
 			log.Fatal("the use-case is unsupported")
 		}
