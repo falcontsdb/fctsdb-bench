@@ -183,7 +183,7 @@ fcbench query-load --urls http://localhost:8086 --file query.txt
 
 一般情况下，我们的测试拓扑如下：
 
-测试机（fcbench-schedule） ------- 被测机（fctsdb数据库+fcbench-agent）
+<b>测试机（fcbench-schedule）</b> -------> <b>被测机（fctsdb数据库+fcbench-agent）<b>
 
 为了支持两次测试间清理数据库：fcbench agent命令提供了一种方式，可以在被测机上，开启、关闭、清理数据库。
 按照以下步骤进行测试：
@@ -203,6 +203,7 @@ fchench schedule --agent http://{被测机ip}:端口 --grafana http://10.10.2.30
 ```
 
 其中--grafana是监控前端地址, 用来拼接完整的监控地址:  http://10.10.2.30:8888/sources/1/dashboards/3?refresh=Paused&tempVars%5Bhost%5D=10.10.2.29&lower=2022-09-07T10%3A36%3A53Z&upper=2022-09-07T10%3A41%3A53Z
+
 3、使用以下命令可以将两次测试生成的csv进行对比, 并生成对比html测试报告：
 ```
 ./fcbench schedule create ~/result/fctsdb-amd/v15n.csv ~/result/fctsdb-amd/v16n.csv --out write-v15n-v16n.html
@@ -215,6 +216,7 @@ fchench schedule --agent http://{被测机ip}:端口 --grafana http://10.10.2.30
 {"Group":"车载Series变化","MixMode":"write_only","UseCase":"vehicle","Workers":64,"BatchSize":1000,"ScaleVar":1,"SamplingInterval":"1s","TimeLimit":"5s","UseGzip":1,"QueryPercent":0,"PrePareData":"","NeedPrePare":false,"Clean":true,"SqlTemplate":null}
 ```
 1. 测试用例（testcase）的参数说明
+```
 Group：分组名，主要用于后续生成报告的时候进行分组展示
 MixMode：混合方式，纯读，纯写，读写混合
 UseCase: 数据集，用于设定测试所在执行的数据集，这些数据集集成在代码中，添加特定的数据集需要在代码中添加
@@ -228,9 +230,11 @@ QueryPercent： 查询请求比例，纯写测试时为0，纯读测试时为100
 PrePareData ：准备多久的数据
 NeedPrepare：是否需要准备
 Clean：是否对当前数据库进行清理，如果为true，在用例执行前会通过agent控制数据库停止，删库，启动
-SqlTemplate：在存在查询请求的测试中生效，具体内容看下一节
 
-2. sql模板功能
+SqlTemplate：在存在查询请求的测试中生效，具体内容看下一节
+```
+
+3. sql模板功能
 在使用influxdb-comparisons工具进行测试过程中发现，它的查询语句需要在代码中添加，从而设置了该功能。例如
 ```sql
 select mean(aqi) as aqi from city_air_quality where city in '{city*6}' and time >= '{now}'-30d group by time(1d)
