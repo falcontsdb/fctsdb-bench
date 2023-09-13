@@ -1,6 +1,6 @@
 # fctsdb-bench
 fctsdb场景性能测试工具基于开源的[influxdb-comparisons](https://github.com/influxdata/influxdb-comparisons)工具重构而来。
-用于实现[海东青性能测试用例设计](https://rockontrol.yuque.com/gtoifn/zd5mco/erg0pp))的内容.
+用于实现[海东青性能测试用例设计](https://rockontrol.yuque.com/gtoifn/zd5mco/erg0pp)的内容.
 
 influxdb-comparisons工具数据生成、写入、查询等所有过程分开，每个过程一套工具。
 fctsdb-bench设计时不采用这种思想，一个fctsdb-bench工具集合了数据的生成、写入、查询语句生成、查询等所有命令
@@ -329,7 +329,7 @@ type Point struct {
 	FieldValues      []interface{}          #field值
 	Int64FiledKeys   [][]byte               #int64类型field名字，特例化，加速int64类型的转换
 	Int64FiledValues []int64                #int64类型field值，特例化，加速int64类型的转换
-	Timestamp        *time.Time             #时间搓
+	Timestamp        *time.Time             #时间戳
 }
 ```
 其中，对int64这种类型单独存储，是为了减少vehicle这种场景在大量int64的field情况下，转换成interface{}的时间消耗，提升性能。
