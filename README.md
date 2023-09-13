@@ -183,7 +183,7 @@ fcbench query-load --urls http://localhost:8086 --file query.txt
 
 一般情况下，我们的测试拓扑如下：
 
-<b>测试机（fcbench-schedule）</b> -------> <b>被测机（fctsdb数据库+fcbench-agent）<b>
+<b>测试机（fcbench-schedule）</b> -------> <b>被测机（fctsdb数据库+fcbench-agent）</b>
 
 为了支持两次测试间清理数据库：fcbench agent命令提供了一种方式，可以在被测机上，开启、关闭、清理数据库。
 按照以下步骤进行测试：
@@ -191,6 +191,7 @@ fcbench query-load --urls http://localhost:8086 --file query.txt
 1、被测机启动agent
 ```
 fcbench agent --fctsdb-path /root/fctsdb/v16n/fctsdb --fctsdb-config /root/fctsdb/configs/test.conf
+//注意agent默认监听端口为8966，可以通过option port来设置
 ```
 
 2、可以查看调度器内置的配置文件，写入到testcase.txt：
@@ -199,7 +200,7 @@ fcbench schedule list > testcase.txt
 ```
 根据需求修改testcase.txt, 根据配置文件运行多次测试, 结果会记录在一个最新时间为名字的csv中，例如benchmark_1013_173901.csv：
 ```
-fchench schedule --agent http://{被测机ip}:端口 --grafana http://10.10.2.30:8888/sources/1/dashboards/3 --config-path testcase.txt 
+fchench schedule --agent http://{被测机ip}:agent端口 --grafana http://10.10.2.30:8888/sources/1/dashboards/3 --config-path testcase.txt 
 ```
 
 其中--grafana是监控前端地址, 用来拼接完整的监控地址:  http://10.10.2.30:8888/sources/1/dashboards/3?refresh=Paused&tempVars%5Bhost%5D=10.10.2.29&lower=2022-09-07T10%3A36%3A53Z&upper=2022-09-07T10%3A41%3A53Z
