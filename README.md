@@ -177,9 +177,8 @@ fcbench query-gen --use-case vehicle --scale-var 1000 --sampling-interval 10s >>
 fcbench query-load --urls http://localhost:8086 --file query.txt
 ```
 
-###  2.5 高级功能-调度器（schedule）
-使用fcbench schedule命令可以连续执行多次测试，配合需要使用fcbench agent命令
-
+##  2.5 高级功能-调度器（schedule）
+使用fcbench schedule命令可以连续执行多次测试，配合需要使用fcbench agent命令。这也是我们团队做版本性能对比最常用的方式。
 
 一般情况下，我们的测试拓扑如下：
 
@@ -213,11 +212,12 @@ fchench schedule --agent http://{被测机ip}:agent端口 --grafana http://10.10
 <b>配置文件</b>
 
 下面介绍下配置文件中的参数和功能。
-在配置文件中，每一行表示一个测试用例（testcase）。
+在配置文件中，每一行为一个json串，用于表示一个测试用例（testcase）。
 ```
 {"Group":"车载Series变化","MixMode":"write_only","UseCase":"vehicle","Workers":64,"BatchSize":1000,"ScaleVar":1,"SamplingInterval":"1s","TimeLimit":"5s","UseGzip":1,"QueryPercent":0,"PrePareData":"","NeedPrePare":false,"Clean":true,"SqlTemplate":null}
 ```
-1. 测试用例（testcase）的参数说明
+参数说明
+---
 ```
 Group：分组名，主要用于后续生成报告的时候进行分组展示
 MixMode：混合方式，纯读，纯写，读写混合
@@ -232,11 +232,11 @@ QueryPercent： 查询请求比例，纯写测试时为0，纯读测试时为100
 PrePareData ：准备多久的数据
 NeedPrepare：是否需要准备
 Clean：是否对当前数据库进行清理，如果为true，在用例执行前会通过agent控制数据库停止，删库，启动
-
 SqlTemplate：在存在查询请求的测试中生效，具体内容看下一节
 ```
 
-2. sql模板功能
+<b>sql模板功能</b>
+-----
 在使用influxdb-comparisons工具进行测试过程中发现，它的查询语句需要在代码中添加，从而设置了该功能。例如
 ```sql
 select mean(aqi) as aqi from city_air_quality where city in '{city*6}' and time >= '{now}'-30d group by time(1d)
@@ -244,7 +244,8 @@ select mean(aqi) as aqi from city_air_quality where city in '{city*6}' and time 
 这个语句中{city*6}表示在数据库中city的tag列中任选6个值填入这个地方，'{now}'表示最新一条数据的时间。
 
    
-3. set功能
+<b>set功能</b>
+-----
 testcase.txt文件支持动态设置agent端的fctsdb数据库路径和config文件路径
 实现方式是在文件中添加内容，一个典型的例子如下：
 
@@ -255,12 +256,10 @@ $Set {"BinPath":"/root/fctsdb/fctsdb", "ConfigPath":"/root/fctsdb/config"}
 ```
 在读取配置文件后，会对配置文件中所有Set语句都进行测试，以确定Set语句中提供的BinPath和ConfigPath都是可用的。
 
-###  2.6 高级功能-mock
+### 2.6 高级功能-mock
 使用fcbench mock支持mock一个海东青数据库，用以测试环境是否达标。
 
 ## 3 代码结构
-
-
 
 ###  3.1 文档目录
 ```
@@ -398,5 +397,4 @@ cmd/main.go
 ```
 
 新加数据库，主要添加一个db_client文件
-
 
