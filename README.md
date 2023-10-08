@@ -1,6 +1,6 @@
 # fctsdb-bench
 fctsdb场景性能测试工具基于开源的[influxdb-comparisons](https://github.com/influxdata/influxdb-comparisons)工具重构而来。
-用于实现[海东青性能测试用例设计](https://rockontrol.yuque.com/gtoifn/zd5mco/erg0pp))的内容.
+用于实现[海东青性能测试用例设计](https://rockontrol.yuque.com/gtoifn/zd5mco/erg0pp)的内容.
 
 influxdb-comparisons工具数据生成、写入、查询等所有过程分开，每个过程一套工具。
 fctsdb-bench设计时不采用这种思想，一个fctsdb-bench工具集合了数据的生成、写入、查询语句生成、查询等所有命令
@@ -177,12 +177,12 @@ fcbench query-gen --use-case vehicle --scale-var 1000 --sampling-interval 10s >>
 fcbench query-load --urls http://localhost:8086 --file query.txt
 ```
 
-###  2.5 高级功能-调度器
-使用fcbench schedule命令可以连续执行多次测试，配合需要使用fcbench agent命令
+###  2.5 高级功能-调度器（schedule）
+使用fcbench schedule命令可以连续执行多次测试，配合需要使用fcbench agent命令。这也是我们团队做版本性能对比最常用的方式。
 
 一般情况下，我们的测试拓扑如下：
 
-测试机（fcbench-schedule） ------- 被测机（fctsdb数据库+fcbench-agent）
+<b>测试机（fcbench-schedule）</b> -------> <b>被测机（fctsdb数据库+fcbench-agent）</b>
 
 为了支持两次测试间清理数据库：fcbench agent命令提供了一种方式，可以在被测机上，开启、关闭、清理数据库。
 按照以下步骤进行测试：
@@ -190,6 +190,7 @@ fcbench query-load --urls http://localhost:8086 --file query.txt
 1、被测机启动agent
 ```
 fcbench agent --fctsdb-path /root/fctsdb/v16n/fctsdb --fctsdb-config /root/fctsdb/configs/test.conf
+//注意agent默认监听端口为8966，可以通过option port来设置
 ```
 
 2、可以查看调度器内置的配置文件，写入到testcase.txt：
@@ -198,15 +199,50 @@ fcbench schedule list > testcase.txt
 ```
 根据需求修改testcase.txt, 根据配置文件运行多次测试, 结果会记录在一个最新时间为名字的csv中，例如benchmark_1013_173901.csv：
 ```
-fchench schedule --agent http://{被测机ip}:端口 --grafana http://10.10.2.30:8888/sources/1/dashboards/3 --config-path testcase.txt 
+fchench schedule --agent http://{被测机ip}:agent端口 --grafana http://10.10.2.30:8888/sources/1/dashboards/3 --config-path testcase.txt 
 ```
 
 其中--grafana是监控前端地址, 用来拼接完整的监控地址:  http://10.10.2.30:8888/sources/1/dashboards/3?refresh=Paused&tempVars%5Bhost%5D=10.10.2.29&lower=2022-09-07T10%3A36%3A53Z&upper=2022-09-07T10%3A41%3A53Z
 
-<b>新增功能</b>
+3、使用以下命令可以将两次测试生成的csv进行对比, 并生成对比html测试报告：
+```
+./fcbench schedule create ~/result/fctsdb-amd/v15n.csv ~/result/fctsdb-amd/v16n.csv --out write-v15n-v16n.html
+```
 
+
+下面介绍下配置文件中的参数和功能。
+在配置文件中，每一行为一个json串，用于表示一个测试用例（testcase）。
+```
+{"Group":"车载Series变化","MixMode":"write_only","UseCase":"vehicle","Workers":64,"BatchSize":1000,"ScaleVar":1,"SamplingInterval":"1s","TimeLimit":"5s","UseGzip":1,"QueryPercent":0,"PrePareData":"","NeedPrePare":false,"Clean":true,"SqlTemplate":null}
+```
+#### 参数说明
+```
+Group：分组名，主要用于后续生成报告的时候进行分组展示
+MixMode：混合方式，纯读，纯写，读写混合
+UseCase: 数据集，用于设定测试所在执行的数据集，这些数据集集成在代码中，添加特定的数据集需要在代码中添加
+Workers：并发数
+BatchSize：写入时单体请求携带的数据量
+ScaleVar ：数据集中series数量（series，时序数据库的概念）
+SamplingInterval : 采样时间
+TimeLimit：测试持续时间
+UseGzip：请求使用的Gzip等级
+QueryPercent： 查询请求比例，纯写测试时为0，纯读测试时为100
+PrePareData ：准备多久的数据
+NeedPrepare：是否需要准备
+Clean：是否对当前数据库进行清理，如果为true，在用例执行前会通过agent控制数据库停止，删库，启动
+SqlTemplate：在存在查询请求的测试中生效，具体内容看下一节
+```
+
+#### sql模板功能
+在使用influxdb-comparisons工具进行测试过程中发现，它的查询语句需要在代码中添加，从而设置了该功能。例如
+```sql
+select mean(aqi) as aqi from city_air_quality where city in '{city*6}' and time >= '{now}'-30d group by time(1d)
+```
+这个语句中{city*6}表示在数据库中city的tag列中任选6个值填入这个地方，'{now}'表示最新一条数据的时间。
+
+   
+#### set功能
 testcase.txt文件支持动态设置agent端的fctsdb数据库路径和config文件路径
-
 实现方式是在文件中添加内容，一个典型的例子如下：
 
 ```
@@ -214,18 +250,12 @@ testcase.txt文件支持动态设置agent端的fctsdb数据库路径和config文
 $Set {"BinPath":"/root/fctsdb/fctsdb", "ConfigPath":"/root/fctsdb/config"}
 {"Group":"车载Series变化","MixMode":"write_only","UseCase":"vehicle","Workers":64,"BatchSize":1000,"ScaleVar":1000,"SamplingInterval":"1s","TimeLimit":"5s","UseGzip":1,"QueryPercent":0,"PrePareData":"","NeedPrePare":false,"Clean":true,"SqlTemplate":null}
 ```
+在读取配置文件后，会对配置文件中所有Set语句都进行测试，以确定Set语句中提供的BinPath和ConfigPath都是可用的。
 
-3、使用以下命令可以将两次测试生成的csv进行对比, 并生成对比html测试报告：
-```
-./fcbench schedule create ~/result/fctsdb-amd/v15n.csv ~/result/fctsdb-amd/v16n.csv --out write-v15n-v16n.html
-```
-
-###  2.6 高级功能-mock
+### 2.6 高级功能-mock
 使用fcbench mock支持mock一个海东青数据库，用以测试环境是否达标。
 
 ## 3 代码结构
-
-
 
 ###  3.1 文档目录
 ```
@@ -294,7 +324,7 @@ type Point struct {
 	FieldValues      []interface{}          #field值
 	Int64FiledKeys   [][]byte               #int64类型field名字，特例化，加速int64类型的转换
 	Int64FiledValues []int64                #int64类型field值，特例化，加速int64类型的转换
-	Timestamp        *time.Time             #时间搓
+	Timestamp        *time.Time             #时间戳
 }
 ```
 其中，对int64这种类型单独存储，是为了减少vehicle这种场景在大量int64的field情况下，转换成interface{}的时间消耗，提升性能。
@@ -363,5 +393,3 @@ cmd/main.go
 ```
 
 新加数据库，主要添加一个db_client文件
-
-
